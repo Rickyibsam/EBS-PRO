@@ -114,7 +114,7 @@ export default function App() {
   const moduleContent = !allowedNav.includes(active)
     ? <><h2>Access restricted</h2><p>Your assigned role ({currentRole.replaceAll("_"," ")}) does not have permission to open this module. Contact your company administrator.</p></>
     : active === "Sales" || active === "Purchases"
-      ? <TransactionsModule db={db} tenantId={organization.id} module={active} />
+      ? <TransactionsModule db={db} tenantId={organization.id} module={active} currentRole={currentRole} />
       : active === "Accounts"
         ? <AccountingModule db={db} tenantId={organization.id} />
         : active === "Price Lists"
