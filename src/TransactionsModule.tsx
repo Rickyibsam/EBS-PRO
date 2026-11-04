@@ -57,7 +57,7 @@ export default function TransactionsModule({db,tenantId,module,currentRole}:{db:
    if(!partyId)throw new Error(purchase?"Please select a supplier.":"Please select a customer.");
    const clean=lines.filter(l=>l.product_id&&l.unit_id&&Number(l.quantity)>0);
    if(!clean.length)throw new Error("Add at least one product with a valid quantity.");
-   for(const l of clean){const pu=allowedUnits(l.product_id).find(x=>x.unit_id===l.unit_id);if(!pu)throw new Error("No valid unit was found for the selected product.");const q=Number(l.quantity),rate=Number(l.rate),taxRate=Number(l.tax_rate),discountValue=Number(l.discount);if(![q,rate,taxRate,discountValue].every(Number.isFinite)||q<=0||rate<0||taxRate<0||discountValue<0)throw new Error("Quantity, rate, tax and discount must be valid non-negative values.");if(discountValue>q*rate*(1+taxRate/100))throw new Error("A line discount cannot exceed its gross amount.");}
+   for(const l of clean){const pu=allowedUnits(l.product_id).find(x=>x.unit_id===l.unit_id);if(!pu)throw new Error("No valid unit was found for the selected product.");const q=Number(l.quantity),rate=Number(l.rate),taxRate=Number(l.tax_rate),discountValue=Number(l.discount);if(![q,rate,taxRate,discountValue].every(Number.isFinite)||q<=0||rate<0||taxRate<0||discountValue<0)throw new Error("Quantity, rate, tax and discount must be valid non-negative values.");if(rate>0&&discountValue>=q*rate)throw new Error("A line discount must be lower than the pre-tax gross amount.");}
    const subtotal=clean.reduce((s,l)=>s+Number(l.quantity)*Number(l.rate),0);
    const tax=clean.reduce((s,l)=>s+Number(l.quantity)*Number(l.rate)*Number(l.tax_rate)/100,0);
    const discount=clean.reduce((s,l)=>s+Number(l.discount),0);
