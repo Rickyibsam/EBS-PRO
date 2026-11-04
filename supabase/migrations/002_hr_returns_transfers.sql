@@ -186,8 +186,8 @@ declare
 begin
   foreach t in array array['employee_attendance','employee_leaves','payroll_runs','payroll_items'] loop
     execute format('alter table public.%I enable row level security', t);
-    read_roles := array['owner','admin','manager','accounts','hr'];
-    write_roles := array['owner','admin','manager','hr'];
+    read_roles := array['owner','admin','manager','accounts'];
+    write_roles := array['owner','admin','manager'];
     execute format('create policy %I on public.%I for select to authenticated using (public.has_tenant_role(tenant_id, %L::text[]))',
       t || '_tenant_read', t, read_roles);
     execute format('create policy %I on public.%I for insert to authenticated with check (public.has_tenant_role(tenant_id, %L::text[]))',
