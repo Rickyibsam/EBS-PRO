@@ -52,7 +52,6 @@ export default function OperationsModule({db,tenantId,module}:{db:SupabaseClient
     const {data:delivery,error}=await db.from("deliveries").insert({tenant_id:tenantId,sales_order_id:form.sales_order_id,warehouse_id:form.warehouse_id,delivery_number:deliveryNo,delivery_date:form.delivery_date||new Date().toISOString().slice(0,10),driver_name:form.driver_name||null,vehicle_number:form.vehicle_number||null,status:"pending",notes:form.notes||null}).select("id").single();if(error)throw error;
     const {error:lineError}=await db.from("delivery_lines").insert(orderLines.map(x=>({tenant_id:tenantId,delivery_id:delivery.id,product_id:x.product_id,quantity_base:Number(x.quantity)*Number(x.conversion_to_base),picked_quantity_base:0,delivered_quantity_base:0})));
     if(lineError){const rollback=await db.from("deliveries").delete().eq("id",delivery.id).eq("tenant_id",tenantId);throw new Error("Delivery lines failed: "+lineError.message+(rollback.error?" Delivery header rollback failed; contact administrator.":" Delivery draft rolled back."));}
-    const {error:orderError}=await db.from("sales_orders").update({status:"dispatched"}).eq("id",form.sales_order_id).eq("tenant_id",tenantId).in("status",["approved","allocated"]);if(orderError)throw orderError;
    }else if(recovery){
     const amount=Number(form.amount);if(!form.party_id||!Number.isFinite(amount)||amount<=0)throw new Error("Select a customer or supplier and enter an amount greater than zero.");
     const {data:user}=await db.auth.getUser();const paymentNo="EBS-PAY-"+Date.now().toString().slice(-9);
@@ -63,7 +62,7 @@ export default function OperationsModule({db,tenantId,module}:{db:SupabaseClient
     const {error}=await db.from("expenses").insert({tenant_id:tenantId,expense_number:number,expense_date:form.expense_date||new Date().toISOString().slice(0,10),description:form.description.trim(),amount,payment_method:form.payment_method||"cash"});
     if(error)throw error;
    }
-   setForm({});setShowForm(false);setNotice(inventory?"Stock adjustment recorded.":receiving?"Goods receipt draft saved. Review and post it only after physical stock verification.":distribution?"Delivery draft created and order marked dispatched.":recovery?"Payment/receipt recorded.":"Expense voucher recorded.");await load();
+   setForm({});setShowForm(false);setNotice(inventory?"Stock adjustment recorded.":receiving?"Goods receipt draft saved. Review and post it only after physical stock verification.":distribution?"Delivery draft created. Order remains approved until physical dispatch is confirmed.":recovery?"Payment/receipt recorded.":"Expense voucher recorded.");await load();
   }catch(err){setNotice(err instanceof Error?err.message:"The record could not be saved.");}
   setSaving(false);
  }
