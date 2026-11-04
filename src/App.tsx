@@ -6,6 +6,7 @@ const OperationsModule = lazy(() => import("./OperationsModule"));
 const AdminModule = lazy(() => import("./AdminModule"));
 const BookerOrderModule = lazy(() => import("./BookerOrderModule"));
 const AccountingModule = lazy(() => import("./AccountingModule"));
+const ReturnsModule = lazy(() => import("./ReturnsModule"));
 const DashboardModule = lazy(() => import("./DashboardModule"));
 const PricingModule = lazy(() => import("./PricingModule"));
 const InvoiceModule = lazy(() => import("./InvoiceModule"));
@@ -17,11 +18,11 @@ const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 const db = url && key ? createClient(url, key) : null;
 
 type Organization = { id: string; name: string; city: string | null; currency: string };
-const nav = ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Customers","Products","Distribution","Recovery","Accounts","Reports","Team & Employees","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Audit Trail","Settings"];
+const nav = ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Customers","Products","Distribution","Recovery","Accounts","Reports","Team & Employees","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Sales Returns","Audit Trail","Settings"];
 const roleAccess: Record<string,string[]> = {
  owner: nav, admin: nav,
- manager: ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Customers","Products","Distribution","Recovery","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices"],
- accounts: ["Overview","Recovery","Accounts","Invoices","Reports"],
+ manager: ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Customers","Products","Distribution","Recovery","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices","Sales Returns"],
+ accounts: ["Overview","Recovery","Accounts","Invoices","Sales Returns","Reports"],
  purchase: ["Overview","Purchases","Goods Receiving","Products","Inventory","Reports"],
  sales: ["Overview","Sales","Booker App","Customers","Products","Routes","Invoices","Reports"],
  order_booker: ["Overview","Booker App","Sales","Customers","Products"],
@@ -121,6 +122,8 @@ export default function App() {
       ? <TransactionsModule db={db} tenantId={organization.id} module={active} currentRole={currentRole} />
       : active === "Accounts"
         ? <AccountingModule db={db} tenantId={organization.id} />
+        : active === "Sales Returns"
+          ? <ReturnsModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Price Lists"
           ? <PricingModule db={db} tenantId={organization.id} />
         : active === "Invoices"
