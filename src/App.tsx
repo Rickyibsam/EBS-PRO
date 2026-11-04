@@ -26,7 +26,8 @@ const roleAccess: Record<string,string[]> = {
 export default function App() {
   const [session,setSession] = useState<Session|null>(null);
   const [loading,setLoading] = useState(true);
-  const [organization,setOrganization] = useState<Organization|null>(null);\n  const [currentRole,setCurrentRole] = useState("viewer");
+  const [organization,setOrganization] = useState<Organization|null>(null);
+  const [currentRole,setCurrentRole] = useState("viewer");
   const [mode,setMode] = useState<"login"|"signup">("login");
   const [email,setEmail] = useState("");
   const [password,setPassword] = useState("");
