@@ -19,6 +19,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
   const [deliveryDate, setDeliveryDate] = useState("");
   const [notes, setNotes] = useState("");
   const [orders, setOrders] = useState<Row[]>([]);
+  const [requestId, setRequestId] = useState(() => crypto.randomUUID());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
@@ -123,7 +124,6 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       const valid = cart.filter(x => x.product_id && x.unit_id && Number.isFinite(Number(x.quantity)) && Number(x.quantity) > 0);
       if (!valid.length) throw new Error("Add at least one valid product line.");
       for (const line of valid) if (linePrice(line) == null) throw new Error("A valid price is missing for one or more product quantities. Ask sales administration to update the price list.");
-      const requestId = crypto.randomUUID();
       const { data, error } = await db.rpc("create_order_booker_order", {
         p_tenant_id: tenantId, p_route_id: routeId, p_customer_id: customerId,
         p_client_request_id: requestId, p_required_delivery_date: deliveryDate || null,
@@ -132,7 +132,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       });
       if (error) throw error;
       setNotice("Order submitted successfully. Reference: " + String(data).slice(0, 8));
-      setCart([{ product_id: "", unit_id: "", quantity: "1" }]); setNotes(""); setDeliveryDate("");
+      setCart([{ product_id: "", unit_id: "", quantity: "1" }]); setNotes(""); setDeliveryDate(""); setRequestId(crypto.randomUUID());
       await load();
     } catch (e) { setNotice(e instanceof Error ? e.message : "Order could not be submitted."); }
     setSaving(false);
