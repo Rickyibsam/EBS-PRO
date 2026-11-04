@@ -52,8 +52,8 @@ export default function WorkspaceModule({ db, tenantId, module }: { db: Supabase
     if (error) setNotice(error.message);
     else {
       const { error: linkError } = await db.from("product_units").insert({ tenant_id: tenantId, product_id: createdProduct.id, unit_id: unitId, conversion_to_base: 1, is_purchase_unit: true, is_sales_unit: true });
-      if (linkError) setNotice("Product save ho gaya, lekin unit mapping nahi bani: " + linkError.message);
-      else setNotice("Product aur base unit successfully save ho gaye.");
+      if (linkError) setNotice("Product saved, but the unit mapping could not be created: " + linkError.message);
+      else setNotice("Product and base unit saved successfully.");
       setProductForm({ sku:"", name:"", brand:"", barcode:"", min_stock:"0", unit_name:"Piece", unit_symbol:"pcs", track_batch:false, track_expiry:false }); setShowForm(false); await load();
     }
     setSaving(false);
@@ -70,7 +70,7 @@ export default function WorkspaceModule({ db, tenantId, module }: { db: Supabase
   if (!isProducts && !isParties) return <section className="module-empty"><h2>{module}</h2><p>Is module ka database-backed workflow aglay development phase mein add hoga. Existing data aur database structure ko preserve kiya ja raha hai.</p></section>;
 
   return <section className="module-page">
-    <div className="module-toolbar"><div><h2>{isProducts ? "Product Master" : partyType === "supplier" ? "Supplier Master" : "Customer Master"}</h2><p>{isProducts ? "SKU, brand, barcode aur stock controls manage karein." : "Business contacts, credit limit aur opening balance manage karein."}</p></div><button className="primary-action" onClick={() => { setShowForm(!showForm); setNotice(""); }}>{showForm ? "Close form" : isProducts ? "+ Add product" : partyType === "supplier" ? "+ Add supplier" : "+ Add customer"}</button></div>
+    <div className="module-toolbar"><div><h2>{isProducts ? "Product Master" : partyType === "supplier" ? "Supplier Master" : "Customer Master"}</h2><p>{isProducts ? "Manage SKUs, brands, barcodes, and stock controls." : "Manage business contacts, credit limits, and opening balances."}</p></div><button className="primary-action" onClick={() => { setShowForm(!showForm); setNotice(""); }}>{showForm ? "Close form" : isProducts ? "+ Add product" : partyType === "supplier" ? "+ Add supplier" : "+ Add customer"}</button></div>
     {notice && <div className="notice">{notice}</div>}
     {showForm && (isProducts ? <form className="data-form" onSubmit={saveProduct}>
       <label>SKU / Item code<input required value={productForm.sku} onChange={e=>setProductForm({...productForm,sku:e.target.value})} /></label>
