@@ -87,11 +87,18 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       if (!customerId) { setPrices([]); setListId(""); return; }
       const { data: assigned, error } = await db.from("customer_price_lists").select("price_list_id").eq("tenant_id", tenantId).eq("customer_id", customerId).limit(1);
       if (error) { if (!cancelled) setNotice(error.message); return; }
-      let selected = assigned?.[0]?.price_list_id || "";
+      const today = new Date().toISOString().slice(0,10);
+      let selected = "";
+      const assignedId = assigned?.[0]?.price_list_id;
+      if (assignedId) {
+        const { data: assignedList, error: assignedListError } = await db.from("price_lists").select("id,valid_from,valid_to").eq("tenant_id",tenantId).eq("id",assignedId).maybeSingle();
+        if (assignedListError) { if (!cancelled) setNotice(assignedListError.message); return; }
+        if (assignedList && (!assignedList.valid_from || assignedList.valid_from <= today) && (!assignedList.valid_to || assignedList.valid_to >= today)) selected = assignedList.id;
+      }
       if (!selected) {
-        const { data: defaults, error: defaultError } = await db.from("price_lists").select("id").eq("tenant_id", tenantId).eq("is_default", true).or("valid_from.is.null,valid_from.lte." + new Date().toISOString().slice(0,10)).or("valid_to.is.null,valid_to.gte." + new Date().toISOString().slice(0,10)).order("created_at", { ascending: false }).limit(1);
+        const { data: defaults, error: defaultError } = await db.from("price_lists").select("id,valid_from,valid_to").eq("tenant_id", tenantId).eq("is_default", true).order("created_at", { ascending: false });
         if (defaultError) { if (!cancelled) setNotice(defaultError.message); return; }
-        selected = defaults?.[0]?.id || "";
+        selected = (defaults || []).find(x => (!x.valid_from || x.valid_from <= today) && (!x.valid_to || x.valid_to >= today))?.id || "";
       }
       if (!selected) { if (!cancelled) { setPrices([]); setListId(""); setNotice("No active customer/default price list is configured. Contact sales administration."); } return; }
       const { data, error: priceError } = await db.from("product_prices").select("product_id,unit_id,price,min_quantity").eq("tenant_id", tenantId).eq("price_list_id", selected);
