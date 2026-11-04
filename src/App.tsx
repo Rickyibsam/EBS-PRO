@@ -34,7 +34,8 @@ export default function App() {
   const [companyName,setCompanyName] = useState("");
   const [city,setCity] = useState("");
   const [active,setActive] = useState("Overview");
-  const [busy,setBusy] = useState(false);\n  const allowedNav = roleAccess[currentRole] || roleAccess.viewer;
+  const [busy,setBusy] = useState(false);
+  const allowedNav = roleAccess[currentRole] || roleAccess.viewer;
   const [notice,setNotice] = useState("");
 
   useEffect(() => {
@@ -52,7 +53,8 @@ export default function App() {
       const {data: memberships,error} = await db.from("tenant_memberships")
         .select("tenant_id,role").eq("user_id",session.user.id).eq("is_active",true);
       if(error){if(live)setNotice(error.message);setLoading(false);return;}
-      const ids = (memberships ?? []).map(row => row.tenant_id);\n      if(live)setCurrentRole((memberships?.[0]?.role as string) || "viewer");
+      const ids = (memberships ?? []).map(row => row.tenant_id);
+      if(live)setCurrentRole((memberships?.[0]?.role as string) || "viewer");
       if(ids.length){
         const {data,error:orgError} = await db.from("organizations")
           .select("id,name,city,currency").in("id",ids).limit(1);
