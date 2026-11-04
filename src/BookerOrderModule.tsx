@@ -47,7 +47,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
         db.from("units_of_measure").select("id,name,symbol").eq("tenant_id", tenantId).order("name"),
         db.from("sales_orders").select("id,order_number,order_date,status,grand_total").eq("tenant_id", tenantId).eq("created_by", auth.user.id).eq("order_source", "order_booker").order("created_at", { ascending: false }).limit(30)
       ]);
-      const err = emp.error || prod.error || pu.error || u.error || routeAssign.error || recent.error;
+      const err = emp.error || prod.error || pu.error || u.error || recent.error;
       if (err) throw err;
       if (!emp.data) throw new Error("Your active employee profile is not linked to this login. Ask the administrator to link your employee account and branch.");
       setEmployee(emp.data); setProducts(prod.data || []); setProductUnits(pu.data || []); setUnits(u.data || []); setOrders(recent.data || []);
