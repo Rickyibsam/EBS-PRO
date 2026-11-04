@@ -120,7 +120,7 @@ export default function App() {
         : active === "Price Lists"
           ? <PricingModule db={db} tenantId={organization.id} />
         : ["Inventory","Distribution","Recovery","Reports","Goods Receiving"].includes(active)
-          ? <OperationsModule db={db} tenantId={organization.id} module={active} />
+          ? <OperationsModule db={db} tenantId={organization.id} module={active} currentRole={currentRole} />
           : ["Team & Employees","Routes","Branches & Warehouses","Booker App","Settings"].includes(active)
             ? <AdminModule db={db} tenantId={organization.id} module={active} currentRole={currentRole} />
             : active !== "Overview"
