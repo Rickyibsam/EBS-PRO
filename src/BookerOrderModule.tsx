@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 type Row = Record<string, any>;
@@ -106,7 +106,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
     const qty = Number(line.quantity);
     return prices.filter(p => p.product_id === line.product_id && p.unit_id === line.unit_id && Number(p.min_quantity) <= qty).sort((a,b) => Number(b.min_quantity)-Number(a.min_quantity))[0]?.price;
   }
-  async function submit(e: React.FormEvent) {
+  async function submit(e: FormEvent) {
     e.preventDefault(); setSaving(true); setNotice("");
     try {
       if (!employee || !routeId || !customerId || !listId) throw new Error("Select your assigned route, customer and ensure a valid price list is available.");
