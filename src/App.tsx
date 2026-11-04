@@ -11,11 +11,22 @@ const db = url && key ? createClient(url, key) : null;
 
 type Organization = { id: string; name: string; city: string | null; currency: string };
 const nav = ["Overview","Sales","Booker App","Inventory","Purchases","Customers","Products","Distribution","Recovery","Accounts","Reports","Team & Employees","Routes","Settings"];
+const roleAccess: Record<string,string[]> = {
+ owner: nav, admin: nav,
+ manager: ["Overview","Sales","Booker App","Inventory","Purchases","Customers","Products","Distribution","Recovery","Accounts","Reports","Team & Employees","Routes"],
+ accounts: ["Overview","Recovery","Accounts","Reports"],
+ purchase: ["Overview","Purchases","Products","Inventory","Reports"],
+ sales: ["Overview","Sales","Booker App","Customers","Products","Routes","Reports"],
+ order_booker: ["Overview","Booker App","Sales","Customers","Products"],
+ warehouse: ["Overview","Inventory","Distribution","Products","Purchases"],
+ cashier: ["Overview","Sales","Recovery","Accounts"],
+ viewer: ["Overview","Reports"]
+};
 
 export default function App() {
   const [session,setSession] = useState<Session|null>(null);
   const [loading,setLoading] = useState(true);
-  const [organization,setOrganization] = useState<Organization|null>(null);
+  const [organization,setOrganization] = useState<Organization|null>(null);\n  const [currentRole,setCurrentRole] = useState("viewer");
   const [mode,setMode] = useState<"login"|"signup">("login");
   const [email,setEmail] = useState("");
   const [password,setPassword] = useState("");
@@ -23,7 +34,7 @@ export default function App() {
   const [companyName,setCompanyName] = useState("");
   const [city,setCity] = useState("");
   const [active,setActive] = useState("Overview");
-  const [busy,setBusy] = useState(false);
+  const [busy,setBusy] = useState(false);\n  const allowedNav = roleAccess[currentRole] || roleAccess.viewer;
   const [notice,setNotice] = useState("");
 
   useEffect(() => {
@@ -39,9 +50,9 @@ export default function App() {
       if (!db || !session) { if(live){setOrganization(null);setLoading(false);} return; }
       setLoading(true);
       const {data: memberships,error} = await db.from("tenant_memberships")
-        .select("tenant_id").eq("user_id",session.user.id).eq("is_active",true);
+        .select("tenant_id,role").eq("user_id",session.user.id).eq("is_active",true);
       if(error){if(live)setNotice(error.message);setLoading(false);return;}
-      const ids = (memberships ?? []).map(row => row.tenant_id);
+      const ids = (memberships ?? []).map(row => row.tenant_id);\n      if(live)setCurrentRole((memberships?.[0]?.role as string) || "viewer");
       if(ids.length){
         const {data,error:orgError} = await db.from("organizations")
           .select("id,name,city,currency").in("id",ids).limit(1);
@@ -94,5 +105,5 @@ export default function App() {
 
   if(!organization)return <main className="center"><form className="setup" onSubmit={addOrganization}><div className="brandline"><div className="logo">E</div><b>EBS <em>PRO</em></b></div><small>COMPANY SETUP</small><h1>Create your business workspace</h1><p>Enter your company name and city. You will be the owner, and the Main Branch will be created automatically.</p><label>Company name<input required minLength={2} value={companyName} onChange={e=>setCompanyName(e.target.value)} placeholder="ABC Distributors"/></label><label>City<input value={city} onChange={e=>setCity(e.target.value)} placeholder="Rawalpindi"/></label>{notice&&<div className="notice">{notice}</div>}<button disabled={busy}>{busy?"Creating…":"Create company"} <span>→</span></button><a className="signout" onClick={()=>void db.auth.signOut()}>Sign out</a></form></main>;
 
-  return <div className="shell"><aside className="sidebar"><div className="brandline"><div className="logo">E</div><b>EBS <em>PRO</em><small>V.01</small></b></div><div className="org"><strong>{organization.name}</strong><small>{organization.city||"Pakistan"} · {organization.currency}</small></div><small className="caption">WORKSPACE</small><nav>{nav.map((item,i)=><button className={active===item?"selected":""} key={item} onClick={()=>setActive(item)}><span>{["⌂","▤","◉","▦","⇩","♙","▣","➜","₨","∑","▥","⚙"][i]}</span>{item}</button>)}</nav><div className="account"><b>{session.user.email}</b><button onClick={()=>void db.auth.signOut()}>Sign out ↗</button></div></aside><main className="main"><header><span>EBS PRO / <b>{active}</b></span><span className="live">● WORKSPACE CONNECTED</span></header><section className="content">{active === "Sales" || active === "Purchases" ? <TransactionsModule db={db} tenantId={organization.id} module={active} /> : ["Inventory","Distribution","Recovery","Accounts","Reports"].includes(active) ? <OperationsModule db={db} tenantId={organization.id} module={active} /> : ["Team & Employees","Routes","Booker App","Settings"].includes(active) ? <AdminModule db={db} tenantId={organization.id} module={active} /> : active !== "Overview" ? <WorkspaceModule db={db} tenantId={organization.id} module={active} /> : <><small>BUSINESS OVERVIEW</small><h1>{active==="Overview"?"Welcome to your workspace":active}</h1><p>Your wholesale and distribution operations, in one connected system.</p><div className="stats">{[["Total sales","PKR 0.00","Sales invoices"],["Outstanding","PKR 0.00","Customer recovery"],["Stock items","0","Product master"],["Orders today","0","Sales & booker orders"]].map(([a,b,c])=><article key={a}><small>{a}</small><strong>{b}</strong><span>{c}</span></article>)}</div><div className="panels"><article><h3>Getting started</h3><p>Next setup tasks for {organization.name}</p>{["Add product categories, units and products","Create customer and supplier accounts","Set up warehouse and opening stock","Assign bookers to routes and customers"].map((s,i)=><div className="task" key={s}><b>0{i+1}</b>{s}<span>→</span></div>)}</article><article><h3>Quick actions</h3><p>Common daily operations</p>{["New sales order","Add customer","Add product","Receive purchase"].map((s,i)=><button className="quick" key={s} onClick={()=>setActive(["Sales","Customers","Products","Purchases"][i])}>{["＋","♙","▣","⇩"][i]}　{s}<span>→</span></button>)}</article></div><footer>EBS PRO V.01 <span>Wholesale & Distribution Management</span><span>Pakistan · PKR</span></footer></>}</section></main></div>;
+  return <div className="shell"><aside className="sidebar"><div className="brandline"><div className="logo">E</div><b>EBS <em>PRO</em><small>V.01</small></b></div><div className="org"><strong>{organization.name}</strong><small>{organization.city||"Pakistan"} · {organization.currency}</small></div><small className="caption">WORKSPACE</small><nav>{nav.filter(item=>allowedNav.includes(item)).map((item,i)=><button className={active===item?"selected":""} key={item} onClick={()=>setActive(item)}><span>{["⌂","▤","◉","▦","⇩","♙","▣","➜","₨","∑","▥","⚙"][i]}</span>{item}</button>)}</nav><div className="account"><b>{session.user.email}</b><button onClick={()=>void db.auth.signOut()}>Sign out ↗</button></div></aside><main className="main"><header><span>EBS PRO / <b>{active}</b></span><span className="live">● {currentRole.replaceAll("_"," ").toUpperCase()} ACCESS</span></header><section className="content">{!allowedNav.includes(active)?<><h2>Access restricted</h2><p>Your assigned role ({currentRole.replaceAll("_"," ")}) does not have permission to open this module. Contact your company administrator.</p></>:active === "Sales" || active === "Purchases" ? <TransactionsModule db={db} tenantId={organization.id} module={active} /> : ["Inventory","Distribution","Recovery","Accounts","Reports"].includes(active) ? <OperationsModule db={db} tenantId={organization.id} module={active} /> : ["Team & Employees","Routes","Booker App","Settings"].includes(active) ? <AdminModule db={db} tenantId={organization.id} module={active} currentRole={currentRole} /> : active !== "Overview" ? <WorkspaceModule db={db} tenantId={organization.id} module={active} /> : <><small>BUSINESS OVERVIEW</small><h1>{active==="Overview"?"Welcome to your workspace":active}</h1><p>Your wholesale and distribution operations, in one connected system.</p><div className="stats">{[["Total sales","PKR 0.00","Sales invoices"],["Outstanding","PKR 0.00","Customer recovery"],["Stock items","0","Product master"],["Orders today","0","Sales & booker orders"]].map(([a,b,c])=><article key={a}><small>{a}</small><strong>{b}</strong><span>{c}</span></article>)}</div><div className="panels"><article><h3>Getting started</h3><p>Next setup tasks for {organization.name}</p>{["Add product categories, units and products","Create customer and supplier accounts","Set up warehouse and opening stock","Assign bookers to routes and customers"].map((s,i)=><div className="task" key={s}><b>0{i+1}</b>{s}<span>→</span></div>)}</article><article><h3>Quick actions</h3><p>Common daily operations</p>{["New sales order","Add customer","Add product","Receive purchase"].map((s,i)=><button className="quick" key={s} onClick={()=>setActive(["Sales","Customers","Products","Purchases"][i])}>{["＋","♙","▣","⇩"][i]}　{s}<span>→</span></button>)}</article></div><footer>EBS PRO V.01 <span>Wholesale & Distribution Management</span><span>Pakistan · PKR</span></footer></>}</section></main></div>;
 }
