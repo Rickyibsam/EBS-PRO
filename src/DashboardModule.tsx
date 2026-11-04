@@ -3,8 +3,8 @@ import type {SupabaseClient} from "@supabase/supabase-js";
 type Metric={label:string;value:string;detail:string};
 export default function DashboardModule({db,tenantId,company,onNavigate}:{db:SupabaseClient;tenantId:string;company:string;onNavigate:(module:string)=>void}){
  const [metrics,setMetrics]=useState<Metric[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState("");
- useEffect(()=>{let active=true;async function load(){setLoading(true);setError("");try{const today=new Date().toISOString().slice(0,10);const [sales,orders,purchases,products,customers,suppliers,receipts,stock,deliveries]=await Promise.all([
- db.from("sales_orders").select("id,grand_total,status,order_date",{count:"exact"}).eq("tenant_id",tenantId).gte("order_date",today+"T00:00:00").lt("order_date",today+"T23:59:59.999"),
+ useEffect(()=>{let active=true;async function load(){setLoading(true);setError("");try{const now=new Date();const fmt=(d:Date)=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");const today=fmt(now);const tomorrow=fmt(new Date(now.getFullYear(),now.getMonth(),now.getDate()+1));const [sales,orders,purchases,products,customers,suppliers,receipts,stock,deliveries]=await Promise.all([
+ db.from("sales_orders").select("id,grand_total,status,order_date",{count:"exact"}).eq("tenant_id",tenantId).gte("order_date",today).lt("order_date",tomorrow),
  db.from("sales_orders").select("id",{count:"exact",head:true}).eq("tenant_id",tenantId).in("status",["draft","submitted","approved","allocated"]),
  db.from("purchase_orders").select("id",{count:"exact",head:true}).eq("tenant_id",tenantId),
  db.from("products").select("id",{count:"exact",head:true}).eq("tenant_id",tenantId).eq("is_active",true),
