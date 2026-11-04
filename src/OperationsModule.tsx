@@ -60,9 +60,8 @@ export default function OperationsModule({db,tenantId,module,currentRole}:{db:Su
     const {data:user}=await db.auth.getUser();if(form.payment_type==="receipt"&&form.sales_invoice_id){const {error}=await db.rpc("record_invoice_receipt",{p_invoice_id:form.sales_invoice_id,p_amount:amount,p_method:form.method||"cash",p_reference_no:form.reference_no||null,p_notes:form.notes||null});if(error)throw error;}else{const {error}=await db.rpc("record_party_payment",{p_party_id:form.party_id,p_payment_type:form.payment_type||"receipt",p_amount:amount,p_method:form.method||"cash",p_reference_no:form.reference_no||null,p_notes:form.notes||null});if(error)throw error;}
    }else if(accounts){
     const amount=Number(form.amount);if(!form.description?.trim()||!Number.isFinite(amount)||amount<=0)throw new Error("Enter a description and an amount greater than zero.");
-    const number="EBS-EXP-"+Date.now().toString().slice(-9);
-    const {error}=await db.from("expenses").insert({tenant_id:tenantId,expense_number:number,expense_date:form.expense_date||new Date().toISOString().slice(0,10),description:form.description.trim(),amount,payment_method:form.payment_method||"cash"});
-    if(error)throw error;
+     const {error}=await db.rpc("record_expense",{p_tenant_id:tenantId,p_description:form.description.trim(),p_amount:amount,p_payment_method:form.payment_method||"cash",p_expense_date:form.expense_date||new Date().toISOString().slice(0,10),p_branch_id:null});
+     if(error)throw error;
    }
    setForm({});setShowForm(false);setNotice(inventory?"Stock adjustment recorded.":receiving?"Goods receipt draft saved. Review and post it only after physical stock verification.":distribution?"Delivery draft created. Order remains approved until physical dispatch is confirmed.":recovery?"Payment/receipt recorded.":"Expense voucher recorded.");await load();
   }catch(err){setNotice(err instanceof Error?err.message:"The record could not be saved.");}
