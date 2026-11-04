@@ -25,7 +25,7 @@ const roleAccess: Record<string,string[]> = {
  sales: ["Overview","Sales","Booker App","Customers","Products","Routes","Invoices","Reports"],
  order_booker: ["Overview","Booker App","Sales","Customers","Products"],
  warehouse: ["Overview","Inventory","Distribution","Goods Receiving","Stock Transfers","Products","Purchases"],
- cashier: ["Overview","Sales","Recovery","Accounts","Invoices"],
+ cashier: ["Overview","Sales","Invoices"],
  viewer: ["Overview","Reports"]
 };
 
