@@ -8,21 +8,22 @@ import AccountingModule from "./AccountingModule";
 import DashboardModule from "./DashboardModule";
 import PricingModule from "./PricingModule";
 import InvoiceModule from "./InvoiceModule";
+import TransfersModule from "./TransfersModule";
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 const db = url && key ? createClient(url, key) : null;
 
 type Organization = { id: string; name: string; city: string | null; currency: string };
-const nav = ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Customers","Products","Distribution","Recovery","Accounts","Reports","Team & Employees","Routes","Branches & Warehouses","Price Lists","Invoices","Settings"];
+const nav = ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Customers","Products","Distribution","Recovery","Accounts","Reports","Team & Employees","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Settings"];
 const roleAccess: Record<string,string[]> = {
  owner: nav, admin: nav,
- manager: ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Customers","Products","Distribution","Recovery","Accounts","Reports","Routes","Price Lists","Invoices"],
+ manager: ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Customers","Products","Distribution","Recovery","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices"],
  accounts: ["Overview","Recovery","Accounts","Invoices","Reports"],
  purchase: ["Overview","Purchases","Goods Receiving","Products","Inventory","Reports"],
  sales: ["Overview","Sales","Booker App","Customers","Products","Routes","Invoices","Reports"],
  order_booker: ["Overview","Booker App","Sales","Customers","Products"],
- warehouse: ["Overview","Inventory","Distribution","Goods Receiving","Products","Purchases"],
+ warehouse: ["Overview","Inventory","Distribution","Goods Receiving","Stock Transfers","Products","Purchases"],
  cashier: ["Overview","Sales","Recovery","Accounts","Invoices"],
  viewer: ["Overview","Reports"]
 };
@@ -122,6 +123,8 @@ export default function App() {
           ? <PricingModule db={db} tenantId={organization.id} />
         : active === "Invoices"
           ? <InvoiceModule db={db} tenantId={organization.id} />
+        : active === "Stock Transfers"
+          ? <TransfersModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : ["Inventory","Distribution","Recovery","Reports","Goods Receiving"].includes(active)
           ? <OperationsModule db={db} tenantId={organization.id} module={active} currentRole={currentRole} />
           : ["Team & Employees","Routes","Branches & Warehouses","Booker App","Settings"].includes(active)
