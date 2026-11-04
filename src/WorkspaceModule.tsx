@@ -12,7 +12,7 @@ export default function WorkspaceModule({ db, tenantId, module }: { db: Supabase
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
-  const [productForm, setProductForm] = useState({ sku: "", name: "", brand: "", barcode: "", min_stock: "0", track_batch: false, track_expiry: false });
+  const [productForm, setProductForm] = useState({ sku: "", name: "", brand: "", barcode: "", min_stock: "0", unit_name: "Piece", unit_symbol: "pcs", track_batch: false, track_expiry: false });
   const [partyForm, setPartyForm] = useState({ party_code: "", party_type: "customer", name: "", contact_person: "", phone: "", city: "", credit_limit: "0", opening_balance: "0" });
 
   const isProducts = module === "Products";
@@ -38,9 +38,24 @@ export default function WorkspaceModule({ db, tenantId, module }: { db: Supabase
 
   async function saveProduct(e: FormEvent) {
     e.preventDefault(); setSaving(true); setNotice("");
-    const { error } = await db.from("products").insert({ tenant_id: tenantId, sku: productForm.sku.trim(), name: productForm.name.trim(), brand: productForm.brand.trim() || null, barcode: productForm.barcode.trim() || null, min_stock: Number(productForm.min_stock) || 0, track_batch: productForm.track_batch, track_expiry: productForm.track_expiry });
+    const unitName = productForm.unit_name.trim() || "Piece";
+    const unitSymbol = productForm.unit_symbol.trim() || "pcs";
+    const { data: existingUnit, error: unitReadError } = await db.from("units_of_measure").select("id").eq("tenant_id", tenantId).eq("symbol", unitSymbol).maybeSingle();
+    if (unitReadError) { setNotice(unitReadError.message); setSaving(false); return; }
+    let unitId = existingUnit?.id as string | undefined;
+    if (!unitId) {
+      const { data: createdUnit, error: unitError } = await db.from("units_of_measure").insert({ tenant_id: tenantId, name: unitName, symbol: unitSymbol, unit_type: "quantity", decimal_places: 3 }).select("id").single();
+      if (unitError) { setNotice(unitError.message); setSaving(false); return; }
+      unitId = createdUnit.id;
+    }
+    const { data: createdProduct, error } = await db.from("products").insert({ tenant_id: tenantId, sku: productForm.sku.trim(), name: productForm.name.trim(), brand: productForm.brand.trim() || null, barcode: productForm.barcode.trim() || null, base_unit_id: unitId, min_stock: Number(productForm.min_stock) || 0, track_batch: productForm.track_batch, track_expiry: productForm.track_expiry }).select("id").single();
     if (error) setNotice(error.message);
-    else { setProductForm({ sku:"", name:"", brand:"", barcode:"", min_stock:"0", track_batch:false, track_expiry:false }); setShowForm(false); await load(); }
+    else {
+      const { error: linkError } = await db.from("product_units").insert({ tenant_id: tenantId, product_id: createdProduct.id, unit_id: unitId, conversion_to_base: 1, is_purchase_unit: true, is_sales_unit: true });
+      if (linkError) setNotice("Product save ho gaya, lekin unit mapping nahi bani: " + linkError.message);
+      else setNotice("Product aur base unit successfully save ho gaye.");
+      setProductForm({ sku:"", name:"", brand:"", barcode:"", min_stock:"0", unit_name:"Piece", unit_symbol:"pcs", track_batch:false, track_expiry:false }); setShowForm(false); await load();
+    }
     setSaving(false);
   }
 
@@ -62,6 +77,8 @@ export default function WorkspaceModule({ db, tenantId, module }: { db: Supabase
       <label>Product name<input required value={productForm.name} onChange={e=>setProductForm({...productForm,name:e.target.value})} /></label>
       <label>Brand<input value={productForm.brand} onChange={e=>setProductForm({...productForm,brand:e.target.value})} /></label>
       <label>Barcode<input value={productForm.barcode} onChange={e=>setProductForm({...productForm,barcode:e.target.value})} /></label>
+      <label>Base unit name<input required value={productForm.unit_name} onChange={e=>setProductForm({...productForm,unit_name:e.target.value})} /></label>
+      <label>Unit symbol<input required value={productForm.unit_symbol} onChange={e=>setProductForm({...productForm,unit_symbol:e.target.value})} /></label>
       <label>Minimum stock<input type="number" min="0" step="0.001" value={productForm.min_stock} onChange={e=>setProductForm({...productForm,min_stock:e.target.value})} /></label>
       <label className="check-label"><input type="checkbox" checked={productForm.track_batch} onChange={e=>setProductForm({...productForm,track_batch:e.target.checked})}/> Track batches</label>
       <label className="check-label"><input type="checkbox" checked={productForm.track_expiry} onChange={e=>setProductForm({...productForm,track_expiry:e.target.checked})}/> Track expiry</label>
