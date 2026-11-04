@@ -38,8 +38,7 @@ export default function OperationsModule({db,tenantId,module}:{db:SupabaseClient
    const {data:user}=await db.auth.getUser();
    if(inventory){
     const qty=Number(form.quantity),cost=Number(form.unit_cost||0);if(!form.product_id||!form.warehouse_id||!Number.isFinite(qty)||qty<=0)throw new Error("Select a product, warehouse and a quantity greater than zero.");
-    const inward=form.direction==="in";
-    const {error}=await db.from("stock_movements").insert({tenant_id:tenantId,product_id:form.product_id,warehouse_id:form.warehouse_id,movement_type:"adjustment",quantity_in:inward?qty:0,quantity_out:inward?0:qty,unit_cost:cost,batch_number:form.batch_number||null,expiry_date:form.expiry_date||null,notes:form.notes||"Manual stock adjustment",created_by:user.user?.id??null});
+    const {error}=await db.rpc("adjust_stock",{p_tenant_id:tenantId,p_warehouse_id:form.warehouse_id,p_product_id:form.product_id,p_direction:form.direction==="in"?"in":"out",p_quantity:qty,p_unit_cost:cost,p_batch_number:form.batch_number||null,p_expiry_date:form.expiry_date||null,p_notes:form.notes||"Manual stock adjustment"});
     if(error)throw error;
    }else if(receiving){
     if(!form.purchase_order_id||!form.warehouse_id||!receivingLines.length)throw new Error("Select a purchase order, warehouse and at least one received line.");
