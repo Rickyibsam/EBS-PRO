@@ -29,7 +29,9 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
   const estimate = useMemo(() => cart.reduce((sum, line) => {
     const qty = Number(line.quantity);
     const candidates = prices.filter(p => p.product_id === line.product_id && p.unit_id === line.unit_id && Number(p.min_quantity) <= qty).sort((a,b) => Number(b.min_quantity)-Number(a.min_quantity));
-    return sum + (candidates[0] ? qty * Number(candidates[0].price) : 0);
+    const product = products.find(p => p.id === line.product_id);
+    const subtotal = candidates[0] ? qty * Number(candidates[0].price) : 0;
+    return sum + subtotal + subtotal * Number(product?.sales_tax_rate || 0) / 100;
   }, 0), [cart, prices]);
 
   async function load() {
@@ -38,19 +40,20 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       const { data: auth, error: authError } = await db.auth.getUser();
       if (authError) throw authError;
       if (!auth.user) throw new Error("Please sign in again.");
-      const [emp, prod, pu, u, routeAssign, recent] = await Promise.all([
+      const [emp, prod, pu, u, recent] = await Promise.all([
         db.from("employees").select("id,employee_code,full_name,branch_id").eq("tenant_id", tenantId).eq("user_id", auth.user.id).eq("employment_status", "active").maybeSingle(),
         db.from("products").select("id,sku,name,sales_tax_rate").eq("tenant_id", tenantId).eq("is_active", true).order("name"),
         db.from("product_units").select("product_id,unit_id,conversion_to_base,is_sales_unit").eq("tenant_id", tenantId).eq("is_sales_unit", true),
         db.from("units_of_measure").select("id,name,symbol").eq("tenant_id", tenantId).order("name"),
-        db.from("route_assignments").select("id,route_id,assigned_from,assigned_to").eq("tenant_id", tenantId).eq("employee_id", (await db.from("employees").select("id").eq("tenant_id",tenantId).eq("user_id",auth.user.id).eq("employment_status","active").maybeSingle()).data?.id || "00000000-0000-0000-0000-000000000000"),
         db.from("sales_orders").select("id,order_number,order_date,status,grand_total").eq("tenant_id", tenantId).eq("created_by", auth.user.id).eq("order_source", "order_booker").order("created_at", { ascending: false }).limit(30)
       ]);
       const err = emp.error || prod.error || pu.error || u.error || routeAssign.error || recent.error;
       if (err) throw err;
       if (!emp.data) throw new Error("Your active employee profile is not linked to this login. Ask the administrator to link your employee account and branch.");
       setEmployee(emp.data); setProducts(prod.data || []); setProductUnits(pu.data || []); setUnits(u.data || []); setOrders(recent.data || []);
-      const assignments = (routeAssign.data || []).filter(x => x.assigned_from <= new Date().toISOString().slice(0,10) && (!x.assigned_to || x.assigned_to >= new Date().toISOString().slice(0,10)));
+      const { data: routeAssign, error: assignmentError } = await db.from("route_assignments").select("id,route_id,assigned_from,assigned_to").eq("tenant_id", tenantId).eq("employee_id", emp.data.id);
+      if (assignmentError) throw assignmentError;
+      const assignments = (routeAssign || []).filter(x => x.assigned_from <= new Date().toISOString().slice(0,10) && (!x.assigned_to || x.assigned_to >= new Date().toISOString().slice(0,10)));
       if (!assignments.length) { setRoutes([]); throw new Error("No active sales route is assigned to your employee account."); }
       const routeResult = await db.from("sales_routes").select("id,route_code,name,area_description").eq("tenant_id", tenantId).in("id", assignments.map(x => x.route_id)).eq("is_active", true).order("name");
       if (routeResult.error) throw routeResult.error;
@@ -153,7 +156,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
           <button type="button" onClick={() => setCart(old => old.length === 1 ? [{product_id:"",unit_id:"",quantity:"1"}] : old.filter((_,n)=>n!==i))}>Remove line</button>
         </div>;
       })}
-      <div className="table-tools"><button type="button" onClick={() => setCart(old => [...old,{product_id:"",unit_id:"",quantity:"1"}])}>+ Add product</button><strong>Estimated total: {money(estimate)}</strong></div>
+      <div className="table-tools"><button type="button" onClick={() => setCart(old => [...old,{product_id:"",unit_id:"",quantity:"1"}])}>+ Add product</button><strong>Estimated total (incl. product tax): {money(estimate)}</strong></div>
       <label>Order notes<textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional delivery instructions"/></label>
       <button disabled={saving || !prices.length}>{saving ? "Submitting order…" : "Submit order"}</button>
       <p className="module-footnote">Orders are submitted using the database's assigned-route, customer, active price-list and duplicate-request checks. Final approval and stock dispatch remain with authorized office/warehouse staff.</p>
