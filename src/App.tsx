@@ -1,15 +1,15 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, lazy, Suspense, useEffect, useState } from "react";
 import { createClient, Session } from "@supabase/supabase-js";
-import WorkspaceModule from "./WorkspaceModule";
-import TransactionsModule from "./TransactionsModule";
-import OperationsModule from "./OperationsModule";
-import AdminModule from "./AdminModule";
-import AccountingModule from "./AccountingModule";
-import DashboardModule from "./DashboardModule";
-import PricingModule from "./PricingModule";
-import InvoiceModule from "./InvoiceModule";
-import TransfersModule from "./TransfersModule";
-import AuditModule from "./AuditModule";
+const WorkspaceModule = lazy(() => import("./WorkspaceModule"));
+const TransactionsModule = lazy(() => import("./TransactionsModule"));
+const OperationsModule = lazy(() => import("./OperationsModule"));
+const AdminModule = lazy(() => import("./AdminModule"));
+const AccountingModule = lazy(() => import("./AccountingModule"));
+const DashboardModule = lazy(() => import("./DashboardModule"));
+const PricingModule = lazy(() => import("./PricingModule"));
+const InvoiceModule = lazy(() => import("./InvoiceModule"));
+const TransfersModule = lazy(() => import("./TransfersModule"));
+const AuditModule = lazy(() => import("./AuditModule"));
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
@@ -136,5 +136,5 @@ export default function App() {
               ? <WorkspaceModule db={db} tenantId={organization.id} module={active} />
               : <DashboardModule db={db} tenantId={organization.id} company={organization.name} onNavigate={setActive} />;
 
-  return <div className="shell"><aside className="sidebar"><div className="brandline"><div className="logo">E</div><b>EBS <em>PRO</em><small>V.01</small></b></div><div className="org"><strong>{organization.name}</strong><small>{organization.city||"Pakistan"} · {organization.currency}</small></div><small className="caption">WORKSPACE</small><nav>{nav.filter(item=>allowedNav.includes(item)).map((item,i)=><button className={active===item?"selected":""} key={item} onClick={()=>setActive(item)}><span>{["⌂","▤","◉","▦","⇩","♙","▣","➜","₨","∑","▥","⚙"][i]}</span>{item}</button>)}</nav><div className="account"><b>{session.user.email}</b><button onClick={()=>void db.auth.signOut()}>Sign out ↗</button></div></aside><main className="main"><header><span>EBS PRO / <b>{active}</b></span><span className="live">● {currentRole.replaceAll("_"," ").toUpperCase()} ACCESS</span></header><section className="content">{moduleContent}</section></main></div>;
+  return <div className="shell"><aside className="sidebar"><div className="brandline"><div className="logo">E</div><b>EBS <em>PRO</em><small>V.01</small></b></div><div className="org"><strong>{organization.name}</strong><small>{organization.city||"Pakistan"} · {organization.currency}</small></div><small className="caption">WORKSPACE</small><nav>{nav.filter(item=>allowedNav.includes(item)).map((item,i)=><button className={active===item?"selected":""} key={item} onClick={()=>setActive(item)}><span>{["⌂","▤","◉","▦","⇩","♙","▣","➜","₨","∑","▥","⚙"][i]}</span>{item}</button>)}</nav><div className="account"><b>{session.user.email}</b><button onClick={()=>void db.auth.signOut()}>Sign out ↗</button></div></aside><main className="main"><header><span>EBS PRO / <b>{active}</b></span><span className="live">● {currentRole.replaceAll("_"," ").toUpperCase()} ACCESS</span></header><section className="content"><Suspense fallback={<div className="table-empty">Loading module…</div>}>{moduleContent}</Suspense></section></main></div>;
 }
