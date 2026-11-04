@@ -4,6 +4,7 @@ const WorkspaceModule = lazy(() => import("./WorkspaceModule"));
 const TransactionsModule = lazy(() => import("./TransactionsModule"));
 const OperationsModule = lazy(() => import("./OperationsModule"));
 const AdminModule = lazy(() => import("./AdminModule"));
+const BookerOrderModule = lazy(() => import("./BookerOrderModule"));
 const AccountingModule = lazy(() => import("./AccountingModule"));
 const DashboardModule = lazy(() => import("./DashboardModule"));
 const PricingModule = lazy(() => import("./PricingModule"));
@@ -130,7 +131,9 @@ export default function App() {
           ? <AuditModule db={db} tenantId={organization.id} />
         : ["Inventory","Distribution","Recovery","Reports","Goods Receiving"].includes(active)
           ? <OperationsModule db={db} tenantId={organization.id} module={active} currentRole={currentRole} />
-          : ["Team & Employees","Routes","Branches & Warehouses","Booker App","Settings"].includes(active)
+          : active === "Booker App" && currentRole === "order_booker"
+            ? <BookerOrderModule db={db} tenantId={organization.id} />
+        : ["Team & Employees","Routes","Branches & Warehouses","Booker App","Settings"].includes(active)
             ? <AdminModule db={db} tenantId={organization.id} module={active} currentRole={currentRole} />
             : active !== "Overview"
               ? <WorkspaceModule db={db} tenantId={organization.id} module={active} />
