@@ -8,7 +8,7 @@ type ProductUnit={id:string;product_id:string;unit_id:string;conversion_to_base:
 type Line={product_id:string;unit_id:string;quantity:string;rate:string;tax_rate:string;discount:string};
 type Header={id:string;order_number:string;order_date:string;status:string;grand_total:number};
 
-export default function TransactionsModule({db,tenantId,module}:{db:SupabaseClient;tenantId:string;module:string}){
+export default function TransactionsModule({db,tenantId,module,currentRole}:{db:SupabaseClient;tenantId:string;module:string;currentRole:string}){
  const purchase=module==="Purchases";
  const table=purchase?"purchase_orders":"sales_orders";
  const [products,setProducts]=useState<Product[]>([]);
@@ -48,6 +48,7 @@ export default function TransactionsModule({db,tenantId,module}:{db:SupabaseClie
  function changeLine(i:number,key:keyof Line,value:string){setLines(old=>old.map((r,n)=>n===i?{...r,[key]:value,...(key==="product_id"?{unit_id:allowedUnits(value)[0]?.unit_id??""}:{})}:r));}
  const total=useMemo(()=>lines.reduce((s,l)=>{const base=(Number(l.quantity)||0)*(Number(l.rate)||0);return s+base+base*(Number(l.tax_rate)||0)/100-(Number(l.discount)||0);},0),[lines]);
  const filtered=rows.filter(r=>r.order_number.toLowerCase().includes(search.toLowerCase())||r.status.toLowerCase().includes(search.toLowerCase()));
+ async function approve(id:string){setNotice("");try{const {data:user}=await db.auth.getUser();const {error}=await db.from(table).update({status:"approved",approved_by:user.user?.id??null}).eq("id",id).eq("tenant_id",tenantId).in("status",["draft","submitted"]);if(error)throw error;setNotice("Document approved.");await loadAll();}catch(e){setNotice(e instanceof Error?e.message:"Approval failed. Check your database permissions.");}}
  async function save(e:FormEvent){
   e.preventDefault();setSaving(true);setNotice("");
   try{
@@ -85,7 +86,7 @@ export default function TransactionsModule({db,tenantId,module}:{db:SupabaseClie
    {!products.length&&<small>Add products and their purchase/sales units in Product Master first.</small>}
   </form>}
   <div className="table-tools"><input placeholder="Search document number or status…" value={search} onChange={e=>setSearch(e.target.value)}/><span>{filtered.length} records</span><button onClick={()=>void loadAll()}>↻ Refresh</button></div>
-  {loading?<div className="table-empty">Loading transactions…</div>:<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Document</th><th>Date</th><th>Status</th><th>Total</th></tr></thead><tbody>{filtered.map(r=><tr key={r.id}><td>{r.order_number}</td><td>{new Date(r.order_date).toLocaleDateString("en-PK")}</td><td><span className="status-active">{r.status}</span></td><td>{money(r.grand_total)}</td></tr>)}{!filtered.length&&<tr><td colSpan={4} className="table-empty">No records found.</td></tr>}</tbody></table></div>}
+  {loading?<div className="table-empty">Loading transactions…</div>:<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Document</th><th>Date</th><th>Status</th><th>Total</th><th>Workflow</th></tr></thead><tbody>{filtered.map(r=><tr key={r.id}><td>{r.order_number}</td><td>{new Date(r.order_date).toLocaleDateString("en-PK")}</td><td><span className="status-active">{r.status}</span></td><td>{money(r.grand_total)}</td><td>{["owner","admin","manager"].includes(currentRole)&&["draft","submitted"].includes(r.status)?<button onClick={()=>void approve(r.id)}>Approve</button>:"—"}</td></tr>)}{!filtered.length&&<tr><td colSpan={5} className="table-empty">No records found.</td></tr>}</tbody></table></div>}
   <p className="module-footnote">Orders are saved as drafts. Stock is not changed until a verified receiving/dispatch posting workflow is implemented.</p>
  </section>;
 }
