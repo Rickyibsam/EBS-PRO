@@ -57,7 +57,7 @@ export default function App() {
     e.preventDefault(); if(!db)return; setBusy(true);setNotice("");
     try {
       if(mode==="signup"){
-        const {data,error}=await db.auth.signUp({email,password,options:{data:{full_name:fullName}}});
+        const {data,error}=await db.auth.signUp({email,password,options:{data:{full_name:fullName},emailRedirectTo:window.location.origin}});
         if(error)throw error;
         if(!data.session)setNotice("Account ban gaya. Email confirmation complete karein, phir sign in karein.");
         else setSession(data.session);
