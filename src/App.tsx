@@ -6,16 +6,17 @@ import OperationsModule from "./OperationsModule";
 import AdminModule from "./AdminModule";
 import AccountingModule from "./AccountingModule";
 import DashboardModule from "./DashboardModule";
+import PricingModule from "./PricingModule";
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 const db = url && key ? createClient(url, key) : null;
 
 type Organization = { id: string; name: string; city: string | null; currency: string };
-const nav = ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Customers","Products","Distribution","Recovery","Accounts","Reports","Team & Employees","Routes","Branches & Warehouses","Settings"];
+const nav = ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Customers","Products","Distribution","Recovery","Accounts","Reports","Team & Employees","Routes","Branches & Warehouses","Price Lists","Settings"];
 const roleAccess: Record<string,string[]> = {
  owner: nav, admin: nav,
- manager: ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Customers","Products","Distribution","Recovery","Accounts","Reports","Routes"],
+ manager: ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Customers","Products","Distribution","Recovery","Accounts","Reports","Routes","Price Lists"],
  accounts: ["Overview","Recovery","Accounts","Reports"],
  purchase: ["Overview","Purchases","Goods Receiving","Products","Inventory","Reports"],
  sales: ["Overview","Sales","Booker App","Customers","Products","Routes","Reports"],
@@ -116,6 +117,8 @@ export default function App() {
       ? <TransactionsModule db={db} tenantId={organization.id} module={active} />
       : active === "Accounts"
         ? <AccountingModule db={db} tenantId={organization.id} />
+        : active === "Price Lists"
+          ? <PricingModule db={db} tenantId={organization.id} />
         : ["Inventory","Distribution","Recovery","Reports","Goods Receiving"].includes(active)
           ? <OperationsModule db={db} tenantId={organization.id} module={active} />
           : ["Team & Employees","Routes","Branches & Warehouses","Booker App","Settings"].includes(active)
