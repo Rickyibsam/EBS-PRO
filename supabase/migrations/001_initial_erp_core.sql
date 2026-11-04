@@ -323,8 +323,8 @@ begin
     execute format('alter table public.%I enable row level security', t);
     execute format(
       'create policy %I on public.%I for all to authenticated using ' ||
-      '(exists (select 1 from public.tenant_memberships m where m.organization_id = organization_id and m.user_id = (select auth.uid()) and m.is_active)) ' ||
-      'with check (exists (select 1 from public.tenant_memberships m where m.organization_id = organization_id and m.user_id = (select auth.uid()) and m.is_active))',
+      '(exists (select 1 from public.tenant_memberships m where m.organization_id = public.' || quote_ident(t) || '.organization_id and m.user_id = (select auth.uid()) and m.is_active)) ' ||
+      'with check (exists (select 1 from public.tenant_memberships m where m.organization_id = public.' || quote_ident(t) || '.organization_id and m.user_id = (select auth.uid()) and m.is_active))',
       t || '_tenant_access', t
     );
   end loop;
