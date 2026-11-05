@@ -1,7 +1,7 @@
 export type OfflineDeliveryVisit = {
   id:string; idempotency_key:string; vehicle_number:string; user_id:string; tenant_id:string; delivery_id:string; delivery_man_employee_id:string; customer_id:string;
   visit_status:string; shops_visited:number; line_quantities:Array<Record<string,unknown>>;
-  notes:string|null; created_by:string|null; queued_at:string;
+  notes:string|null; created_by:string|null; queued_at:string; proof_of_delivery_signature?:Array<{x:number;y:number;move:boolean}>;
 };
 export type DeliverySnapshot = {id:string;tenant_id:string;user_id:string;data:Record<string,unknown>;updated_at:string};
 const DB_NAME="ebs-pro-delivery-offline";const QUEUE="pending-visits";const SNAPSHOTS="delivery-snapshots";
