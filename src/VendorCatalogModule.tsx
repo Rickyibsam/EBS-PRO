@@ -35,7 +35,7 @@ export default function VendorCatalogModule({db,tenantId,currentRole}:{db:Supaba
   <div className="module-toolbar"><div><h2>Vendor Feeding & Vendor Product Catalog</h2><p>Vendor-wise SKU mapping, vendor item codes, latest purchase cost, minimum order quantities and lead times.</p></div>{canEdit&&<button className="primary-action" onClick={()=>setShow(!show)}>{show?"Close form":"+ Feed vendor product"}</button>}</div>
   {notice&&<div className="notice">{notice}</div>}
   {show&&<form className="data-form" onSubmit={save}>
-   <label>Vendor / Vendor<select required value={form.supplier_id} onChange={e=>setForm({...form,supplier_id:e.target.value})}><option value="">Select vendor</option>{vendors.map(x=><option key={x.id} value={x.id}>{x.party_code} · {x.name}</option>)}</select></label>
+   <label>Vendor<select required value={form.supplier_id} onChange={e=>setForm({...form,supplier_id:e.target.value})}><option value="">Select vendor</option>{vendors.map(x=><option key={x.id} value={x.id}>{x.party_code} · {x.name}</option>)}</select></label>
    <label>Product / SKU<select required value={form.product_id} onChange={e=>{const p=products.find(x=>x.id===e.target.value);setForm({...form,product_id:e.target.value,purchase_cost:String(p?.cost_price??0)});}}><option value="">Select product</option>{products.map(x=><option key={x.id} value={x.id}>{x.sku} · {x.name}</option>)}</select></label>
    <label>Vendor item code<input value={form.supplier_item_code} onChange={e=>setForm({...form,supplier_item_code:e.target.value})}/></label>
    <label>Purchase cost (PKR)<input required type="number" min="0" step="0.0001" value={form.purchase_cost} onChange={e=>setForm({...form,purchase_cost:e.target.value})}/></label>
