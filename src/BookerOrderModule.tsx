@@ -63,7 +63,9 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       const routeResult = await db.from("sales_routes").select("id,route_code,name,area_description").eq("tenant_id", tenantId).in("id", assignments.map(x => x.route_id)).eq("is_active", true).order("name");
       if (routeResult.error) throw routeResult.error;
       setRoutes(routeResult.data || []);
+      const effectiveRouteId=routeId||routeResult.data?.[0]?.id||"";
       if (!routeId && routeResult.data?.[0]) setRouteId(routeResult.data[0].id);
+      await cacheBookerSnapshot(tenantId,{employee:emp.data,products:prod.data||[],productUnits:pu.data||[],units:u.data||[],orders:recent.data||[],routes:routeResult.data||[],routeId:effectiveRouteId});
     } catch (e) {
       if(!navigator.onLine){
         try{const cached=await getBookerSnapshot(tenantId);const d=cached?.data;if(d){setEmployee((d.employee as Row)||null);setProducts((d.products as Row[])||[]);setProductUnits((d.productUnits as Row[])||[]);setUnits((d.units as Row[])||[]);setOrders((d.orders as Row[])||[]);setRoutes((d.routes as Row[])||[]);setRouteId(String(d.routeId||""));setCustomers((d.customers as Row[])||[]);setCustomerId(String(d.customerId||""));setPrices((d.prices as Row[])||[]);setListId(String(d.listId||""));setNotice("Offline mode: using the last saved route, customer list and price list. Orders will sync when online.");}else setNotice("Offline and no saved Booker catalogue is available on this device. Connect once to cache route data.");}
