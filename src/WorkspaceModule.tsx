@@ -8,6 +8,7 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
   const [products, setProducts] = useState<Product[]>([]);
   const [parties, setParties] = useState<Party[]>([]);
   const [categories,setCategories] = useState<Array<{id:string;name:string}>>([]);
+  const [unitCache,setUnitCache]=useState<Array<{id:string;name:string;symbol:string}>>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
@@ -85,6 +86,7 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
     const productWrite=editingProductId?await db.from("products").update(productPayload).eq("tenant_id",tenantId).eq("id",editingProductId).select("id").single():await db.from("products").insert({tenant_id:tenantId,...productPayload}).select("id").single();
     const createdProduct=productWrite.data;const error=productWrite.error;
     if (error) setNotice(error.message);
+    else if (!createdProduct) setNotice("Product save returned no record. Please refresh and check the SKU.");
     else {
       const { data:baseMapping }=await db.from("product_units").select("id").eq("tenant_id",tenantId).eq("product_id",createdProduct.id).eq("unit_id",unitId).maybeSingle();
       const baseWrite=baseMapping?await db.from("product_units").update({conversion_to_base:1,is_purchase_unit:true,is_sales_unit:true}).eq("id",baseMapping.id):await db.from("product_units").insert({tenant_id:tenantId,product_id:createdProduct.id,unit_id:unitId,conversion_to_base:1,is_purchase_unit:true,is_sales_unit:true});
