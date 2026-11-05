@@ -16,7 +16,7 @@ const launchers=[
  {title:"10. Administration & Security",description:"User access, roles, login history, settings and voucher controls",icon:"⚙",modules:["Team & Employees","Login History","Settings","Voucher Revision History","Audit Trail"]}
 ];
 export default function DashboardModule({db,tenantId,company,allowedModules,onNavigate}:{db:SupabaseClient;tenantId:string;company:string;allowedModules:string[];onNavigate:(module:string)=>void}){
- const [metrics,setMetrics]=useState<Metric[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState("");
+ const [metrics,setMetrics]=useState<Metric[]>([]),[recentActivity,setRecentActivity]=useState<any[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState("");
  const [updatedAt,setUpdatedAt]=useState("");
  const [expandedLauncher,setExpandedLauncher]=useState("1. Dashboard & Management");
  useEffect(()=>{let live=true;async function load(){setLoading(true);setError("");try{
@@ -33,12 +33,12 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
    db.from("payments").select("amount,payment_type").eq("tenant_id",tenantId).eq("payment_date",today),
    db.from("deliveries").select("id",{count:"exact",head:true}).eq("tenant_id",tenantId).in("status",["pending","picked","dispatched"]),
    db.rpc("get_low_stock_alerts",{p_tenant_id:tenantId}),
-   db.from("audit_logs").select("id",{count:"exact",head:true}).eq("tenant_id",tenantId).gte("created_at",since),
+   db.from("audit_logs").select("id,action,entity_type,created_at",{count:"exact"}).eq("tenant_id",tenantId).gte("created_at",since).order("created_at",{ascending:false}).limit(6),
    db.rpc("get_inventory_valuation",{p_tenant_id:tenantId}),
    db.from("chart_of_accounts").select("id,account_type").eq("tenant_id",tenantId),
    db.from("journal_lines").select("account_id,debit,credit,journal_entries!inner(entry_date,status)").eq("tenant_id",tenantId).eq("journal_entries.status","posted").eq("journal_entries.entry_date",today)
   ]);
-  const err=[sales,orders,purchases,purchaseInvoices,products,customers,vendors,receipts,deliveries].find(x=>x.error);if(err)throw err.error;
+  const err=[sales,salesPeriod,orders,purchases,purchaseInvoices,products,customers,vendors,receipts,deliveries].find(x=>x.error);if(err)throw err.error;
   const daySales=(sales.data??[]).reduce((s,x)=>s+Number(x.grand_total||0),0);
   const weekSales=(salesPeriod.data??[]).filter(x=>x.invoice_date>=weekStart).reduce((s,x)=>s+Number(x.grand_total||0),0);
   const monthSales=(salesPeriod.data??[]).reduce((s,x)=>s+Number(x.grand_total||0),0);
@@ -65,7 +65,7 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
    {label:"Vendors",value:String(vendors.count??0),detail:"Active supplier accounts",icon:"⌂",tone:"amber"},
    {label:"Activity (24h)",value:activityCount===null?"—":String(activityCount),detail:activityCount===null?"Not available for this role":"Recorded audit events",icon:"◷",tone:"blue"}
   ];
-  if(live){setMetrics(next);setUpdatedAt(now.toLocaleTimeString("en-PK",{hour:"2-digit",minute:"2-digit"}));}
+  if(live){setMetrics(next);setRecentActivity(activity.data??[]);setUpdatedAt(now.toLocaleTimeString("en-PK",{hour:"2-digit",minute:"2-digit"}));}
  }catch(e){if(live)setError(e instanceof Error?e.message:"Dashboard could not load.");}finally{if(live)setLoading(false);}}
  void load();return()=>{live=false;};
  },[db,tenantId]);
@@ -77,6 +77,7 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
   <div className="dashboard-section-head"><div><span className="section-kicker">LIVE PERFORMANCE</span><h2>Business snapshot</h2><p>Posted invoices, open workflows and current stock signals</p></div><button className="dashboard-refresh" onClick={()=>window.location.reload()}>↻ Refresh view</button></div>
   {error&&<div className="notice">{error}</div>}
   {loading?<div className="dashboard-loading"><span className="loading-pulse"/> Reading live business data…</div>:<div className="ai-metric-grid">{metrics.map(m=><article className="ai-metric" key={m.label}><div className={"metric-icon "+m.tone}>{m.icon}</div><div className="metric-label">{m.label}</div><strong>{m.value}</strong><small>{m.detail}</small><span className="metric-glow"/></article>)}</div>}
+  {recentActivity.length>0&&<section className="recent-activity"><div className="dashboard-section-head"><div><span className="section-kicker">AUDIT STREAM</span><h2>Recent activity</h2><p>Latest recorded workspace events</p></div><button className="dashboard-refresh" onClick={()=>onNavigate("Audit Trail")}>Open audit trail →</button></div><div className="recent-activity-list">{recentActivity.map(item=><div key={item.id}><span className="activity-dot">•</span><b>{String(item.action||"Activity").replaceAll("_"," ")}</b><span>{item.entity_type||"Business record"}</span><time>{new Date(item.created_at).toLocaleString("en-PK",{dateStyle:"short",timeStyle:"short"})}</time></div>)}</div></section>}
   <div className="dashboard-lower"><article className="pulse-card"><div className="pulse-heading"><span className="pulse-spark">✦</span><div><small>SMART BUSINESS PULSE</small><h3>Operations insight</h3></div><span className="pulse-live">LIVE</span></div><p>{loading?"Preparing your operations summary…":pulse}</p><div className="pulse-actions"><button onClick={()=>onNavigate(low>0?"Inventory":pending>0?"Distribution":"Sales")}>{low>0?"Review stock alerts":pending>0?"Review deliveries":"Open sales workspace"} <span>→</span></button><button onClick={()=>onNavigate("Reports")}>View reports <span>→</span></button></div></article>
    <article className="focus-card"><div><small>QUICK CREATE</small><h3>Start a workflow</h3><p>Jump into a frequently used task.</p></div><div className="focus-actions"><button onClick={()=>onNavigate("Sales")}>＋ New sales order</button><button onClick={()=>onNavigate("Customers")}>＋ Add customer</button><button onClick={()=>onNavigate("Products")}>＋ Add product</button><button onClick={()=>onNavigate("Purchases")}>＋ Purchase order</button></div></article></div>
   <div className="dashboard-section-head launcher-head"><div><span className="section-kicker">WORKSPACE</span><h2>Explore modules</h2><p>Choose a business area to open its tools</p></div></div>
