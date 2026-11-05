@@ -13,7 +13,7 @@ const InvoiceModule = lazy(() => import("./InvoiceModule"));
 const TransfersModule = lazy(() => import("./TransfersModule"));
 const AuditModule = lazy(() => import("./AuditModule"));
 const VendorCatalogModule = lazy(() => import("./VendorCatalogModule"));
-const PayrollModule = lazy(() => import("./PayrollModule"));
+const PayrollModule = lazy(() => import("./PayrollModule"));\nconst TargetsModule = lazy(() => import("./TargetsModule"));
 const PurchaseInvoiceModule = lazy(() => import("./PurchaseInvoiceModule"));
 const PurchaseReturnsModule = lazy(() => import("./PurchaseReturnsModule"));
 
@@ -22,10 +22,10 @@ const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 const db = url && key ? createClient(url, key) : null;
 
 type Organization = { id: string; name: string; city: string | null; currency: string };
-const nav = ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Recovery","Accounts","Reports","Team & Employees","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Audit Trail","Booker Product Access","Settings"];
+const nav = ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Recovery","Accounts","Reports","Team & Employees","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Audit Trail","Booker Product Access","Targets & Incentives","Settings"];
 const roleAccess: Record<string,string[]> = {
  owner: nav, admin: nav,
- manager: ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Recovery","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Booker Product Access"],
+ manager: ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Recovery","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Booker Product Access","Targets & Incentives"],
  accounts: ["Overview","Recovery","Accounts","Invoices","Vendor Invoices","Purchase Returns","Sales Returns","Payroll","Reports"],
  purchase: ["Overview","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Vendors","Products","Inventory","Vendor Feeding","Reports"],
  sales: ["Overview","Sales","Booker App","Customers","Products","Routes","Invoices","Sales Returns","Reports","Booker Product Access"],
