@@ -14,7 +14,7 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
    const {data:emp,error:empError}=await db.from("employees").select("id,full_name,employee_code").eq("tenant_id",tenantId).eq("user_id",user.user.id).maybeSingle();
    if(empError)throw empError;if(!emp)throw new Error("Your login is not linked to an active deliveryman employee record. Ask the administrator to link your staff account.");
    setEmployee(emp);
-   const {data:d,error:dError}=await db.from("deliveries").select("id,delivery_number,sales_order_id,delivery_date,status,route_id").eq("tenant_id",tenantId).eq("delivery_man_employee_id",emp.id).order("delivery_date",{ascending:false}).limit(100);
+   const {data:d,error:dError}=await db.from("deliveries").select("id,delivery_number,sales_order_id,delivery_date,status,route_id,vehicle_number").eq("tenant_id",tenantId).eq("delivery_man_employee_id",emp.id).order("delivery_date",{ascending:false}).limit(100);
    if(dError)throw dError;const deliveryRows=d??[];setDeliveries(deliveryRows);
    const ids=deliveryRows.map(x=>x.sales_order_id),deliveryIds=deliveryRows.map(x=>x.id);
    if(ids.length){
@@ -45,7 +45,7 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
   try{
    const pending=await getQueuedDeliveryVisits(tenantId);
    for(const item of pending){
-    const {error}=await db.from("delivery_shop_visits").upsert({tenant_id:item.tenant_id,delivery_id:item.delivery_id,delivery_man_employee_id:item.delivery_man_employee_id,customer_id:item.customer_id,visit_status:item.visit_status,shops_visited:item.shops_visited,line_quantities:item.line_quantities,notes:item.notes,created_by:item.created_by},{onConflict:"tenant_id,delivery_id"});
+    const {error}=await db.rpc("record_van_delivery_visit",{p_delivery_id:item.delivery_id,p_visit_status:item.visit_status,p_line_quantities:item.line_quantities,p_notes:item.notes,p_idempotency_key:item.idempotency_key});
     if(error)throw error;
     await removeQueuedDeliveryVisit(item.id);
    }
@@ -60,20 +60,20 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
    if(!d||!o)throw new Error("Select one of your assigned deliveries.");
    const {data:user}=await db.auth.getUser();
    const selectedLines=lines.filter(x=>x.delivery_id===d.id);
-   const quantityReport=selectedLines.map(x=>({delivery_line_id:x.id,product_id:x.product_id,picked_quantity_base:Number(x.picked_quantity_base||0),delivered_quantity_base:Number(lineQuantities[x.id]?.delivered||0),market_return_quantity_base:Number(lineQuantities[x.id]?.marketReturn||0)}));
+   const quantityReport=selectedLines.map(x=>({delivery_line_id:x.id,product_id:x.product_id,picked_quantity_base:Number(x.picked_quantity_base||0),delivered_quantity_base:Number(lineQuantities[x.id]?.delivered??x.picked_quantity_base??0),market_return_quantity_base:Number(lineQuantities[x.id]?.marketReturn||0),return_batch_number:lineQuantities[x.id]?.returnBatch||null,return_expiry_date:lineQuantities[x.id]?.returnExpiry||null}));
    for(const q of quantityReport){if(!Number.isFinite(q.delivered_quantity_base)||q.delivered_quantity_base<0||q.delivered_quantity_base>q.picked_quantity_base)throw new Error("Delivered quantity must be between zero and picked quantity.");if(!Number.isFinite(q.market_return_quantity_base)||q.market_return_quantity_base<0||q.market_return_quantity_base>q.delivered_quantity_base)throw new Error("Market return quantity cannot exceed delivered quantity.");}
-   const payload={tenant_id:tenantId,delivery_id:d.id,delivery_man_employee_id:employee.id,customer_id:o.customer_id,visit_status:form.visit_status,shops_visited:1,line_quantities:quantityReport,notes:form.notes.trim()||null,created_by:user.user?.id??null};
+   const payload={idempotency_key:crypto.randomUUID(),vehicle_number:d.vehicle_number||"",tenant_id:tenantId,delivery_id:d.id,delivery_man_employee_id:employee.id,customer_id:o.customer_id,visit_status:form.visit_status,shops_visited:1,line_quantities:quantityReport,notes:form.notes.trim()||null,created_by:user.user?.id??null,queued_at:new Date().toISOString()};
    if(!navigator.onLine){
-    await queueDeliveryVisit({id:crypto.randomUUID(),...payload,created_by:payload.created_by||null,queued_at:new Date().toISOString()});
+    await queueDeliveryVisit({...payload,id:crypto.randomUUID(),created_by:payload.created_by||null});
     setNotice("No internet: delivery visit safely queued on this device. It will sync when connection returns.");
    }else{
-    const {error}=await db.from("delivery_shop_visits").upsert(payload,{onConflict:"tenant_id,delivery_id"});
+    const {error}=await db.rpc("record_van_delivery_visit",{p_delivery_id:d.id,p_visit_status:form.visit_status,p_line_quantities:quantityReport,p_notes:form.notes.trim()||null,p_idempotency_key:payload.idempotency_key});
     if(error){
      if(/fetch|network|offline|connection/i.test(error.message||"")){
-      await queueDeliveryVisit({id:crypto.randomUUID(),...payload,created_by:payload.created_by||null,queued_at:new Date().toISOString()});
+      await queueDeliveryVisit({...payload,id:crypto.randomUUID(),created_by:payload.created_by||null});
       setNotice("Connection interrupted: delivery visit queued for automatic synchronization.");
      }else throw error;
-    }else setNotice("Shop visit saved. Delivered quantities and invoice are finalized by the warehouse/manager confirmation.");
+    }else setNotice("Delivery completion saved. Van stock was reduced for sold quantities and customer returns were added back to the van with batch/expiry traceability. Create/post the customer invoice through the invoice workflow.");
    }setForm({delivery_id:"",visit_status:"delivered",notes:""});setLineQuantities({});if(navigator.onLine)await load();
   }catch(e){setNotice(e instanceof Error?e.message:"Shop visit could not be saved.");}
   setSaving(false);
@@ -90,12 +90,12 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
     {!deliveries.length&&<tr><td colSpan={6} className="table-empty">No deliveries are currently assigned to your account.</td></tr>}
    </tbody></table></div>
    <form className="transaction-form" onSubmit={saveVisit}><h3>Record customer shop visit</h3><div className="form-grid">
-    <label>Assigned delivery / customer<select required value={form.delivery_id} onChange={e=>setForm(x=>({...x,delivery_id:e.target.value}))}><option value="">Select delivery</option>{deliveries.map(d=><option key={d.id} value={d.id}>{d.delivery_number} · {customerFor(d)?.name||orders.find(o=>o.id===d.sales_order_id)?.order_number||"Customer"}</option>)}</select></label>
+    <label>Assigned delivery / customer<select required value={form.delivery_id} onChange={e=>{const id=e.target.value;setForm(x=>({...x,delivery_id:id}));const d=deliveries.find(x=>x.id===id);setLineQuantities(Object.fromEntries(lines.filter(x=>x.delivery_id===id).map(x=>[x.id,{delivered:String(x.picked_quantity_base||0),marketReturn:"0",returnBatch:"",returnExpiry:""}])));}}><option value="">Select delivery</option>{deliveries.map(d=><option key={d.id} value={d.id}>{d.delivery_number} · {customerFor(d)?.name||orders.find(o=>o.id===d.sales_order_id)?.order_number||"Customer"} · {d.vehicle_number||"No vehicle"}</option>)}</select></label>
     <label>Visit result<select value={form.visit_status} onChange={e=>setForm(x=>({...x,visit_status:e.target.value}))}><option value="delivered">Delivered</option><option value="short_delivered">Short delivered</option><option value="not_available">Shop not available</option><option value="market_return">Market return</option><option value="refused">Customer refused</option></select></label>
     <label>Notes<input value={form.notes} onChange={e=>setForm(x=>({...x,notes:e.target.value}))} placeholder="Reason, returned items, customer remarks"/></label>
-   </div><button disabled={saving||!form.delivery_id}>{saving?"Saving…":"Save shop visit"}</button></form>
+   </div>{selectedDeliveryLines.map(line=>{const p=products.find(x=>x.id===line.product_id),q=lineQuantities[line.id]||{delivered:String(line.picked_quantity_base||0),marketReturn:"0",returnBatch:"",returnExpiry:""};return <div className="form-grid" key={line.id}><label>{p?.name||p?.sku||"Product"} · Picked {line.picked_quantity_base}<input type="number" min="0" max={line.picked_quantity_base} step="0.001" value={q.delivered} onChange={e=>setLineQuantities(x=>({...x,[line.id]:{...q,delivered:e.target.value}}))}/></label><label>Customer return quantity<input type="number" min="0" max={q.delivered||0} step="0.001" value={q.marketReturn} onChange={e=>setLineQuantities(x=>({...x,[line.id]:{...q,marketReturn:e.target.value}}))}/></label>{Number(q.marketReturn)>0&&<><label>Return batch number<input value={q.returnBatch} onChange={e=>setLineQuantities(x=>({...x,[line.id]:{...q,returnBatch:e.target.value}}))}/></label><label>Return expiry date<input type="date" value={q.returnExpiry} onChange={e=>setLineQuantities(x=>({...x,[line.id]:{...q,returnExpiry:e.target.value}}))}/></label></>}</div>})}<button disabled={saving||!form.delivery_id||deliveries.find(x=>x.id===form.delivery_id)?.status!=="dispatched"}>{saving?"Saving…":"Save delivery & stock movements"}</button></form>
    <h3>Visit history</h3><div className="data-table-wrap"><table className="data-table"><thead><tr><th>Date</th><th>Delivery</th><th>Customer</th><th>Result</th><th>Notes</th></tr></thead><tbody>{visits.map(v=><tr key={v.id}><td>{new Date(v.visit_at).toLocaleString("en-PK")}</td><td>{deliveries.find(d=>d.id===v.delivery_id)?.delivery_number||"—"}</td><td>{customers.find(c=>c.id===v.customer_id)?.name||"—"}</td><td>{v.visit_status.replaceAll("_"," ")}{Array.isArray(v.line_quantities)&&v.line_quantities.length>0?<div>{v.line_quantities.map((q:Row,i:number)=><div key={i}>Delivered {q.delivered_quantity_base} · Market return {q.market_return_quantity_base}</div>)}</div>:null}</td><td>{v.notes||"—"}</td></tr>)}{!visits.length&&<tr><td colSpan={5} className="table-empty">No visits recorded yet.</td></tr>}</tbody></table></div>
   </>}
-  <p className="module-footnote">Assigned delivery data is cached locally for offline viewing on this device. Visit updates are queued and replayed with the tenant+delivery unique key when online. Final inventory issue, returns and invoice posting remain controlled by warehouse/manager confirmation.</p>
+  <p className="module-footnote">Assigned delivery data is cached locally for offline viewing on this device. Visit updates are queued and replayed with the tenant+delivery unique key when online. Delivered quantities and returns now post to the van ledger transactionally; invoice posting remains in the existing invoice workflow.</p>
  </section>;
 }
