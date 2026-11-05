@@ -15,6 +15,7 @@ export function resolveAllowedNavigation(
  if(role==="admin")return nav.filter(item=>item!=="User Permissions");
  const baseline=roleAccess[role]||roleAccess.viewer||[];
  return nav.filter(item=>{
+  if(item==="User Permissions")return false;
   const groupIndex=groups.findIndex(group=>group.items.includes(item));
   const key=MODULE_KEYS[groupIndex];
   return key&&Object.prototype.hasOwnProperty.call(overrides,key)?overrides[key]:baseline.includes(item);
