@@ -16,6 +16,10 @@ export default function AccountingModule({ db, tenantId }: { db: SupabaseClient;
   const [cashAccounts,setCashAccounts]=useState<Row[]>([]);
   const [cashRows,setCashRows]=useState<Row[]>([]);
   const [cashAccountId,setCashAccountId]=useState("");
+  const [cashRecons,setCashRecons]=useState<Row[]>([]);
+  const [statementDate,setStatementDate]=useState(new Date().toISOString().slice(0,10));
+  const [statementBalance,setStatementBalance]=useState("0");
+  const [reconNotes,setReconNotes]=useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
@@ -78,14 +82,22 @@ export default function AccountingModule({ db, tenantId }: { db: SupabaseClient;
     setCashAccounts(accountsData||[]);
     if(!accountsData?.length){setNotice("Cash and bank control accounts are not configured.");return;}
     const ids=accountsData.map(x=>x.id);
-    const [j,l]=await Promise.all([
+    const [j,l,r]=await Promise.all([
       db.from("journal_entries").select("id,journal_number,entry_date,narration").eq("tenant_id",tenantId).eq("status","posted").order("entry_date",{ascending:true}).limit(5000),
-      db.from("journal_lines").select("journal_entry_id,account_id,debit,credit,memo").eq("tenant_id",tenantId).in("account_id",ids).limit(20000)
+      db.from("journal_lines").select("journal_entry_id,account_id,debit,credit,memo").eq("tenant_id",tenantId).in("account_id",ids).limit(20000),
+      db.from("bank_reconciliations").select("id,account_id,statement_date,statement_balance,book_balance,difference,notes,created_at").eq("tenant_id",tenantId).order("statement_date",{ascending:false}).limit(100)
     ]);
-    if(j.error||l.error){setNotice(j.error?.message||l.error?.message||"Cashbook could not be loaded.");return;}
+    if(j.error||l.error||r.error){setNotice(j.error?.message||l.error?.message||r.error?.message||"Cashbook could not be loaded.");return;}
     const jm=new Map((j.data||[]).map(x=>[x.id,x])),am=new Map(accountsData.map(x=>[x.id,x]));
-    setCashRows((l.data||[]).filter(x=>jm.has(x.journal_entry_id)).map(x=>({...x,...jm.get(x.journal_entry_id),...(am.get(x.account_id)||{})})).sort((a,b)=>String(a.entry_date).localeCompare(String(b.entry_date))||String(a.journal_number).localeCompare(String(b.journal_number))));
+    setCashRows((l.data||[]).filter(x=>jm.has(x.journal_entry_id)).map(x=>({...x,...jm.get(x.journal_entry_id),...(am.get(x.account_id)||{})})).sort((a,b)=>String(a.entry_date).localeCompare(String(b.entry_date))||String(a.journal_number).localeCompare(String(b.journal_number))));setCashRecons(r.data||[]);
     if(!cashAccountId)setCashAccountId(ids[0]);
+  }
+
+  async function saveReconciliation(){
+    const amount=Number(statementBalance);if(!cashAccountId||!statementDate||!Number.isFinite(amount)){setNotice("Select an account and enter a valid statement balance.");return;}
+    const book=cashRows.filter(x=>x.account_id===cashAccountId).reduce((n,x)=>n+Number(x.debit||0)-Number(x.credit||0),0);
+    const {error}=await db.from("bank_reconciliations").insert({tenant_id:tenantId,account_id:cashAccountId,statement_date:statementDate,statement_balance:amount,book_balance:book,difference:amount-book,notes:reconNotes.trim()||null});
+    if(error)setNotice(error.message);else{setNotice("Bank/cash reconciliation snapshot saved.");setReconNotes("");await loadCashBook();}
   }
 
   async function postJournal(id: string) {
@@ -213,6 +225,8 @@ export default function AccountingModule({ db, tenantId }: { db: SupabaseClient;
       {(()=>{const code=ledgerType==="customer"?"1100":"2000";const items=ledgerRows.filter(x=>x.account_code===code&&(!selectedParty||x.party_id===selectedParty)).slice().sort((a,b)=>String(a.entry_date).localeCompare(String(b.entry_date))||String(a.journal_number).localeCompare(String(b.journal_number)));const debit=items.reduce((n,x)=>n+Number(x.debit||0),0),credit=items.reduce((n,x)=>n+Number(x.credit||0),0),balance=ledgerType==="customer"?debit-credit:credit-debit;return <><div className="stats report-stats"><article><small>Total debits</small><strong>{money(debit)}</strong></article><article><small>Total credits</small><strong>{money(credit)}</strong></article><article><small>{ledgerType==="customer"?"Receivable":"Payable"} balance</small><strong>{money(balance)}</strong></article></div><div className="data-table-wrap"><table className="data-table"><thead><tr><th>Date</th><th>Party</th><th>Journal</th><th>Description</th><th>Debit</th><th>Credit</th><th>Running balance</th></tr></thead><tbody>{items.map((x,i)=>{const p=ledgerParties.find(y=>y.id===x.party_id);const prior=items.slice(0,i+1).reduce((n,y)=>n+(ledgerType==="customer"?Number(y.debit)-Number(y.credit):Number(y.credit)-Number(y.debit)),0);return <tr key={x.journal_entry_id+":"+i}><td>{x.entry_date}</td><td>{p?.name||x.party_id}</td><td>{x.journal_number}</td><td>{x.narration||x.memo||"—"}</td><td>{money(x.debit)}</td><td>{money(x.credit)}</td><td>{money(prior)}</td></tr>;})}{!items.length&&<tr><td colSpan={7} className="table-empty">No posted ledger transactions for this party type.</td></tr>}</tbody></table></div></>;})()}
     </> : tab === "cash" ? <>
       <div className="module-toolbar"><div><h3>Cash & Bank Book</h3><p>Posted cash and bank journal movements with running balances.</p></div><select value={cashAccountId} onChange={e=>setCashAccountId(e.target.value)}>{cashAccounts.map(a=><option key={a.id} value={a.id}>{a.account_code} · {a.account_name}</option>)}</select><button onClick={()=>void loadCashBook()}>↻ Refresh</button></div>
+      <form className="transaction-form" onSubmit={e=>{e.preventDefault();void saveReconciliation();}}><h4>Statement / physical cash reconciliation</h4><div className="form-grid"><label>Statement date<input type="date" required value={statementDate} onChange={e=>setStatementDate(e.target.value)}/></label><label>Statement or counted balance (PKR)<input type="number" step="0.01" required value={statementBalance} onChange={e=>setStatementBalance(e.target.value)}/></label><label>Notes<input value={reconNotes} onChange={e=>setReconNotes(e.target.value)}/></label></div><button type="submit">Save reconciliation snapshot</button></form>
+      <h4>Reconciliation history</h4><div className="data-table-wrap"><table className="data-table"><thead><tr><th>Date</th><th>Account</th><th>Statement</th><th>Book</th><th>Difference</th><th>Notes</th></tr></thead><tbody>{cashRecons.filter(x=>x.account_id===cashAccountId).map(x=><tr key={x.id}><td>{x.statement_date}</td><td>{cashAccounts.find(a=>a.id===x.account_id)?.account_name}</td><td>{money(x.statement_balance)}</td><td>{money(x.book_balance)}</td><td>{money(x.difference)}</td><td>{x.notes||"—"}</td></tr>)}{!cashRecons.some(x=>x.account_id===cashAccountId)&&<tr><td colSpan={6} className="table-empty">No reconciliation snapshots yet.</td></tr>}</tbody></table></div>
       {(()=>{const items=cashRows.filter(x=>x.account_id===cashAccountId);let balance=0;const ledger=items.map(x=>{balance+=Number(x.debit||0)-Number(x.credit||0);return {...x,running:balance};});return <><div className="stats report-stats"><article><small>Book balance</small><strong>{money(balance)}</strong></article><article><small>Money in</small><strong>{money(items.reduce((n,x)=>n+Number(x.debit||0),0))}</strong></article><article><small>Money out</small><strong>{money(items.reduce((n,x)=>n+Number(x.credit||0),0))}</strong></article></div><div className="data-table-wrap"><table className="data-table"><thead><tr><th>Date</th><th>Journal</th><th>Description</th><th>In</th><th>Out</th><th>Running balance</th></tr></thead><tbody>{ledger.slice().reverse().map(x=><tr key={x.journal_entry_id}><td>{x.entry_date}</td><td>{x.journal_number}</td><td>{x.narration||x.memo||"—"}</td><td>{money(x.debit)}</td><td>{money(x.credit)}</td><td>{money(x.running)}</td></tr>)}{!ledger.length&&<tr><td colSpan={6} className="table-empty">No posted cash or bank movements.</td></tr>}</tbody></table></div></>;})()}
     </> : <>
     </>
