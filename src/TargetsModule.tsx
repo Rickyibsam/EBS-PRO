@@ -12,7 +12,7 @@ export default function TargetsModule({db,tenantId,currentRole}:{db:SupabaseClie
  db.from("parties").select("id,name,party_code").eq("tenant_id",tenantId).in("party_type",["supplier","both"]).order("name"),
  db.from("products").select("id,name,sku,brand").eq("tenant_id",tenantId).eq("is_active",true).order("name"),
  db.from("vendor_product_catalog").select("product_id,supplier_id").eq("tenant_id",tenantId),
- db.from("sales_orders").select("id,booker_employee_id,order_date,status").eq("tenant_id",tenantId).in("status",["approved","allocated","dispatched"]),
+ db.from("sales_orders").select("id,booker_employee_id,order_date,status").eq("tenant_id",tenantId).in("status",["approved","allocated","dispatched","delivered"]),
  db.from("sales_order_lines").select("sales_order_id,product_id,quantity,line_total").eq("tenant_id",tenantId),
  db.from("deliveries").select("id,sales_order_id,delivery_date,status,delivery_man_employee_id,route_id").eq("tenant_id",tenantId),
  db.from("delivery_lines").select("delivery_id,product_id,delivered_quantity_base").eq("tenant_id",tenantId),
