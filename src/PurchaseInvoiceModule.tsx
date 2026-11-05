@@ -9,13 +9,14 @@ export default function PurchaseInvoiceModule({db,tenantId,currentRole}:{db:Supa
  const money=(v:number)=>"PKR "+Number(v||0).toLocaleString("en-PK",{minimumFractionDigits:2,maximumFractionDigits:2});
  async function load(){
   setLoading(true);setNotice("");
-  const [g,o,p,i]=await Promise.all([
+  const [g,o,p,i,pay]=await Promise.all([
    db.from("goods_receipts").select("id,grn_number,received_date,purchase_order_id,status").eq("tenant_id",tenantId).eq("status","posted").order("received_date",{ascending:false}).limit(300),
    db.from("purchase_orders").select("id,po_number,supplier_id").eq("tenant_id",tenantId),
    db.from("parties").select("id,party_code,name").eq("tenant_id",tenantId).in("party_type",["supplier","both"]).order("name"),
-   db.from("purchase_invoices").select("id,goods_receipt_id,supplier_id,supplier_invoice_no,invoice_date,due_date,subtotal,tax_amount,grand_total,status,posted_at").eq("tenant_id",tenantId).order("invoice_date",{ascending:false}).limit(300)
+   db.from("purchase_invoices").select("id,goods_receipt_id,supplier_id,supplier_invoice_no,invoice_date,due_date,subtotal,tax_amount,grand_total,status,posted_at").eq("tenant_id",tenantId).order("invoice_date",{ascending:false}).limit(300),
+   db.from("payments").select("purchase_invoice_id,amount").eq("tenant_id",tenantId).eq("payment_type","payment").not("purchase_invoice_id","is",null)
   ]);
-  const err=g.error||o.error||p.error||i.error;if(err)setNotice(err.message);else{setGrns(g.data??[]);setOrders(o.data??[]);setParties(p.data??[]);setInvoices(i.data??[]);}
+  const err=g.error||o.error||p.error||i.error||pay.error;if(err)setNotice(err.message);else{setGrns(g.data??[]);setOrders(o.data??[]);setParties(p.data??[]);setInvoices((i.data??[]).map(x=>{const paid=(pay.data??[]).filter(y=>y.purchase_invoice_id===x.id).reduce((n,y)=>n+Number(y.amount||0),0);return {...x,paid,outstanding:Math.max(Number(x.grand_total)-paid,0)};}));}
   setLoading(false);
  }
  useEffect(()=>{void load();},[tenantId]);
@@ -49,6 +50,6 @@ export default function PurchaseInvoiceModule({db,tenantId,currentRole}:{db:Supa
    <label>Notes<input value={notes} onChange={e=>setNotes(e.target.value)}/></label>
   </div><p className="module-footnote">The invoice net amount is matched to accepted GRN quantities and costs. Differences must be corrected in the GRN/PO before posting; input tax is recorded separately.</p><button disabled={saving||!availableGrns.length}>{saving?"Creating…":"Create matched invoice draft"}</button></form>}
   <h3>Supplier invoice register</h3>
-  {loading?<div className="table-empty">Loading supplier invoices…</div>:<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Supplier</th><th>GRN</th><th>Supplier invoice</th><th>Date</th><th>Due</th><th>Net</th><th>Tax</th><th>Total</th><th>Status</th><th>Action</th></tr></thead><tbody>{invoices.map(i=>{const g=grns.find(x=>x.id===i.goods_receipt_id);const supplier=parties.find(x=>x.id===i.supplier_id);return <tr key={i.id}><td>{supplier?.name||i.supplier_id}</td><td>{g?.grn_number||"—"}</td><td>{i.supplier_invoice_no}</td><td>{i.invoice_date}</td><td>{i.due_date||"—"}</td><td>{money(i.subtotal)}</td><td>{money(i.tax_amount)}</td><td>{money(i.grand_total)}</td><td>{i.status}</td><td>{i.status==="draft"&&canPost?<button disabled={saving} onClick={()=>void post(i.id)}>Post to AP</button>:i.status==="posted"?"Posted":"—"}</td></tr>;})}{!invoices.length&&<tr><td colSpan={10} className="table-empty">No supplier invoices have been matched yet.</td></tr>}</tbody></table></div>}
+  {loading?<div className="table-empty">Loading supplier invoices…</div>:<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Supplier</th><th>GRN</th><th>Supplier invoice</th><th>Date</th><th>Due</th><th>Net</th><th>Tax</th><th>Total</th><th>Paid</th><th>Outstanding</th><th>Status</th><th>Action</th></tr></thead><tbody>{invoices.map(i=>{const g=grns.find(x=>x.id===i.goods_receipt_id);const supplier=parties.find(x=>x.id===i.supplier_id);return <tr key={i.id}><td>{supplier?.name||i.supplier_id}</td><td>{g?.grn_number||"—"}</td><td>{i.supplier_invoice_no}</td><td>{i.invoice_date}</td><td>{i.due_date||"—"}</td><td>{money(i.subtotal)}</td><td>{money(i.tax_amount)}</td><td>{money(i.grand_total)}</td><td>{money(i.paid||0)}</td><td>{money(i.outstanding??i.grand_total)}</td><td>{i.status}</td><td>{i.status==="draft"&&canPost?<button disabled={saving} onClick={()=>void post(i.id)}>Post to AP</button>:i.status==="posted"?"Posted":"—"}</td></tr>;})}{!invoices.length&&<tr><td colSpan={12} className="table-empty">No supplier invoices have been matched yet.</td></tr>}</tbody></table></div>}
  </section>;
 }
