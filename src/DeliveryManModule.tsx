@@ -60,11 +60,12 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
   try{
    const d=deliveries.find(x=>x.id===form.delivery_id),o=orders.find(x=>x.id===d?.sales_order_id);
    if(!d||!o)throw new Error("Select one of your assigned deliveries.");
-   const {data:user}=await db.auth.getUser();
+   const {data:{session}}=await db.auth.getSession();
+   if(!session?.user?.id)throw new Error("Your signed-in session is not available on this device. Sign in once while online before saving offline visits.");
    const selectedLines=lines.filter(x=>x.delivery_id===d.id);
    const quantityReport=selectedLines.map(x=>({delivery_line_id:x.id,product_id:x.product_id,picked_quantity_base:Number(x.picked_quantity_base||0),delivered_quantity_base:Number(lineQuantities[x.id]?.delivered??x.picked_quantity_base??0),market_return_quantity_base:Number(lineQuantities[x.id]?.marketReturn||0),return_batch_number:lineQuantities[x.id]?.returnBatch||null,return_expiry_date:lineQuantities[x.id]?.returnExpiry||null}));
    for(const q of quantityReport){if(!Number.isFinite(q.delivered_quantity_base)||q.delivered_quantity_base<0||q.delivered_quantity_base>q.picked_quantity_base)throw new Error("Delivered quantity must be between zero and picked quantity.");if(!Number.isFinite(q.market_return_quantity_base)||q.market_return_quantity_base<0||q.market_return_quantity_base>q.delivered_quantity_base)throw new Error("Market return quantity cannot exceed delivered quantity.");}
-   const payload={idempotency_key:crypto.randomUUID(),vehicle_number:d.vehicle_number||"",user_id:authUserId,tenant_id:tenantId,delivery_id:d.id,delivery_man_employee_id:employee.id,customer_id:o.customer_id,visit_status:form.visit_status,shops_visited:1,line_quantities:quantityReport,notes:form.notes.trim()||null,created_by:user.user?.id??null,queued_at:new Date().toISOString()};
+   const payload={idempotency_key:crypto.randomUUID(),vehicle_number:d.vehicle_number||"",user_id:authUserId,tenant_id:tenantId,delivery_id:d.id,delivery_man_employee_id:employee.id,customer_id:o.customer_id,visit_status:form.visit_status,shops_visited:1,line_quantities:quantityReport,notes:form.notes.trim()||null,created_by:session.user.id,queued_at:new Date().toISOString()};
    if(!navigator.onLine){
     await queueDeliveryVisit({...payload,id:crypto.randomUUID(),created_by:payload.created_by||null});
     setNotice("No internet: delivery visit safely queued on this device. It will sync when connection returns.");
