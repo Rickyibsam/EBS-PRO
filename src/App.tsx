@@ -1,3 +1,4 @@
+import { resolveAllowedNavigation } from "./lib/erpAccess";
 import { FormEvent, lazy, Suspense, useEffect, useState } from "react";
 import { createClient, Session } from "@supabase/supabase-js";
 const WorkspaceModule = lazy(() => import("./WorkspaceModule"));
@@ -85,13 +86,7 @@ export default function App() {
   const [active,setActive] = useState(()=>{const app=new URLSearchParams(window.location.search).get("app");return app==="booker"?"Booker App":app==="delivery"?"Delivery Man App":"Overview";});
   const [expandedGroup,setExpandedGroup] = useState(()=>{const app=new URLSearchParams(window.location.search).get("app");const initial=app==="booker"?"Booker App":app==="delivery"?"Delivery Man App":"Overview";return navGroups.find(g=>g.items.includes(initial))?.name||"Overview";});
   const [busy,setBusy] = useState(false);
-  const baseAllowedNav = roleAccess[currentRole] || roleAccess.viewer;
-  const moduleKeys = ["dashboard_management","sales_customer","order_booking","inventory","purchase_supplier","accounts_finance","distribution_delivery","hr_payroll","reports_analytics","administration_security"];
-  const allowedNav = currentRole==="owner"||currentRole==="admin" ? nav.filter(item=>currentRole==="owner"||item!=="User Permissions") : nav.filter(item=>{
-    const groupIndex=navGroups.findIndex(group=>group.items.includes(item));
-    const moduleKey=moduleKeys[groupIndex];
-    return moduleKey&&Object.prototype.hasOwnProperty.call(modulePermissions,moduleKey)?modulePermissions[moduleKey]:baseAllowedNav.includes(item);
-  });
+  const allowedNav = resolveAllowedNavigation(currentRole,nav,roleAccess,navGroups,modulePermissions);
   const [notice,setNotice] = useState("");
   useEffect(()=>{const group=navGroups.find(item=>item.items.includes(active));if(group)setExpandedGroup(group.name);},[active]);
 
