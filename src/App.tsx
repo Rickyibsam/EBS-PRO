@@ -39,14 +39,16 @@ const db = url && key ? createClient(url, key) : null;
 type Organization = { id: string; name: string; city: string | null; currency: string };
 const nav = ["Overview","Sales","Booker App","Delivery Man App","Inventory","Batch & Expiry","Stock Take","Van Stock","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Delivery Charges","Recovery","Customer Credit Control","Accounts","Reports","Team & Employees","HR & Attendance","Login History","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Asset & Budget Control","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register","Voucher Revision History","Audit Trail","Booker Product Access","Targets & Incentives","Settings"];
 const navGroups = [
- {name:"Overview",icon:"✦",items:["Overview"]},
- {name:"Sales & Customers",icon:"◈",items:["Sales","Customers","Invoices","Sales Returns","Customer Credit Control","Recovery","Price Lists"]},
- {name:"Field Operations",icon:"⌖",items:["Booker App","Delivery Man App","Distribution","Delivery Charges","Routes"]},
- {name:"Inventory & Warehouse",icon:"▦",items:["Inventory","Batch & Expiry","Stock Take","Van Stock","Products","Stock Transfers","Branches & Warehouses"]},
- {name:"Purchasing",icon:"⇩",items:["Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Vendors","Vendor Feeding"]},
- {name:"Finance",icon:"◉",items:["Accounts","Payroll","Asset & Budget Control","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register"]},
- {name:"People & Access",icon:"♙",items:["Team & Employees","HR & Attendance","Login History","Booker Product Access","Settings"]},
- {name:"Reports & Governance",icon:"▤",items:["Reports","Targets & Incentives","Voucher Revision History","Audit Trail"]}
+ {name:"1. Dashboard & Management",icon:"✦",items:["Overview"]},
+ {name:"2. Sales & Customer Management",icon:"◈",items:["Sales","Customers","Invoices","Sales Returns","Customer Credit Control","Recovery","Price Lists"]},
+ {name:"3. Order Booking App",icon:"▣",items:["Booker App","Booker Product Access"]},
+ {name:"4. Inventory & Warehouse",icon:"▦",items:["Inventory","Products","Batch & Expiry","Stock Take","Van Stock","Stock Transfers","Branches & Warehouses"]},
+ {name:"5. Purchase & Supplier Management",icon:"⇩",items:["Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Vendors","Vendor Feeding"]},
+ {name:"6. Accounts & Finance",icon:"◉",items:["Accounts","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register","Asset & Budget Control"]},
+ {name:"7. Distribution & Delivery",icon:"⌖",items:["Delivery Man App","Distribution","Delivery Charges","Routes"]},
+ {name:"8. HR & Payroll",icon:"♙",items:["Team & Employees","HR & Attendance","Payroll"]},
+ {name:"9. Reports & Analytics",icon:"▤",items:["Reports","Targets & Incentives"]},
+ {name:"10. Administration & Security",icon:"⚙",items:["Login History","Settings","Voucher Revision History","Audit Trail"]}
 ];
 const roleAccess: Record<string,string[]> = {
  owner: nav, admin: nav,
@@ -225,7 +227,7 @@ export default function App() {
             ? <AdminModule db={db} tenantId={organization.id} module={active} currentRole={currentRole} />
             : active !== "Overview"
               ? <WorkspaceModule db={db} tenantId={organization.id} module={active} currentRole={currentRole} />
-              : <DashboardModule db={db} tenantId={organization.id} company={organization.name} onNavigate={setActive} />;
+              : <DashboardModule db={db} tenantId={organization.id} company={organization.name} allowedModules={allowedNav} onNavigate={setActive} />;
 
   return <div className="shell"><aside className="sidebar"><div className="brandline"><div className="logo">E</div><b>EBS <em>PRO</em><small>V.01</small></b></div><div className="org"><strong>{organization.name}</strong><small>{organization.city||"Pakistan"} · {organization.currency}</small>{tenantChoices.length>1&&<select aria-label="Switch company workspace" value={organization.id} onChange={e=>{const choice=tenantChoices.find(x=>x.id===e.target.value);if(choice){setOrganization(choice);setCurrentRole(choice.role);setActive("Overview");}}}>{tenantChoices.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select>}</div><small className="caption">WORKSPACE MODULES</small><nav className="module-nav">{navGroups.map(group=>{const items=group.items.filter(item=>allowedNav.includes(item));if(!items.length)return null;const opened=expandedGroup===group.name;return <div className="nav-group" key={group.name}><button className={"nav-group-head"+(items.includes(active)?" has-active":"")} aria-expanded={opened} onClick={()=>setExpandedGroup(opened?"":group.name)}><span className="nav-group-icon">{group.icon}</span><b>{group.name}</b><span className="nav-chevron">{opened?"⌄":"›"}</span></button>{opened&&<div className="nav-group-items">{items.map(item=><button className={active===item?"selected":""} key={item} onClick={()=>setActive(item)}>{item}</button>)}</div>}</div>})}</nav><div className="account"><b>{session.user.email}</b><button onClick={()=>void db.auth.signOut()}>Sign out ↗</button></div></aside><main className="main"><header><span>EBS PRO / <b>{active}</b></span><span className="live">● {currentRole.replaceAll("_"," ").toUpperCase()} ACCESS</span></header><section className="content"><Suspense fallback={<div className="table-empty">Loading module…</div>}>{moduleContent}</Suspense></section></main></div>;
 }
