@@ -1,7 +1,7 @@
 import {useEffect,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 type Row=Record<string,any>;
-const today=()=>new Date().toISOString().slice(0,10);
+const today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");};
 const money=(n:number)=>"PKR "+Number(n||0).toLocaleString("en-PK",{maximumFractionDigits:2});
 export default function StockTakeModule({db,tenantId,currentRole}:{db:SupabaseClient;tenantId:string;currentRole:string}){
  const [warehouses,setWarehouses]=useState<Row[]>([]),[takes,setTakes]=useState<Row[]>([]),[snapshot,setSnapshot]=useState<Row[]>([]),[lines,setLines]=useState<Row[]>([]),[products,setProducts]=useState<Row[]>([]);
