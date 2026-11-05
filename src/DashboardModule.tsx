@@ -8,7 +8,7 @@ const launchers=[
  {title:"Inventory & Warehouse",description:"Stock, batches, expiry and vehicle inventory",icon:"▦",modules:["Inventory","Batch & Expiry","Stock Take","Van Stock","Stock Transfers"]},
  {title:"Purchase & Vendors",description:"Procurement, GRN, supplier invoices and returns",icon:"⇩",modules:["Purchases","Goods Receiving","Vendor Invoices","Purchase Returns"]},
  {title:"Finance & Control",description:"Ledgers, reconciliation, payroll and budgets",icon:"◉",modules:["Accounts","Payroll","Asset & Budget Control","Bank Reconciliation"]},
- {title:"Distribution",description:"Booker orders, delivery routes and proof of delivery",icon:"⌖",modules:["Booker App","Delivery Man App","Distribution","Routes"]},
+ {title:"Distribution",description:"Booker orders, delivery routes and proof of delivery",icon:"⌖",modules:["Booker App","Delivery Man App","Distribution","Delivery Charges","Routes"]},
  {title:"Reports & Governance",description:"Performance, incentives, audit and voucher history",icon:"▤",modules:["Reports","Targets & Incentives","Audit Trail","Voucher Revision History"]}
 ];
 export default function DashboardModule({db,tenantId,company,onNavigate}:{db:SupabaseClient;tenantId:string;company:string;onNavigate:(module:string)=>void}){
