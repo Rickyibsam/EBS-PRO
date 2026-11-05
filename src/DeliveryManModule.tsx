@@ -103,7 +103,7 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
  const customerFor=(delivery:Row)=>customers.find(x=>x.id===orders.find(o=>o.id===delivery.sales_order_id)?.customer_id);
  const selectedDeliveryLines=lines.filter(x=>x.delivery_id===form.delivery_id);
  return <section className="module-page">
-  <div className="module-toolbar"><div><h2>Delivery Man App</h2><p>Assigned deliveries, customer stops, product quantities and visit outcomes, with offline assignment snapshots and queued synchronization.</p></div>{installPrompt&&<button onClick={async()=>{await installPrompt.prompt();setInstallPrompt(null);}}>Install Delivery App</button>}<button onClick={()=>void load()}>↻ Refresh</button></div>
+  <div className="module-toolbar"><div><h2>Delivery Man App</h2><p>Assigned deliveries, customer stops, product quantities and visit outcomes, with offline assignment snapshots and queued synchronization.</p></div>{installPrompt&&<button onClick={async()=>{await installPrompt.prompt();setInstallPrompt(null);}}>Install Delivery App</button>}{!installPrompt&&<button title="iPhone/iPad: Share → Add to Home Screen. Chrome/Edge: browser menu → Install app." onClick={()=>setNotice("Install on iPhone/iPad: open Share and choose Add to Home Screen. On Chrome/Edge, use the browser menu and choose Install app.")}>Install help</button>}<button onClick={()=>void load()}>↻ Refresh</button></div>
   {notice&&<div className="notice">{notice}</div>}
   {loading?<div className="table-empty">Loading assigned deliveries…</div>:!employee?<div className="notice">Employee account is not linked.</div>:<>
    <p className="module-footnote">Signed in as {employee.full_name} · {employee.employee_code}</p>
