@@ -16,6 +16,7 @@ export default function TransactionsModule({db,tenantId,module,currentRole}:{db:
  const [parties,setParties]=useState<Party[]>([]);
  const [units,setUnits]=useState<Unit[]>([]);
  const [productUnits,setProductUnits]=useState<ProductUnit[]>([]);
+ const [vendorCosts,setVendorCosts]=useState<Array<{supplier_id:string;product_id:string;purchase_cost:number;is_preferred:boolean}>>([]);
  const [warehouses,setWarehouses]=useState<{id:string;name:string}[]>([]);
  const [rows,setRows]=useState<Header[]>([]);
  const [partyId,setPartyId]=useState("");
