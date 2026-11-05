@@ -12,19 +12,20 @@ const PricingModule = lazy(() => import("./PricingModule"));
 const InvoiceModule = lazy(() => import("./InvoiceModule"));
 const TransfersModule = lazy(() => import("./TransfersModule"));
 const AuditModule = lazy(() => import("./AuditModule"));
+const VendorCatalogModule = lazy(() => import("./VendorCatalogModule"));
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 const db = url && key ? createClient(url, key) : null;
 
 type Organization = { id: string; name: string; city: string | null; currency: string };
-const nav = ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Customers","Suppliers","Products","Distribution","Recovery","Accounts","Reports","Team & Employees","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Sales Returns","Audit Trail","Settings"];
+const nav = ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Customers","Suppliers","Products","Distribution","Recovery","Accounts","Reports","Team & Employees","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Audit Trail","Settings"];
 const roleAccess: Record<string,string[]> = {
  owner: nav, admin: nav,
- manager: ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Customers","Suppliers","Products","Distribution","Recovery","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices","Sales Returns"],
+ manager: ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Customers","Suppliers","Products","Distribution","Recovery","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding"],
  accounts: ["Overview","Recovery","Accounts","Invoices","Sales Returns","Reports"],
  purchase: ["Overview","Purchases","Goods Receiving","Suppliers","Products","Inventory","Reports"],
- sales: ["Overview","Sales","Booker App","Customers","Products","Routes","Invoices","Sales Returns","Reports"],
+ sales: ["Overview","Sales","Booker App","Customers","Products","Routes","Invoices","Sales Returns","Vendor Feeding","Reports"],
  order_booker: ["Overview","Booker App","Sales","Customers","Products"],
  warehouse: ["Overview","Inventory","Distribution","Goods Receiving","Stock Transfers","Products","Purchases"],
  cashier: ["Overview","Sales","Invoices"],
@@ -131,6 +132,8 @@ export default function App() {
           ? <InvoiceModule db={db} tenantId={organization.id} />
         : active === "Stock Transfers"
           ? <TransfersModule db={db} tenantId={organization.id} currentRole={currentRole} />
+        : active === "Vendor Feeding"
+          ? <VendorCatalogModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Audit Trail"
           ? <AuditModule db={db} tenantId={organization.id} />
         : ["Inventory","Distribution","Recovery","Reports","Goods Receiving"].includes(active)
