@@ -22,13 +22,13 @@ const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 const db = url && key ? createClient(url, key) : null;
 
 type Organization = { id: string; name: string; city: string | null; currency: string };
-const nav = ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Supplier Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Recovery","Accounts","Reports","Team & Employees","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Audit Trail","Booker Product Access","Settings"];
+const nav = ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Recovery","Accounts","Reports","Team & Employees","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Audit Trail","Booker Product Access","Settings"];
 const roleAccess: Record<string,string[]> = {
  owner: nav, admin: nav,
- manager: ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Supplier Invoices","Purchase Returns","Customers","Suppliers","Products","Distribution","Recovery","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll"],
- accounts: ["Overview","Recovery","Accounts","Invoices","Supplier Invoices","Purchase Returns","Sales Returns","Payroll","Reports"],
- purchase: ["Overview","Purchases","Goods Receiving","Supplier Invoices","Purchase Returns","Suppliers","Products","Inventory","Vendor Feeding","Reports"],
- sales: ["Overview","Sales","Booker App","Customers","Products","Routes","Invoices","Sales Returns","Reports"],
+ manager: ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Recovery","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Booker Product Access"],
+ accounts: ["Overview","Recovery","Accounts","Invoices","Vendor Invoices","Purchase Returns","Sales Returns","Payroll","Reports"],
+ purchase: ["Overview","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Vendors","Products","Inventory","Vendor Feeding","Reports"],
+ sales: ["Overview","Sales","Booker App","Customers","Products","Routes","Invoices","Sales Returns","Reports","Booker Product Access"],
  order_booker: ["Overview","Booker App","Sales","Customers","Products"],
  warehouse: ["Overview","Inventory","Distribution","Goods Receiving","Stock Transfers","Products","Purchases"],
  cashier: ["Overview","Sales","Invoices"],
@@ -137,7 +137,7 @@ export default function App() {
           ? <TransfersModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Purchase Returns"
           ? <PurchaseReturnsModule db={db} tenantId={organization.id} currentRole={currentRole} />
-        : active === "Supplier Invoices"
+        : active === "Vendor Invoices"
           ? <PurchaseInvoiceModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Payroll"
           ? <PayrollModule db={db} tenantId={organization.id} currentRole={currentRole} />
