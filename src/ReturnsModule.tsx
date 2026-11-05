@@ -97,6 +97,7 @@ export default function ReturnsModule({ db, tenantId, currentRole }: { db: Supab
     setSaving(false);
   }
 
+  function exportNotes(){const data=notes.map(n=>({credit_note:n.credit_note_number,date:n.credit_note_date,invoice:invoices.find(i=>i.id===n.sales_invoice_id)?.invoice_number||"",customer:customers.find(c=>c.id===n.customer_id)?.name||"",reason:n.reason,status:n.status,total:n.grand_total}));const keys=Object.keys(data[0]||{credit_note:"",date:"",invoice:"",customer:"",reason:"",status:"",total:""});const csv=[keys.join(","),...data.map(x=>keys.map(k=>'"'+String(x[k as keyof typeof x]??"").replace(/"/g,'""')+'"').join(","))].join("\\r\\n");const blob=new Blob(["\\uFEFF"+csv],{type:"text/csv;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="sales-credit-notes.csv";a.click();URL.revokeObjectURL(url);}
   const invoice=invoices.find(x=>x.id===invoiceId);
   const estimate=invoiceLines.reduce((sum,x)=>{const q=Number(x.return_quantity)||0;const gross=q*Number(x.unit_price);const tax=gross*Number(x.tax_rate)/100;const discount=Number(x.quantity)>0?Number(x.discount_amount)*(q/Number(x.quantity)):0;return sum+gross+tax-discount;},0);
 
@@ -119,7 +120,7 @@ export default function ReturnsModule({ db, tenantId, currentRole }: { db: Supab
       <button disabled={saving||!invoiceLines.length}>{saving?"Saving…":"Save credit note draft"}</button>
       <p className="module-footnote">Posting is restricted to owner, admin, manager and accounts roles. Accepted returns add stock at the original dispatch cost; price-only credits do not change stock.</p>
     </form>
-    <h3>Credit note register</h3>
+    <div className="module-toolbar"><h3>Credit note register</h3><button onClick={exportNotes}>Export Excel (CSV)</button><button onClick={()=>window.print()}>Print / PDF</button></div>
     {loading?<div className="table-empty">Loading credit notes…</div>:<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Credit note</th><th>Date</th><th>Invoice</th><th>Customer</th><th>Reason</th><th>Amount</th><th>Status / action</th></tr></thead><tbody>
       {notes.map(n=><tr key={n.id}><td>{n.credit_note_number}</td><td>{n.credit_note_date}</td><td>{invoices.find(i=>i.id===n.sales_invoice_id)?.invoice_number||n.sales_invoice_id}</td><td>{customers.find(c=>c.id===n.customer_id)?.name||n.customer_id}</td><td>{n.reason}</td><td>{money(n.grand_total)}</td><td><button onClick={()=>void preparePrint(n)}>Print</button> {n.status==="draft"&&canPost?<button disabled={saving} onClick={()=>void postNote(n.id)}>Post credit note</button>:n.status==="draft"?"Awaiting accounts posting":n.status}</td></tr>)}
       {!notes.length&&<tr><td colSpan={7} className="table-empty">No credit notes recorded yet.</td></tr>}
