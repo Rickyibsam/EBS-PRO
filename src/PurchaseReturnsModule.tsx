@@ -46,14 +46,14 @@ export default function PurchaseReturnsModule({db,tenantId,currentRole}:{db:Supa
   try{const {data,error}=await db.rpc("post_purchase_debit_note",{p_debit_note_id:id});if(error)throw error;if(data?.success!==true)throw new Error("Supplier return posting was not confirmed.");setNotice("Supplier debit note posted. Stock and GRNI/AP accounting updated.");await load();}
   catch(err){setNotice(err instanceof Error?err.message:"Supplier return posting failed.");}finally{setSaving(false);}
  }
- const availableGrns=grns.filter(g=>!notes.some(n=>n.goods_receipt_id===g.id&&n.status==="posted"));
+ const availableGrns=grns;
  return <section className="module-page">
   <div className="module-toolbar"><div><h2>Purchase Returns & Supplier Debit Notes</h2><p>Return accepted goods against posted GRNs, validate quantities and reverse inventory and supplier liability.</p></div>{canCreate&&<button className="primary-action" onClick={()=>setShow(!show)}>{show?"Close form":"+ Create purchase return"}</button>}<button onClick={()=>void load()}>↻ Refresh</button></div>
   {notice&&<div className="notice">{notice}</div>}
   {show&&<form className="transaction-form" onSubmit={create}><h3>New supplier return</h3><div className="form-grid">
    <label>Posted GRN<select required value={selectedGrn} onChange={e=>void chooseGrn(e.target.value)}><option value="">Select goods receipt</option>{availableGrns.map(g=>{const po=orders.find(x=>x.id===g.purchase_order_id),supplier=parties.find(x=>x.id===po?.supplier_id);return <option key={g.id} value={g.id}>{g.grn_number} · {supplier?.name||"Supplier"} · {g.received_date}</option>;})}</select></label>
    <label>Return date<input type="date" required value={noteDate} onChange={e=>setNoteDate(e.target.value)}/></label>
-   <label>Reason<input required value={reason} onChange={e=>setReason(e.target.value)} placeholder="Damaged / expired / quality issue"/></label>
+   <label>Reason<input required value={reason} onChange={e=>setReason(e.target.value)} placeholder="Damaged / expired / quality issue"/></label></div><p className="module-footnote">For correct supplier payable accounting, post the matched supplier invoice first; the debit note then reduces AP and removes stock from its original batch.</p><div className="form-grid">
   </div>
   {lines.length>0&&<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Product</th><th>Batch</th><th>Expiry</th><th>Accepted</th><th>Already returned</th><th>Return qty</th><th>Value</th></tr></thead><tbody>{lines.map(x=><tr key={x.id}><td>{products.find(p=>p.id===x.product_id)?.sku} · {products.find(p=>p.id===x.product_id)?.name||x.product_id}</td><td>{x.batch_number||"—"}</td><td>{x.expiry_date||"—"}</td><td>{x.accepted_quantity}</td><td>{x.already_returned}</td><td><input type="number" min="0" max={Number(x.accepted_quantity)-Number(x.already_returned)} step="0.001" value={x.return_quantity} onChange={e=>setLines(old=>old.map(y=>y.id===x.id?{...y,return_quantity:e.target.value}:y))}/></td><td>{money(Number(x.return_quantity||0)*Number(x.unit_cost||0))}</td></tr>)}</tbody></table></div>}
   <button disabled={saving||!lines.length}>{saving?"Creating…":"Create debit note draft"}</button></form>}
