@@ -1,7 +1,7 @@
 import {useEffect,useMemo,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 type Metric={label:string;value:string;detail:string;icon:string;tone:string};
-type Notice={id:string;title:string;detail:string;module:string;level:"warning"|"info";read_at:string|null};
+type Notice={id:string;title:string;detail:string;module:string;level:"warning"|"info";read_at?:string|null};
 const money=(v:number)=>"PKR "+Number(v||0).toLocaleString("en-PK",{maximumFractionDigits:0});
 const localDate=(d:Date)=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");
 const launchers=[
