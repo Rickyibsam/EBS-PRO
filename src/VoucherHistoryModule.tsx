@@ -1,32 +1,61 @@
 import {useEffect,useMemo,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 const TYPES=[
- {table:"sales_orders",label:"Sales orders",number:"order_number",date:"order_date",notes:"notes",approval:true},
- {table:"purchase_orders",label:"Purchase orders",number:"po_number",date:"order_date",notes:"notes",approval:true},
- {table:"journal_entries",label:"Journal vouchers",number:"journal_number",date:"entry_date",notes:"narration",approval:false},
- {table:"goods_receipts",label:"Goods receipts",number:"grn_number",date:"received_date",notes:"notes",approval:false},
- {table:"purchase_invoices",label:"Purchase invoices",number:"supplier_invoice_no",date:"invoice_date",notes:"notes",approval:false},
- {table:"sales_invoices",label:"Sales invoices",number:"invoice_number",date:"invoice_date",notes:null,approval:false},
- {table:"sales_credit_notes",label:"Sales credit notes",number:"credit_note_number",date:"credit_note_date",notes:"reason",approval:false},
- {table:"purchase_debit_notes",label:"Purchase debit notes",number:"debit_note_number",date:"note_date",notes:"reason",approval:false}
+ {table:"sales_orders",label:"Sales orders",number:"order_number",date:"order_date",notes:"notes",approval:true,lines:"sales_order_lines",parentKey:"sales_order_id",lineKind:"taxedSales"},
+ {table:"purchase_orders",label:"Purchase orders",number:"po_number",date:"order_date",notes:"notes",approval:true,lines:"purchase_order_lines",parentKey:"purchase_order_id",lineKind:"taxedPurchase"},
+ {table:"journal_entries",label:"Journal vouchers",number:"journal_number",date:"entry_date",notes:"narration",approval:false,lines:"journal_lines",parentKey:"journal_entry_id",lineKind:"journal"},
+ {table:"goods_receipts",label:"Goods receipts",number:"grn_number",date:"received_date",notes:"notes",approval:false,lines:"goods_receipt_lines",parentKey:"goods_receipt_id",lineKind:"grn"},
+ {table:"purchase_invoices",label:"Purchase invoices",number:"supplier_invoice_no",date:"invoice_date",notes:"notes",approval:false,lines:"purchase_invoice_lines",parentKey:"purchase_invoice_id",lineKind:"simplePurchase"},
+ {table:"sales_invoices",label:"Sales invoices",number:"invoice_number",date:"invoice_date",notes:null,approval:false,lines:"sales_invoice_lines",parentKey:"sales_invoice_id",lineKind:"taxedSales"},
+ {table:"sales_credit_notes",label:"Sales credit notes",number:"credit_note_number",date:"credit_note_date",notes:"reason",approval:false,lines:"sales_credit_note_lines",parentKey:"credit_note_id",lineKind:"taxedSales"},
+ {table:"purchase_debit_notes",label:"Purchase debit notes",number:"debit_note_number",date:"note_date",notes:"reason",approval:false,lines:"purchase_debit_note_lines",parentKey:"debit_note_id",lineKind:"simpleDebit"}
 ] as const;
+const LINE_FIELDS:any={
+ taxedSales:[["quantity","Quantity","number"],["unit_price","Unit price","number"],["tax_rate","Tax %","number"],["discount_amount","Discount","number"]],
+ taxedPurchase:[["quantity","Quantity","number"],["unit_cost","Unit cost","number"],["tax_rate","Tax %","number"],["discount_amount","Discount","number"]],
+ simplePurchase:[["quantity","Quantity","number"],["unit_cost","Unit cost","number"]],
+ simpleDebit:[["quantity","Quantity","number"],["unit_cost","Unit cost","number"]],
+ journal:[["debit","Debit","number"],["credit","Credit","number"],["memo","Line memo","text"]],
+ grn:[["quantity","Received quantity","number"],["accepted_quantity","Accepted quantity","number"],["rejected_quantity","Rejected quantity","number"],["unit_cost","Unit cost","number"],["batch_number","Batch number","text"],["expiry_date","Expiry date","date"]]
+};
 export default function VoucherHistoryModule({db,tenantId,currentRole}:{db:SupabaseClient;tenantId:string;currentRole:string}){
  const [rows,setRows]=useState<any[]>([]),[loading,setLoading]=useState(true),[notice,setNotice]=useState(""),[filter,setFilter]=useState("all");
- const [table,setTable]=useState<string>("sales_orders"),[drafts,setDrafts]=useState<any[]>([]),[selectedId,setSelectedId]=useState(""),[draftDate,setDraftDate]=useState(""),[draftNotes,setDraftNotes]=useState(""),[saving,setSaving]=useState(false);
+ const [table,setTable]=useState<string>("sales_orders"),[drafts,setDrafts]=useState<any[]>([]),[selectedId,setSelectedId]=useState(""),[draftDate,setDraftDate]=useState(""),[draftNotes,setDraftNotes]=useState(""),[lineRows,setLineRows]=useState<any[]>([]),[saving,setSaving]=useState(false);
  const canEdit=["owner","admin","manager","accounts"].includes(currentRole);
  const config=useMemo(()=>TYPES.find(x=>x.table===table)||TYPES[0],[table]);
  async function load(){setLoading(true);const {data,error}=await db.from("voucher_revisions").select("id,entity_table,entity_id,action,before_data,after_data,changed_by,changed_at").eq("tenant_id",tenantId).order("changed_at",{ascending:false}).limit(1000);if(error)setNotice(error.message);else setRows(data||[]);setLoading(false);}
  async function loadDrafts(nextTable=table){
-  setSelectedId("");setDraftDate("");setDraftNotes("");
+  setSelectedId("");setDraftDate("");setDraftNotes("");setLineRows([]);
   const {data,error}=await db.from(nextTable as any).select("*").eq("tenant_id",tenantId).eq("status","draft").order("created_at",{ascending:false}).limit(200);
   if(error){setDrafts([]);setNotice(error.message);return;}
   setDrafts(data||[]);
+ }
+ async function loadDraftLines(id:string,nextTable=table){
+  const cfg=TYPES.find(x=>x.table===nextTable);
+  if(!cfg?.lines){setLineRows([]);return;}
+  const {data,error}=await db.from(cfg.lines as any).select("*").eq("tenant_id",tenantId).eq(cfg.parentKey as string,id);
+  if(error){setNotice(error.message);setLineRows([]);return;}
+  setLineRows(data||[]);
+ }
+ function changeLine(id:string,key:string,value:any){setLineRows(rows=>rows.map(row=>row.id===id?{...row,[key]:value}:row));}
+ async function saveLines(){
+  if(!canEdit||!selectedId||!config.lines)return;
+  setSaving(true);setNotice("");
+  try{
+   const fields=(LINE_FIELDS as any)[config.lineKind] as Array<[string,string,string]>;
+   const payload=lineRows.map(row=>Object.fromEntries([["id",row.id],...fields.map(([key])=>[key,row[key]??null])]));
+   const {data,error}=await db.rpc("update_draft_voucher_lines",{p_tenant_id:tenantId,p_voucher_table:table,p_voucher_id:selectedId,p_lines:payload});
+   if(error)throw error;
+   setNotice("All draft line items saved. Line totals and voucher totals were recalculated atomically.");
+   await loadDraftLines(selectedId,table);await load();
+  }catch(e){setNotice(e instanceof Error?e.message:"Draft line items could not be saved.");}
+  finally{setSaving(false);}
  }
  useEffect(()=>{void load();void loadDrafts("sales_orders");},[tenantId]);
  useEffect(()=>{void loadDrafts(table);},[table]);
  function chooseDraft(id:string){
   setSelectedId(id);const row=drafts.find(x=>x.id===id);if(!row)return;
-  setDraftDate(String(row[config.date]||"").slice(0,10));setDraftNotes(config.notes?String(row[config.notes]||""):"");
+  setDraftDate(String(row[config.date]||"").slice(0,10));setDraftNotes(config.notes?String(row[config.notes]||""):"");void loadDraftLines(id,table);
  }
  async function saveDraft(){
   if(!canEdit||!selectedId)return;
@@ -72,11 +101,12 @@ export default function VoucherHistoryModule({db,tenantId,currentRole}:{db:Supab
    {selected&&<label>Voucher date<input type="date" value={draftDate} onChange={e=>setDraftDate(e.target.value)}/></label>}
    {selected&&config.notes&&<label>Notes / narration<input value={draftNotes} onChange={e=>setDraftNotes(e.target.value)}/></label>}
   </div>
-  {selected&&<div className="table-tools"><span>Only draft vouchers can be edited. Monetary totals and line items remain controlled by their source module.</span><button disabled={!canEdit||saving} onClick={()=>void saveDraft()}>Save draft changes</button>{config.approval&&<button disabled={!canEdit||saving} onClick={()=>void approveDraft()}>Approve & lock draft</button>}{table==="journal_entries"&&<button disabled={!canEdit||saving} onClick={()=>void postJournal()}>Post journal</button>}</div>}
+  {selected&&<div className="table-tools"><span>Only draft vouchers can be edited. Line totals and header totals are recalculated in one database transaction.</span><button disabled={!canEdit||saving} onClick={()=>void saveDraft()}>Save draft header</button>{config.approval&&<button disabled={!canEdit||saving} onClick={()=>void approveDraft()}>Approve & lock draft</button>}{table==="journal_entries"&&<button disabled={!canEdit||saving} onClick={()=>void postJournal()}>Post journal</button>}</div>}
+  {selected&&config.lines&&<div className="transaction-form"><h3>Draft line item editor</h3>{lineRows.map(row=><div className="form-grid" key={row.id}><strong>{row.product_id||row.account_id||row.id}</strong>{(LINE_FIELDS as any)[config.lineKind].map(([key,label,type]:[string,string,string])=><label key={key}>{label}<input type={type} step={type==="number"?"0.001":undefined} value={row[key]??""} onChange={e=>changeLine(row.id,key,type==="number"?(e.target.value===""?"":Number(e.target.value)):e.target.value)}/></label>)}</div>)}{!lineRows.length&&<p>No line items found for this draft.</p>}<button disabled={!canEdit||saving||!lineRows.length} onClick={()=>void saveLines()}>Save all line items</button></div>}
   {!drafts.length&&<p className="module-footnote">No draft vouchers available for this type.</p>}
   </div>
   <div className="table-tools"><select value={filter} onChange={e=>setFilter(e.target.value)}><option value="all">All voucher types</option>{[...new Set(rows.map(x=>x.entity_table))].map(x=><option key={x}>{x}</option>)}</select><span>{shown.length} revisions</span></div>
   {loading?<div className="table-empty">Loading revision history…</div>:<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Changed at</th><th>Voucher type</th><th>Record ID</th><th>Action</th><th>Before snapshot</th><th>After snapshot</th><th>Changed by</th></tr></thead><tbody>{shown.map(x=><tr key={x.id}><td>{new Date(x.changed_at).toLocaleString("en-PK")}</td><td>{x.entity_table}</td><td><code>{x.entity_id}</code></td><td>{x.action}</td><td><details><summary>View JSON</summary><pre>{JSON.stringify(x.before_data,null,2)}</pre></details></td><td>{x.after_data?<details><summary>View JSON</summary><pre>{JSON.stringify(x.after_data,null,2)}</pre></details>:"—"}</td><td>{x.changed_by||"System"}</td></tr>)}{!shown.length&&<tr><td colSpan={7} className="table-empty">No draft voucher revisions recorded.</td></tr>}</tbody></table></div>}
-  <p className="module-footnote">Posted voucher headers and lines are protected at database level. Draft header edits are snapshotted. Approval is enabled here for sales and purchase orders; other documents must use their dedicated receipt, invoice, return or journal posting workflow. Line-item editing is still controlled in the source transaction modules.</p>
+  <p className="module-footnote">Posted voucher headers and lines are protected at database level. Draft headers and supported line items can be edited here with atomic total recalculation and automatic revision snapshots. Approval is enabled for sales and purchase orders; other documents use their dedicated posting workflows.</p>
  </section>;
 }
