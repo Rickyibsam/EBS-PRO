@@ -22,7 +22,7 @@ const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 const db = url && key ? createClient(url, key) : null;
 
 type Organization = { id: string; name: string; city: string | null; currency: string };
-const nav = ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Supplier Invoices","Purchase Returns","Customers","Suppliers","Products","Distribution","Recovery","Accounts","Reports","Team & Employees","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Audit Trail","Settings"];
+const nav = ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Supplier Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Recovery","Accounts","Reports","Team & Employees","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Audit Trail","Booker Product Access","Settings"];
 const roleAccess: Record<string,string[]> = {
  owner: nav, admin: nav,
  manager: ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Supplier Invoices","Purchase Returns","Customers","Suppliers","Products","Distribution","Recovery","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll"],
@@ -149,7 +149,7 @@ export default function App() {
           ? <OperationsModule db={db} tenantId={organization.id} module={active} currentRole={currentRole} />
           : active === "Booker App" && currentRole === "order_booker"
             ? <BookerOrderModule db={db} tenantId={organization.id} />
-        : ["Team & Employees","Routes","Branches & Warehouses","Booker App","Settings"].includes(active)
+        : ["Team & Employees","Routes","Branches & Warehouses","Booker App","Booker Product Access","Settings"].includes(active)
             ? <AdminModule db={db} tenantId={organization.id} module={active} currentRole={currentRole} />
             : active !== "Overview"
               ? <WorkspaceModule db={db} tenantId={organization.id} module={active} currentRole={currentRole} />
