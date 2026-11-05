@@ -5,14 +5,14 @@ type Row=Record<string,any>;
 let deferredInstallPrompt:any=null;
 if(typeof window!=="undefined")window.addEventListener("beforeinstallprompt",(event:Event)=>{event.preventDefault();deferredInstallPrompt=event;});
 export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenantId:string}){
- const [employee,setEmployee]=useState<Row|null>(null),[deliveries,setDeliveries]=useState<Row[]>([]),[orders,setOrders]=useState<Row[]>([]),[customers,setCustomers]=useState<Row[]>([]),[products,setProducts]=useState<Row[]>([]),[lines,setLines]=useState<Row[]>([]),[visits,setVisits]=useState<Row[]>([]);
+ const [authUserId,setAuthUserId]=useState(""),[employee,setEmployee]=useState<Row|null>(null),[deliveries,setDeliveries]=useState<Row[]>([]),[orders,setOrders]=useState<Row[]>([]),[customers,setCustomers]=useState<Row[]>([]),[products,setProducts]=useState<Row[]>([]),[lines,setLines]=useState<Row[]>([]),[visits,setVisits]=useState<Row[]>([]);
  const [form,setForm]=useState({delivery_id:"",visit_status:"delivered",notes:""}),[lineQuantities,setLineQuantities]=useState<Record<string,{delivered:string;marketReturn:string;returnBatch:string;returnExpiry:string}>>({}),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[notice,setNotice]=useState("");
  const [installPrompt,setInstallPrompt]=useState<any>(deferredInstallPrompt);
  useEffect(()=>{const handler=(event:Event)=>{event.preventDefault();setInstallPrompt(event as any);};window.addEventListener("beforeinstallprompt",handler);return()=>window.removeEventListener("beforeinstallprompt",handler);},[]);
  async function load(){
   setLoading(true);setNotice("");
   try{
-   const {data:user}=await db.auth.getUser();if(!user.user)throw new Error("Please sign in again.");
+   const {data:user}=await db.auth.getUser();if(!user.user)throw new Error("Please sign in again.");setAuthUserId(user.user.id);
    const {data:emp,error:empError}=await db.from("employees").select("id,full_name,employee_code").eq("tenant_id",tenantId).eq("user_id",user.user.id).maybeSingle();
    if(empError)throw empError;if(!emp)throw new Error("Your login is not linked to an active deliveryman employee record. Ask the administrator to link your staff account.");
    setEmployee(emp);
@@ -32,11 +32,11 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
      productIds.length?db.from("products").select("id,name,sku,barcode").eq("tenant_id",tenantId).in("id",productIds):Promise.resolve({data:[],error:null})
     ]);
     if(cu.error)throw cu.error;if(pr.error)throw pr.error;setCustomers(cu.data??[]);setProducts(pr.data??[]);
-   await cacheDeliverySnapshot(tenantId,{employee:emp,deliveries:deliveryRows,orders:o.data??[],lines:l.data??[],visits:v.data??[],customers:cu.data??[],products:pr.data??[]});
+   await cacheDeliverySnapshot(tenantId,user.user.id,{employee:emp,deliveries:deliveryRows,orders:o.data??[],lines:l.data??[],visits:v.data??[],customers:cu.data??[],products:pr.data??[]});
    }else{setOrders([]);setLines([]);setVisits([]);setCustomers([]);setProducts([]);}
   }catch(e){
    if(!navigator.onLine){
-    try{const cached=await getDeliverySnapshot(tenantId);const d=cached?.data;if(d){setEmployee((d.employee as Row)||null);setDeliveries((d.deliveries as Row[])||[]);setOrders((d.orders as Row[])||[]);setLines((d.lines as Row[])||[]);setVisits((d.visits as Row[])||[]);setCustomers((d.customers as Row[])||[]);setProducts((d.products as Row[])||[]);setNotice("Offline mode: showing the last saved assigned deliveries. New visits are queued on this device until connection returns.");}else setNotice("Offline and no delivery assignment snapshot is saved. Connect once to download your assignments.");}
+    try{const {data:{session}}=await db.auth.getSession();const offlineUserId=session?.user.id||"";if(!offlineUserId)throw new Error("Sign in on this device before viewing offline delivery assignments.");setAuthUserId(offlineUserId);const cached=await getDeliverySnapshot(tenantId,offlineUserId);const d=cached?.data;if(d){setEmployee((d.employee as Row)||null);setDeliveries((d.deliveries as Row[])||[]);setOrders((d.orders as Row[])||[]);setLines((d.lines as Row[])||[]);setVisits((d.visits as Row[])||[]);setCustomers((d.customers as Row[])||[]);setProducts((d.products as Row[])||[]);setNotice("Offline mode: showing the last saved assigned deliveries. New visits are queued on this device until connection returns.");}else setNotice("Offline and no delivery assignment snapshot is saved. Connect once to download your assignments.");}
     catch(cacheError){setNotice(cacheError instanceof Error?cacheError.message:"Offline delivery data could not be loaded.");}
    }else setNotice(e instanceof Error?e.message:"Assigned deliveries could not be loaded.");
   }
@@ -45,7 +45,7 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
  async function syncPendingVisits(){
   if(!navigator.onLine)return;
   try{
-   const pending=await getQueuedDeliveryVisits(tenantId);
+   const {data:{session}}=await db.auth.getSession();const userId=session?.user.id||authUserId;if(!userId)return;const pending=await getQueuedDeliveryVisits(tenantId,userId);
    for(const item of pending){
     const {error}=await db.rpc("record_van_delivery_visit",{p_delivery_id:item.delivery_id,p_visit_status:item.visit_status,p_line_quantities:item.line_quantities,p_notes:item.notes,p_idempotency_key:item.idempotency_key});
     if(error)throw error;
@@ -64,7 +64,7 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
    const selectedLines=lines.filter(x=>x.delivery_id===d.id);
    const quantityReport=selectedLines.map(x=>({delivery_line_id:x.id,product_id:x.product_id,picked_quantity_base:Number(x.picked_quantity_base||0),delivered_quantity_base:Number(lineQuantities[x.id]?.delivered??x.picked_quantity_base??0),market_return_quantity_base:Number(lineQuantities[x.id]?.marketReturn||0),return_batch_number:lineQuantities[x.id]?.returnBatch||null,return_expiry_date:lineQuantities[x.id]?.returnExpiry||null}));
    for(const q of quantityReport){if(!Number.isFinite(q.delivered_quantity_base)||q.delivered_quantity_base<0||q.delivered_quantity_base>q.picked_quantity_base)throw new Error("Delivered quantity must be between zero and picked quantity.");if(!Number.isFinite(q.market_return_quantity_base)||q.market_return_quantity_base<0||q.market_return_quantity_base>q.delivered_quantity_base)throw new Error("Market return quantity cannot exceed delivered quantity.");}
-   const payload={idempotency_key:crypto.randomUUID(),vehicle_number:d.vehicle_number||"",tenant_id:tenantId,delivery_id:d.id,delivery_man_employee_id:employee.id,customer_id:o.customer_id,visit_status:form.visit_status,shops_visited:1,line_quantities:quantityReport,notes:form.notes.trim()||null,created_by:user.user?.id??null,queued_at:new Date().toISOString()};
+   const payload={idempotency_key:crypto.randomUUID(),vehicle_number:d.vehicle_number||"",user_id:authUserId,tenant_id:tenantId,delivery_id:d.id,delivery_man_employee_id:employee.id,customer_id:o.customer_id,visit_status:form.visit_status,shops_visited:1,line_quantities:quantityReport,notes:form.notes.trim()||null,created_by:user.user?.id??null,queued_at:new Date().toISOString()};
    if(!navigator.onLine){
     await queueDeliveryVisit({...payload,id:crypto.randomUUID(),created_by:payload.created_by||null});
     setNotice("No internet: delivery visit safely queued on this device. It will sync when connection returns.");
