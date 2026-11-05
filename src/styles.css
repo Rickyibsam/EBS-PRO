@@ -156,3 +156,9 @@
 .recent-activity-list time{margin-left:auto;color:#9aa9a8;white-space:nowrap}
 .activity-dot{color:#35bd9b;font-size:18px;line-height:1}
 @media(max-width:560px){.recent-activity-list>div{flex-wrap:wrap}.recent-activity-list time{margin-left:28px;width:100%}}
+
+
+.backup-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:14px 0}
+.backup-grid>.transaction-form{min-width:0}
+.backup-grid .primary-action{margin-top:10px}
+@media(max-width:760px){.backup-grid{grid-template-columns:1fr}}
