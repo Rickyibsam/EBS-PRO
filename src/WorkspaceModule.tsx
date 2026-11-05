@@ -21,7 +21,7 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
 
   const isProducts = module === "Products";
   const isParties = module === "Customers" || module === "Vendors";
-  const partyType = module === "Vendors" ? "vendor" : "customer";
+  const partyType = module === "Vendors" ? "supplier" : "customer";
 
   async function load() {
     setLoading(true); setNotice("");
@@ -116,7 +116,7 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
   if (!isProducts && !isParties) return <section className="module-empty"><h2>{module}</h2><p>Is module ka database-backed workflow aglay development phase mein add hoga. Existing data aur database structure ko preserve kiya ja raha hai.</p></section>;
 
   return <section className="module-page">
-    <div className="module-toolbar"><div><h2>{isProducts ? "Product Master" : partyType === "supplier" ? "Vendor Master" : "Customer Master"}</h2><p>{isProducts ? "Manage SKUs, brands, barcodes, and stock controls." : "Manage business contacts, credit limits, and opening balances."}</p></div>{(isProducts?["owner","admin","manager","purchase"]:partyType==="supplier"?["owner","admin","manager","purchase"]:["owner","admin","manager","sales","purchase"]).includes(currentRole)&&<button className="primary-action" onClick={() => { setShowForm(!showForm); setNotice(""); }}>{showForm ? "Close form" : isProducts ? "+ Add product" : partyType === "supplier" ? "+ Add supplier" : "+ Add customer"}</button>}</div>
+    <div className="module-toolbar"><div><h2>{isProducts ? "Product Master" : partyType === "supplier" ? "Vendor Master" : "Customer Master"}</h2><p>{isProducts ? "Manage SKUs, brands, barcodes, and stock controls." : "Manage business contacts, credit limits, and opening balances."}</p></div>{(isProducts?["owner","admin","manager","purchase"]:partyType==="supplier"?["owner","admin","manager","purchase"]:["owner","admin","manager","sales","purchase"]).includes(currentRole)&&<button className="primary-action" onClick={() => { setShowForm(!showForm); setNotice(""); }}>{showForm ? "Close form" : isProducts ? "+ Add product" : partyType === "supplier" ? "+ Add Vendor" : "+ Add customer"}</button>}</div>
     {notice && <div className="notice">{notice}</div>}
     {showForm && (isProducts ? <form className="data-form" onSubmit={saveProduct}>
       <label>SKU / Item code<input required value={productForm.sku} onChange={e=>setProductForm({...productForm,sku:e.target.value})} /></label>
