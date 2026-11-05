@@ -1,5 +1,5 @@
 export type OfflineDeliveryVisit = {
-  id:string; tenant_id:string; delivery_id:string; delivery_man_employee_id:string; customer_id:string;
+  id:string; idempotency_key:string; vehicle_number:string; tenant_id:string; delivery_id:string; delivery_man_employee_id:string; customer_id:string;
   visit_status:string; shops_visited:number; line_quantities:Array<Record<string,unknown>>;
   notes:string|null; created_by:string|null; queued_at:string;
 };
