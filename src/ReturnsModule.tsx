@@ -15,6 +15,8 @@ export default function ReturnsModule({ db, tenantId, currentRole }: { db: Supab
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
+  const [printNote,setPrintNote] = useState<Row|null>(null);
+  const [printLines,setPrintLines] = useState<Row[]>([]);
   const canPost = ["owner","admin","manager","accounts"].includes(currentRole);
   const money = (v: number) => "PKR " + Number(v || 0).toLocaleString("en-PK",{minimumFractionDigits:2,maximumFractionDigits:2});
 
@@ -72,6 +74,18 @@ export default function ReturnsModule({ db, tenantId, currentRole }: { db: Supab
     setSaving(false);
   }
 
+  async function preparePrint(note:Row){
+    try{
+      const {data,error}=await db.from("sales_credit_note_lines").select("product_id,unit_id,quantity,unit_price,tax_rate,discount_amount,line_total,return_to_stock").eq("tenant_id",tenantId).eq("credit_note_id",note.id);
+      if(error)throw error;
+      const productIds=[...new Set((data??[]).map(x=>x.product_id))],unitIds=[...new Set((data??[]).map(x=>x.unit_id))];
+      const [p,u]=await Promise.all([db.from("products").select("id,name,sku").eq("tenant_id",tenantId).in("id",productIds),db.from("units_of_measure").select("id,name,symbol").eq("tenant_id",tenantId).in("id",unitIds)]);
+      if(p.error)throw p.error;if(u.error)throw u.error;
+      setPrintLines((data??[]).map(x=>({...x,product_name:p.data?.find(y=>y.id===x.product_id)?.name||x.product_id,unit_name:u.data?.find(y=>y.id===x.unit_id)?.symbol||""})));
+      setPrintNote(note);
+    }catch(e){setNotice(e instanceof Error?e.message:"Credit note print preview could not be prepared.");}
+  }
+
   async function postNote(id:string){
     setSaving(true);setNotice("");
     try{const {data,error}=await db.rpc("post_sales_credit_note",{p_credit_note_id:id});if(error)throw error;if(data?.success!==true)throw new Error("Credit note posting was not confirmed.");setNotice("Credit note posted. Customer balance and returned stock/accounting have been updated.");await load();}
@@ -101,8 +115,9 @@ export default function ReturnsModule({ db, tenantId, currentRole }: { db: Supab
     </form>
     <h3>Credit note register</h3>
     {loading?<div className="table-empty">Loading credit notes…</div>:<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Credit note</th><th>Date</th><th>Invoice</th><th>Customer</th><th>Reason</th><th>Amount</th><th>Status / action</th></tr></thead><tbody>
-      {notes.map(n=><tr key={n.id}><td>{n.credit_note_number}</td><td>{n.credit_note_date}</td><td>{invoices.find(i=>i.id===n.sales_invoice_id)?.invoice_number||n.sales_invoice_id}</td><td>{customers.find(c=>c.id===n.customer_id)?.name||n.customer_id}</td><td>{n.reason}</td><td>{money(n.grand_total)}</td><td>{n.status==="draft"&&canPost?<button disabled={saving} onClick={()=>void postNote(n.id)}>Post credit note</button>:n.status==="draft"?"Awaiting accounts posting":n.status}</td></tr>)}
+      {notes.map(n=><tr key={n.id}><td>{n.credit_note_number}</td><td>{n.credit_note_date}</td><td>{invoices.find(i=>i.id===n.sales_invoice_id)?.invoice_number||n.sales_invoice_id}</td><td>{customers.find(c=>c.id===n.customer_id)?.name||n.customer_id}</td><td>{n.reason}</td><td>{money(n.grand_total)}</td><td><button onClick={()=>void preparePrint(n)}>Print</button> {n.status==="draft"&&canPost?<button disabled={saving} onClick={()=>void postNote(n.id)}>Post credit note</button>:n.status==="draft"?"Awaiting accounts posting":n.status}</td></tr>)}
       {!notes.length&&<tr><td colSpan={7} className="table-empty">No credit notes recorded yet.</td></tr>}
     </tbody></table></div>}
+    {printNote&&<section className="print-document"><div className="print-top"><h2>EBS PRO V.01</h2><strong>SALES CREDIT NOTE</strong><p>Wholesale & Distribution</p></div><div className="print-meta"><div><b>Customer</b><br/>{customers.find(c=>c.id===printNote.customer_id)?.name||"—"}</div><div><b>Credit note</b><br/>{printNote.credit_note_number}<br/>{printNote.credit_note_date}<br/>Status: {printNote.status}</div></div><p>Reason: {printNote.reason}</p><table className="print-table"><thead><tr><th>Product</th><th>Qty</th><th>Rate</th><th>Tax</th><th>Discount</th><th>Total</th></tr></thead><tbody>{printLines.map((line,i)=><tr key={i}><td>{line.product_name}</td><td>{line.quantity} {line.unit_name}</td><td>{money(line.unit_price)}</td><td>{line.tax_rate}%</td><td>{money(line.discount_amount)}</td><td>{money(line.line_total)}</td></tr>)}</tbody></table><div className="print-total">Credit total: {money(printNote.grand_total)}</div><div className="print-actions"><button onClick={()=>window.print()}>Print</button><button onClick={()=>setPrintNote(null)}>Close</button></div></section>}
   </section>;
 }
