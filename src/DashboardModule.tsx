@@ -13,7 +13,7 @@ const launchers=[
  {title:"7. Distribution & Delivery",description:"Delivery assignments, route operations, drivers and charges",icon:"⌖",modules:["Delivery Man App","Distribution","Delivery Charges","Routes"]},
  {title:"8. HR & Payroll",description:"Employee records, attendance, leave, payroll and commissions",icon:"♙",modules:["Team & Employees","HR & Attendance","Payroll","Targets & Incentives"]},
  {title:"9. Reports & Analytics",description:"Sales, purchase, stock, recovery, profitability and audit reports",icon:"▤",modules:["Reports","Targets & Incentives","Audit Trail"]},
- {title:"10. Administration & Security",description:"User access, roles, login history, settings and voucher controls",icon:"⚙",modules:["Team & Employees","Login History","Settings","Voucher Revision History","Audit Trail"]}
+ {title:"10. Administration & Security",description:"User access, roles, login history, settings and voucher controls",icon:"⚙",modules:["Team & Employees","Login History","Settings","Backup & Restore","Voucher Revision History","Audit Trail"]}
 ];
 export default function DashboardModule({db,tenantId,company,allowedModules,onNavigate}:{db:SupabaseClient;tenantId:string;company:string;allowedModules:string[];onNavigate:(module:string)=>void}){
  const [metrics,setMetrics]=useState<Metric[]>([]),[recentActivity,setRecentActivity]=useState<any[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState("");
