@@ -47,7 +47,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       if (!auth.user) throw new Error("Please sign in again.");
       const [emp, prod, pu, u, recent] = await Promise.all([
         db.from("employees").select("id,employee_code,full_name,branch_id").eq("tenant_id", tenantId).eq("user_id", auth.user.id).eq("employment_status", "active").maybeSingle(),
-        db.from("products").select("id,sku,name,sales_tax_rate").eq("tenant_id", tenantId).eq("is_active", true).order("name"),
+        db.from("products").select("id,sku,name,brand,sales_tax_rate").eq("tenant_id", tenantId).eq("is_active", true).order("name"),
         db.from("product_units").select("product_id,unit_id,conversion_to_base,is_sales_unit").eq("tenant_id", tenantId).eq("is_sales_unit", true),
         db.from("units_of_measure").select("id,name,symbol").eq("tenant_id", tenantId).order("name"),
         db.from("sales_orders").select("id,order_number,order_date,status,grand_total").eq("tenant_id", tenantId).eq("created_by", auth.user.id).eq("order_source", "order_booker").order("created_at", { ascending: false }).limit(30)
