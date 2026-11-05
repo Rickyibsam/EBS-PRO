@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-type Product = { id: string; sku: string; name: string; brand: string | null; barcode: string | null; category_id:string|null; base_unit_id:string|null; is_active: boolean; min_stock: number; cost_price:number; sale_price:number; track_expiry: boolean; track_batch: boolean };
+type Product = { id: string; sku: string; name: string; brand: string | null; barcode: string | null; category_id:string|null; base_unit_id:string|null; description:string|null; purchase_tax_rate:number; sales_tax_rate:number; reorder_level:number; is_active: boolean; min_stock: number; cost_price:number; sale_price:number; track_expiry: boolean; track_batch: boolean };
 type Party = { id: string; party_code: string; party_type: string; name: string; contact_person: string | null; phone: string | null; email:string|null;address:string|null;tax_number:string|null;payment_terms_days:number;city: string | null; credit_limit: number; opening_balance: number; status: string };
 
 export default function WorkspaceModule({ db, tenantId, module, currentRole }: { db: SupabaseClient; tenantId: string; module: string; currentRole: string }) {
