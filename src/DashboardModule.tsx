@@ -20,9 +20,10 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
  const [updatedAt,setUpdatedAt]=useState("");
  const [expandedLauncher,setExpandedLauncher]=useState("1. Dashboard & Management");
  useEffect(()=>{let live=true;async function load(){setLoading(true);setError("");try{
-  const now=new Date(),today=localDate(now),since=new Date(now.getTime()-24*60*60*1000).toISOString();
-  const [sales,orders,purchases,purchaseInvoices,products,customers,vendors,receipts,deliveries,lowStock,activity,inventoryValuation,coa,journalLines]=await Promise.all([
+  const now=new Date(),today=localDate(now),since=new Date(now.getTime()-24*60*60*1000).toISOString(),monthStart=localDate(new Date(now.getFullYear(),now.getMonth(),1)),weekStartDate=new Date(now);weekStartDate.setDate(now.getDate()-((now.getDay()+6)%7));const weekStart=localDate(weekStartDate);
+  const [sales,salesPeriod,orders,purchases,purchaseInvoices,products,customers,vendors,receipts,deliveries,lowStock,activity,inventoryValuation,coa,journalLines]=await Promise.all([
    db.from("sales_invoices").select("id,grand_total,status,invoice_date",{count:"exact"}).eq("tenant_id",tenantId).eq("invoice_date",today).eq("status","posted"),
+   db.from("sales_invoices").select("grand_total,invoice_date").eq("tenant_id",tenantId).eq("status","posted").gte("invoice_date",monthStart).lte("invoice_date",today),
    db.from("sales_orders").select("id",{count:"exact",head:true}).eq("tenant_id",tenantId).in("status",["draft","submitted","approved","allocated"]),
    db.from("purchase_orders").select("id",{count:"exact",head:true}).eq("tenant_id",tenantId),
    db.from("purchase_invoices").select("id,grand_total,status,invoice_date",{count:"exact"}).eq("tenant_id",tenantId).eq("invoice_date",today).eq("status","posted"),
@@ -39,6 +40,8 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
   ]);
   const err=[sales,orders,purchases,purchaseInvoices,products,customers,vendors,receipts,deliveries].find(x=>x.error);if(err)throw err.error;
   const daySales=(sales.data??[]).reduce((s,x)=>s+Number(x.grand_total||0),0);
+  const weekSales=(salesPeriod.data??[]).filter(x=>x.invoice_date>=weekStart).reduce((s,x)=>s+Number(x.grand_total||0),0);
+  const monthSales=(salesPeriod.data??[]).reduce((s,x)=>s+Number(x.grand_total||0),0);
   const dayReceipts=(receipts.data??[]).filter(x=>x.payment_type==="receipt").reduce((s,x)=>s+Number(x.amount||0),0);
   const dayPurchases=(purchaseInvoices.data??[]).reduce((s,x)=>s+Number(x.grand_total||0),0);
   const accountTypes=new Map((coa.data??[]).map(x=>[x.id,x.account_type]));
@@ -47,6 +50,8 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
   const lowCount=lowStock.error?null:(lowStock.data||[]).length,activityCount=activity.error?null:(activity.count??0);
   const next:Metric[]=[
    {label:"Sales today",value:money(daySales),detail:(sales.count??0)+" posted invoices",icon:"↗",tone:"mint"},
+   {label:"Sales this week",value:money(weekSales),detail:"Monday-to-date · posted invoices",icon:"◷",tone:"blue"},
+   {label:"Sales this month",value:money(monthSales),detail:"Month-to-date · posted invoices",icon:"▤",tone:"violet"},
    {label:"Open sales orders",value:String(orders.count??0),detail:"Awaiting next workflow step",icon:"▤",tone:"blue"},
    {label:"Pending deliveries",value:String(deliveries.count??0),detail:"Pending, picked or dispatched",icon:"⌖",tone:"amber"},
    {label:"Receipts today",value:money(dayReceipts),detail:"Customer receipts recorded",icon:"₨",tone:"violet"},
