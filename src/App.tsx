@@ -27,6 +27,7 @@ const BatchExpiryModule = lazy(() => import("./BatchExpiryModule"));
 const AssetBudgetModule = lazy(() => import("./AssetBudgetModule"));
 const VanStockModule = lazy(() => import("./VanStockModule"));
 const StockTakeModule = lazy(() => import("./StockTakeModule"));
+const HRModule = lazy(() => import("./HRModule"));
 const VoucherHistoryModule = lazy(() => import("./VoucherHistoryModule"));
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -42,19 +43,19 @@ const navGroups = [
  {name:"Inventory & Warehouse",icon:"▦",items:["Inventory","Batch & Expiry","Stock Take","Van Stock","Products","Stock Transfers","Branches & Warehouses"]},
  {name:"Purchasing",icon:"⇩",items:["Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Vendors","Vendor Feeding"]},
  {name:"Finance",icon:"◉",items:["Accounts","Payroll","Asset & Budget Control","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register"]},
- {name:"People & Access",icon:"♙",items:["Team & Employees","Booker Product Access","Settings"]},
+ {name:"People & Access",icon:"♙",items:["Team & Employees","HR & Attendance","Booker Product Access","Settings"]},
  {name:"Reports & Governance",icon:"▤",items:["Reports","Targets & Incentives","Voucher Revision History","Audit Trail"]}
 ];
 const roleAccess: Record<string,string[]> = {
  owner: nav, admin: nav,
- manager: ["Overview","Sales","Booker App","Inventory","Batch & Expiry","Stock Take","Van Stock","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Recovery","Customer Credit Control","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Asset & Budget Control","Booker Product Access","Targets & Incentives"],
+ manager: ["Overview","Sales","Booker App","Inventory","Batch & Expiry","Stock Take","Van Stock","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Recovery","Customer Credit Control","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Asset & Budget Control","HR & Attendance","Booker Product Access","Targets & Incentives"],
  accounts: ["Overview","Recovery","Accounts","Invoices","Vendor Invoices","Purchase Returns","Sales Returns","Payroll","Asset & Budget Control","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register","Voucher Revision History","Customer Credit Control","Reports"],
  purchase: ["Overview","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Vendors","Products","Inventory","Vendor Feeding","Reports"],
  sales: ["Overview","Sales","Booker App","Customers","Products","Routes","Invoices","Sales Returns","Reports","Booker Product Access","Targets & Incentives"],
- order_booker: ["Overview","Booker App","Sales","Customers","Products"],
+ order_booker: ["Overview","Booker App","Sales","Customers","Products","HR & Attendance"],
  warehouse: ["Overview","Inventory","Batch & Expiry","Stock Take","Van Stock","Distribution","Goods Receiving","Stock Transfers","Products","Purchases"],
  cashier: ["Overview","Sales","Invoices"],
- delivery_man: ["Overview","Delivery Man App"],
+ delivery_man: ["Overview","Delivery Man App","HR & Attendance"],
  viewer: ["Overview","Reports"]
 };
 
