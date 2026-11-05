@@ -1,6 +1,7 @@
 import {useEffect,useMemo,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 type Metric={label:string;value:string;detail:string;icon:string;tone:string};
+type Notice={id:string;title:string;detail:string;module:string;level:"warning"|"info"};
 const money=(v:number)=>"PKR "+Number(v||0).toLocaleString("en-PK",{maximumFractionDigits:0});
 const localDate=(d:Date)=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");
 const launchers=[
@@ -16,12 +17,12 @@ const launchers=[
  {title:"10. Administration & Security",description:"User access, roles, login history, settings and voucher controls",icon:"⚙",modules:["Team & Employees","Login History","Settings","Backup & Restore","Voucher Revision History","Audit Trail"]}
 ];
 export default function DashboardModule({db,tenantId,company,allowedModules,onNavigate}:{db:SupabaseClient;tenantId:string;company:string;allowedModules:string[];onNavigate:(module:string)=>void}){
- const [metrics,setMetrics]=useState<Metric[]>([]),[recentActivity,setRecentActivity]=useState<any[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState("");
+ const [metrics,setMetrics]=useState<Metric[]>([]),[recentActivity,setRecentActivity]=useState<any[]>([]),[notifications,setNotifications]=useState<Notice[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState("");
  const [updatedAt,setUpdatedAt]=useState("");
  const [expandedLauncher,setExpandedLauncher]=useState("1. Dashboard & Management");
  useEffect(()=>{let live=true;async function load(){setLoading(true);setError("");try{
   const now=new Date(),today=localDate(now),since=new Date(now.getTime()-24*60*60*1000).toISOString(),monthStart=localDate(new Date(now.getFullYear(),now.getMonth(),1)),weekStartDate=new Date(now);weekStartDate.setDate(now.getDate()-((now.getDay()+6)%7));const weekStart=localDate(weekStartDate);
-  const [sales,salesPeriod,orders,purchases,purchaseInvoices,products,customers,vendors,receipts,deliveries,lowStock,activity,inventoryValuation,coa,journalLines]=await Promise.all([
+  const [sales,salesPeriod,orders,purchases,purchaseInvoices,products,customers,vendors,receipts,deliveries,lowStock,activity,inventoryValuation,coa,journalLines,pendingOrders,overdueInvoices]=await Promise.all([
    db.from("sales_invoices").select("id,grand_total,status,invoice_date",{count:"exact"}).eq("tenant_id",tenantId).eq("invoice_date",today).eq("status","posted"),
    db.from("sales_invoices").select("grand_total,invoice_date").eq("tenant_id",tenantId).eq("status","posted").gte("invoice_date",monthStart).lte("invoice_date",today),
    db.from("sales_orders").select("id",{count:"exact",head:true}).eq("tenant_id",tenantId).in("status",["draft","submitted","approved","allocated"]),
@@ -36,7 +37,9 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
    db.from("audit_logs").select("id,action,entity_type,created_at",{count:"exact"}).eq("tenant_id",tenantId).gte("created_at",since).order("created_at",{ascending:false}).limit(6),
    db.rpc("get_inventory_valuation",{p_tenant_id:tenantId}),
    db.from("chart_of_accounts").select("id,account_type").eq("tenant_id",tenantId),
-   db.from("journal_lines").select("account_id,debit,credit,journal_entries!inner(entry_date,status)").eq("tenant_id",tenantId).eq("journal_entries.status","posted").eq("journal_entries.entry_date",today)
+   db.from("journal_lines").select("account_id,debit,credit,journal_entries!inner(entry_date,status)").eq("tenant_id",tenantId).eq("journal_entries.status","posted").eq("journal_entries.entry_date",today),
+   db.from("sales_orders").select("id,order_number,status").eq("tenant_id",tenantId).in("status",["draft","submitted"]).limit(100),
+   db.from("sales_invoices").select("id,invoice_number,due_date,grand_total").eq("tenant_id",tenantId).eq("status","posted").lt("due_date",today).limit(1000)
   ]);
   const err=[sales,salesPeriod,orders,purchases,purchaseInvoices,products,customers,vendors,receipts,deliveries].find(x=>x.error);if(err)throw err.error;
   const daySales=(sales.data??[]).reduce((s,x)=>s+Number(x.grand_total||0),0);
@@ -65,7 +68,12 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
    {label:"Vendors",value:String(vendors.count??0),detail:"Active supplier accounts",icon:"⌂",tone:"amber"},
    {label:"Activity (24h)",value:activityCount===null?"—":String(activityCount),detail:activityCount===null?"Not available for this role":"Recorded audit events",icon:"◷",tone:"blue"}
   ];
-  if(live){setMetrics(next);setRecentActivity(activity.data??[]);setUpdatedAt(now.toLocaleTimeString("en-PK",{hour:"2-digit",minute:"2-digit"}));}
+  const notices:Notice[]=[];
+  if(!lowStock.error&&(lowStock.data??[]).length>0&&allowedModules.includes("Inventory"))notices.push({id:"low-stock",title:"Low stock needs attention",detail:(lowStock.data??[]).length+" product(s) are at or below their reorder threshold.",module:"Inventory",level:"warning"});
+  if(!pendingOrders.error&&(pendingOrders.data??[]).length>0&&allowedModules.includes("Sales"))notices.push({id:"sales-approval",title:"Sales orders awaiting approval",detail:(pendingOrders.data??[]).length+" draft or submitted order(s) are waiting for review.",module:"Sales",level:"info"});
+  if(!overdueInvoices.error&&(overdueInvoices.data??[]).length>0&&allowedModules.includes("Invoices"))notices.push({id:"past-due-invoices",title:"Invoices past their due date",detail:(overdueInvoices.data??[]).length+" posted invoice(s) have a due date before today. Review balances before recovery.",module:"Invoices",level:"warning"});
+  if(!deliveries.error&&(deliveries.count??0)>0&&allowedModules.includes("Distribution"))notices.push({id:"delivery-queue",title:"Deliveries in the dispatch queue",detail:(deliveries.count??0)+" delivery(ies) are pending, picked or dispatched.",module:"Distribution",level:"info"});
+  if(live){setMetrics(next);setRecentActivity(activity.data??[]);setNotifications(notices);setUpdatedAt(now.toLocaleTimeString("en-PK",{hour:"2-digit",minute:"2-digit"}));}
  }catch(e){if(live)setError(e instanceof Error?e.message:"Dashboard could not load.");}finally{if(live)setLoading(false);}}
  void load();return()=>{live=false;};
  },[db,tenantId]);
@@ -77,6 +85,7 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
   <div className="dashboard-section-head"><div><span className="section-kicker">LIVE PERFORMANCE</span><h2>Business snapshot</h2><p>Posted invoices, open workflows and current stock signals</p></div><button className="dashboard-refresh" onClick={()=>window.location.reload()}>↻ Refresh view</button></div>
   {error&&<div className="notice">{error}</div>}
   {loading?<div className="dashboard-loading"><span className="loading-pulse"/> Reading live business data…</div>:<div className="ai-metric-grid">{metrics.map(m=><article className="ai-metric" key={m.label}><div className={"metric-icon "+m.tone}>{m.icon}</div><div className="metric-label">{m.label}</div><strong>{m.value}</strong><small>{m.detail}</small><span className="metric-glow"/></article>)}</div>}
+  {notifications.length>0&&<section className="recent-activity"><div className="dashboard-section-head"><div><span className="section-kicker">ACTION CENTRE</span><h2>Operational notifications</h2><p>{notifications.length} live item(s) need attention or review</p></div></div><div className="recent-activity-list">{notifications.map(item=><div key={item.id}><span className="activity-dot">{item.level==="warning"?"!":"•"}</span><b>{item.title}</b><span>{item.detail}</span><time><button className="dashboard-refresh" onClick={()=>onNavigate(item.module)}>Open →</button></time></div>)}</div></section>}
   {recentActivity.length>0&&<section className="recent-activity"><div className="dashboard-section-head"><div><span className="section-kicker">AUDIT STREAM</span><h2>Recent activity</h2><p>Latest recorded workspace events</p></div>{allowedModules.includes("Audit Trail")&&<button className="dashboard-refresh" onClick={()=>onNavigate("Audit Trail")}>Open audit trail →</button>}</div><div className="recent-activity-list">{recentActivity.map(item=><div key={item.id}><span className="activity-dot">•</span><b>{String(item.action||"Activity").replaceAll("_"," ")}</b><span>{item.entity_type||"Business record"}</span><time>{new Date(item.created_at).toLocaleString("en-PK",{dateStyle:"short",timeStyle:"short"})}</time></div>)}</div></section>}
   <div className="dashboard-lower"><article className="pulse-card"><div className="pulse-heading"><span className="pulse-spark">✦</span><div><small>SMART BUSINESS PULSE</small><h3>Operations insight</h3></div><span className="pulse-live">LIVE</span></div><p>{loading?"Preparing your operations summary…":pulse}</p><div className="pulse-actions"><button onClick={()=>onNavigate(low>0?"Inventory":pending>0?"Distribution":"Sales")}>{low>0?"Review stock alerts":pending>0?"Review deliveries":"Open sales workspace"} <span>→</span></button><button onClick={()=>onNavigate("Reports")}>View reports <span>→</span></button></div></article>
    <article className="focus-card"><div><small>QUICK CREATE</small><h3>Start a workflow</h3><p>Jump into a frequently used task.</p></div><div className="focus-actions"><button onClick={()=>onNavigate("Sales")}>＋ New sales order</button><button onClick={()=>onNavigate("Customers")}>＋ Add customer</button><button onClick={()=>onNavigate("Products")}>＋ Add product</button><button onClick={()=>onNavigate("Purchases")}>＋ Purchase order</button></div></article></div>
