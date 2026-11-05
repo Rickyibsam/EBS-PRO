@@ -73,9 +73,9 @@ export default function TransactionsModule({db,tenantId,module,currentRole}:{db:
    if(!partyId)throw new Error(purchase?"Please select a supplier.":"Please select a customer.");
    const clean=lines.filter(l=>l.product_id&&l.unit_id&&Number(l.quantity)>0);
    if(!clean.length)throw new Error("Add at least one product with a valid quantity.");
-   for(const l of clean){const pu=allowedUnits(l.product_id).find(x=>x.unit_id===l.unit_id);if(!pu)throw new Error("No valid unit was found for the selected product.");const q=Number(l.quantity),rate=Number(l.rate),taxRate=Number(l.tax_rate),discountValue=Number(l.discount);if(![q,rate,taxRate,discountValue].every(Number.isFinite)||q<=0||rate<0||taxRate<0||discountValue<0)throw new Error("Quantity, rate, tax and discount must be valid non-negative values.");if(rate>0&&discountValue>=q*rate)throw new Error("A line discount must be lower than the pre-tax gross amount.");}
+   for(const l of clean){const pu=allowedUnits(l.product_id).find(x=>x.unit_id===l.unit_id);if(!pu)throw new Error("No valid unit was found for the selected product.");const q=Number(l.quantity),rate=Number(l.rate),taxRate=Number(l.tax_rate),discountValue=Number(l.discount);if(![q,rate,taxRate,discountValue].every(Number.isFinite)||q<=0||rate<0||taxRate<0||discountValue<0)throw new Error("Quantity, rate, tax and discount must be valid non-negative values.");if(discountValue>q*rate+0.000001)throw new Error("A line discount cannot exceed the pre-tax gross amount.");}
    const subtotal=clean.reduce((s,l)=>s+Number(l.quantity)*Number(l.rate),0);
-   const tax=clean.reduce((s,l)=>s+Number(l.quantity)*Number(l.rate)*Number(l.tax_rate)/100,0);
+   const tax=clean.reduce((s,l)=>s+Math.max(0,Number(l.quantity)*Number(l.rate)-Number(l.discount))*Number(l.tax_rate)/100,0);
    const discount=clean.reduce((s,l)=>s+Number(l.discount),0);
    const doc=(purchase?"EBS-PO-":"EBS-SO-")+Date.now().toString().slice(-10);
    const {data:userData}=await db.auth.getUser();
@@ -84,7 +84,7 @@ export default function TransactionsModule({db,tenantId,module,currentRole}:{db:
    else {header.order_number=doc;header.customer_id=partyId;header.order_source="backoffice";if(warehouseId)header.warehouse_id=warehouseId;}
    const {data:created,error}=await db.from(table).insert(header).select("id").single();
    if(error)throw error;
-   const detail=clean.map(l=>{const pu=allowedUnits(l.product_id).find(x=>x.unit_id===l.unit_id)!;const amount=Number(l.quantity)*Number(l.rate);const taxAmount=amount*Number(l.tax_rate)/100;return {tenant_id:tenantId,[purchase?"purchase_order_id":"sales_order_id"]:created.id,product_id:l.product_id,unit_id:l.unit_id,quantity:Number(l.quantity),conversion_to_base:Number(pu.conversion_to_base),[purchase?"unit_cost":"unit_price"]:Number(l.rate),tax_rate:Number(l.tax_rate)||0,discount_amount:Number(l.discount)||0,line_total:amount+taxAmount-(Number(l.discount)||0)};});
+   const detail=clean.map(l=>{const pu=allowedUnits(l.product_id).find(x=>x.unit_id===l.unit_id)!;const amount=Number(l.quantity)*Number(l.rate);const taxAmount=Math.max(0,amount-Number(l.discount))*Number(l.tax_rate)/100;return {tenant_id:tenantId,[purchase?"purchase_order_id":"sales_order_id"]:created.id,product_id:l.product_id,unit_id:l.unit_id,quantity:Number(l.quantity),conversion_to_base:Number(pu.conversion_to_base),[purchase?"unit_cost":"unit_price"]:Number(l.rate),tax_rate:Number(l.tax_rate)||0,discount_amount:Number(l.discount)||0,line_total:amount+taxAmount-(Number(l.discount)||0)};});
    const lineTable=purchase?"purchase_order_lines":"sales_order_lines";
    const {error:lineError}=await db.from(lineTable).insert(detail);
    if(lineError){const cleanup=await db.from(table).delete().eq("id",created.id).eq("tenant_id",tenantId).eq("status","draft");setNotice("Order lines could not be saved: "+lineError.message+(cleanup.error?" The empty draft could not be removed; please review document "+doc+".":" The empty draft was rolled back."));await loadAll();return;}
