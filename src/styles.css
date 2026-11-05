@@ -162,3 +162,15 @@
 .backup-grid>.transaction-form{min-width:0}
 .backup-grid .primary-action{margin-top:10px}
 @media(max-width:760px){.backup-grid{grid-template-columns:1fr}}
+
+@media print{
+ @page{size:A4 portrait;margin:12mm}
+ body *{visibility:hidden!important}
+ .report-print,.report-print *{visibility:visible!important}
+ .report-print{display:block!important;position:absolute!important;left:0!important;top:0!important;width:100%!important;padding:0!important;background:#fff!important;color:#111!important}
+ .report-print .data-table-wrap{break-inside:avoid;page-break-inside:avoid;margin:0 0 12px;border:1px solid #ddd;box-shadow:none}
+ .report-print .data-table{font-size:9px}
+ .report-print h3{font-size:12px;color:#111}
+ .report-print .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+ .report-print .stats article{border:1px solid #ddd;background:#fff;color:#111;box-shadow:none}
+}
