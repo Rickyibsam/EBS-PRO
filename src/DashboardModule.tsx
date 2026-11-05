@@ -15,7 +15,7 @@ export default function DashboardModule({db,tenantId,company,onNavigate}:{db:Sup
  const [metrics,setMetrics]=useState<Metric[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState("");
  const [updatedAt,setUpdatedAt]=useState("");
  useEffect(()=>{let live=true;async function load(){setLoading(true);setError("");try{
-  const now=new Date(),today=localDate(now),tomorrow=localDate(new Date(now.getFullYear(),now.getMonth(),now.getDate()+1)),since=new Date(now.getTime()-24*60*60*1000).toISOString();
+  const now=new Date(),today=localDate(now),since=new Date(now.getTime()-24*60*60*1000).toISOString();
   const [sales,orders,purchases,purchaseInvoices,products,customers,vendors,receipts,deliveries,lowStock,activity,inventoryValuation,coa,journalLines]=await Promise.all([
    db.from("sales_invoices").select("id,grand_total,status,invoice_date",{count:"exact"}).eq("tenant_id",tenantId).eq("invoice_date",today).eq("status","posted"),
    db.from("sales_orders").select("id",{count:"exact",head:true}).eq("tenant_id",tenantId).in("status",["draft","submitted","approved","allocated"]),
@@ -27,7 +27,10 @@ export default function DashboardModule({db,tenantId,company,onNavigate}:{db:Sup
    db.from("payments").select("amount,payment_type").eq("tenant_id",tenantId).eq("payment_date",today),
    db.from("deliveries").select("id",{count:"exact",head:true}).eq("tenant_id",tenantId).in("status",["pending","picked","dispatched"]),
    db.rpc("get_low_stock_alerts",{p_tenant_id:tenantId}),
-   db.from("audit_logs").select("id",{count:"exact",head:true}).eq("tenant_id",tenantId).gte("created_at",since)
+   db.from("audit_logs").select("id",{count:"exact",head:true}).eq("tenant_id",tenantId).gte("created_at",since),
+   db.rpc("get_inventory_valuation",{p_tenant_id:tenantId}),
+   db.from("chart_of_accounts").select("id,account_type").eq("tenant_id",tenantId),
+   db.from("journal_lines").select("account_id,debit,credit,journal_entries!inner(entry_date,status)").eq("tenant_id",tenantId).eq("journal_entries.status","posted").eq("journal_entries.entry_date",today)
   ]);
   const err=[sales,orders,purchases,purchaseInvoices,products,customers,vendors,receipts,deliveries].find(x=>x.error);if(err)throw err.error;
   const daySales=(sales.data??[]).reduce((s,x)=>s+Number(x.grand_total||0),0);
@@ -35,7 +38,7 @@ export default function DashboardModule({db,tenantId,company,onNavigate}:{db:Sup
   const dayPurchases=(purchaseInvoices.data??[]).reduce((s,x)=>s+Number(x.grand_total||0),0);
   const accountTypes=new Map((coa.data??[]).map(x=>[x.id,x.account_type]));
   const netProfit=(journalLines.data??[]).reduce((sum,x)=>{const type=accountTypes.get(x.account_id);return sum+(type==="income"?Number(x.credit||0)-Number(x.debit||0):type==="expense"?Number(x.debit||0)-Number(x.credit||0):0);},0);
-  const stockValue=inventoryValuation.error?null:Number(inventoryValuation.data?.total_value||0);
+  const stockValue=inventoryValuation.error?null:Number(inventoryValuation.data?.total_value||0),profitValue=coa.error||journalLines.error?null:netProfit;
   const lowCount=lowStock.error?null:(lowStock.data||[]).length,activityCount=activity.error?null:(activity.count??0);
   const next:Metric[]=[
    {label:"Sales today",value:money(daySales),detail:(sales.count??0)+" posted invoices",icon:"↗",tone:"mint"},
@@ -46,7 +49,7 @@ export default function DashboardModule({db,tenantId,company,onNavigate}:{db:Sup
    {label:"Purchases today",value:money(dayPurchases),detail:(purchaseInvoices.count??0)+" posted supplier invoices",icon:"⇩",tone:"blue"},
    {label:"Purchase orders",value:String(purchases.count??0),detail:"Purchase documents",icon:"▱",tone:"blue"},
    {label:"Stock value",value:stockValue===null?"—":money(stockValue),detail:"Warehouse and van ledger valuation",icon:"▦",tone:"mint"},
-   {label:"Net profit today",value:money(netProfit),detail:"Posted GL income less expenses",icon:"✧",tone:"violet"},
+   {label:"Net profit today",value:profitValue===null?"—":money(profitValue),detail:"Posted GL income less expenses",icon:"✧",tone:"violet"},
    {label:"Active products",value:String(products.count??0),detail:"Product master records",icon:"▦",tone:"mint"},
    {label:"Customers",value:String(customers.count??0),detail:"Active customer accounts",icon:"♙",tone:"violet"},
    {label:"Vendors",value:String(vendors.count??0),detail:"Active supplier accounts",icon:"⌂",tone:"amber"},
