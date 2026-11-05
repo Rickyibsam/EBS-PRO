@@ -9,7 +9,7 @@ self.addEventListener("install", event => {
     if (!shell.ok) throw new Error("EBS PRO app shell could not be cached.");
     await cache.put("/", shell.clone());
     const html = await shell.text();
-    const assets = [...html.matchAll(/(?:src|href)=["']([^"']+\\.(?:js|css))["']/gi)]
+    const assets = [...html.matchAll(/(?:src|href)=["']([^"']+\.(?:js|css))["']/gi)]
       .map(match => new URL(match[1], self.location.origin).href)
       .filter(url => new URL(url).origin === self.location.origin);
     await Promise.all(assets.map(async asset => {
@@ -59,7 +59,7 @@ self.addEventListener("fetch", event => {
   }
 
   // Cache only static build assets and the public app shell; never cache HTML/data fetches.
-  const isStaticAsset = /\\.(?:js|css|svg|png|jpg|jpeg|webp|woff2?)$/i.test(url.pathname);
+  const isStaticAsset = /\.(?:js|css|svg|png|jpg|jpeg|webp|woff2?)$/i.test(url.pathname);
   if (!isStaticAsset) return;
 
   event.respondWith((async () => {
