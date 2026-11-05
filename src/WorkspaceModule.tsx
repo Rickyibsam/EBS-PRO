@@ -12,6 +12,7 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
+  const [categoryName,setCategoryName]=useState("");
   const [showForm, setShowForm] = useState(false);
   const [productForm, setProductForm] = useState({ sku: "", name: "", brand: "", barcode: "", category_id:"", min_stock: "0", unit_name: "Piece", unit_symbol: "pcs", alternate_unit_name:"", alternate_unit_symbol:"", conversion_to_base:"1", alternate_purchase:true, alternate_sales:true, track_batch: false, track_expiry: false });
   const [partyForm, setPartyForm] = useState({ party_code: "", party_type: "customer", name: "", contact_person: "", phone: "", city: "", credit_limit: "0", opening_balance: "0" });
@@ -44,6 +45,14 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
       : await db.from("parties").update({status:active?"inactive":"active"}).eq("id",id).eq("tenant_id",tenantId);
     if(result.error){setNotice(result.error.message);return;}
     setNotice(isProducts?"Product status updated.":"Party status updated.");await load();
+  }
+
+  async function saveCategory(){
+    const name=categoryName.trim();if(!name){setNotice("Enter a category name.");return;}
+    const code=name.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,40);
+    const {data,error}=await db.from("product_categories").insert({tenant_id:tenantId,name,code,is_active:true}).select("id,name").single();
+    if(error){setNotice(error.message);return;}
+    setCategories(old=>[...old,data].sort((a,b)=>a.name.localeCompare(b.name)));setProductForm(old=>({...old,category_id:data.id}));setCategoryName("");setNotice("Product category created.");
   }
 
   async function saveProduct(e: FormEvent) {
@@ -92,14 +101,14 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
   if (!isProducts && !isParties) return <section className="module-empty"><h2>{module}</h2><p>Is module ka database-backed workflow aglay development phase mein add hoga. Existing data aur database structure ko preserve kiya ja raha hai.</p></section>;
 
   return <section className="module-page">
-    <div className="module-toolbar"><div><h2>{isProducts ? "Product Master" : partyType === "supplier" ? "Supplier Master" : "Customer Master"}</h2><p>{isProducts ? "Manage SKUs, brands, barcodes, and stock controls." : "Manage business contacts, credit limits, and opening balances."}</p></div><button className="primary-action" onClick={() => { setShowForm(!showForm); setNotice(""); }}>{showForm ? "Close form" : isProducts ? "+ Add product" : partyType === "supplier" ? "+ Add supplier" : "+ Add customer"}</button></div>
+    <div className="module-toolbar"><div><h2>{isProducts ? "Product Master" : partyType === "supplier" ? "Supplier Master" : "Customer Master"}</h2><p>{isProducts ? "Manage SKUs, brands, barcodes, and stock controls." : "Manage business contacts, credit limits, and opening balances."}</p></div>{(isProducts?["owner","admin","manager","purchase"]:partyType==="supplier"?["owner","admin","manager","purchase"]:["owner","admin","manager","sales","purchase"]).includes(currentRole)&&<button className="primary-action" onClick={() => { setShowForm(!showForm); setNotice(""); }}>{showForm ? "Close form" : isProducts ? "+ Add product" : partyType === "supplier" ? "+ Add supplier" : "+ Add customer"}</button>}</div>
     {notice && <div className="notice">{notice}</div>}
     {showForm && (isProducts ? <form className="data-form" onSubmit={saveProduct}>
       <label>SKU / Item code<input required value={productForm.sku} onChange={e=>setProductForm({...productForm,sku:e.target.value})} /></label>
       <label>Product name<input required value={productForm.name} onChange={e=>setProductForm({...productForm,name:e.target.value})} /></label>
       <label>Brand<input value={productForm.brand} onChange={e=>setProductForm({...productForm,brand:e.target.value})} /></label>
       <label>Barcode<input value={productForm.barcode} onChange={e=>setProductForm({...productForm,barcode:e.target.value})} /></label>
-      <label>Category<select value={productForm.category_id} onChange={e=>setProductForm({...productForm,category_id:e.target.value})}><option value="">Uncategorised</option>{categories.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+      <label>Category<select value={productForm.category_id} onChange={e=>setProductForm({...productForm,category_id:e.target.value})}><option value="">Uncategorised</option>{categories.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>{["owner","admin","manager","purchase"].includes(currentRole)&&<div className="form-grid"><label>New category<input value={categoryName} onChange={e=>setCategoryName(e.target.value)} placeholder="Beverages / Grocery"/></label><button type="button" onClick={()=>void saveCategory()}>Add category</button></div>}
       <label>Base unit name<input required value={productForm.unit_name} onChange={e=>setProductForm({...productForm,unit_name:e.target.value})} /></label>
       <label>Unit symbol<input required value={productForm.unit_symbol} onChange={e=>setProductForm({...productForm,unit_symbol:e.target.value})} /></label>
       <h3>Optional alternate unit / carton conversion</h3>
