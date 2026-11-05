@@ -60,7 +60,7 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
 
   async function editProduct(p:Product){
     setNotice("");const base=unitCache.find(x=>x.id===p.base_unit_id);
-    const {data:mapping}=await db.from("product_units").select("unit_id,conversion_to_base,is_purchase_unit,is_sales_unit").eq("tenant_id",tenantId).eq("product_id",p.id).neq("conversion_to_base",1).maybeSingle();
+    const {data:mapping}=await db.from("product_units").select("unit_id,conversion_to_base,is_purchase_unit,is_sales_unit").eq("tenant_id",tenantId).eq("product_id",p.id).neq("unit_id",p.base_unit_id||"").maybeSingle();
     const alt=mapping?await db.from("units_of_measure").select("name,symbol").eq("tenant_id",tenantId).eq("id",mapping.unit_id).maybeSingle():{data:null};
     setEditingProductId(p.id);setProductForm(old=>({...old,sku:p.sku,name:p.name,brand:p.brand||"",barcode:p.barcode||"",category_id:p.category_id||"",description:p.description||"",cost_price:String(p.cost_price??0),sale_price:String(p.sale_price??0),purchase_tax_rate:String(p.purchase_tax_rate??0),sales_tax_rate:String(p.sales_tax_rate??0),min_stock:String(p.min_stock??0),reorder_level:String(p.reorder_level??0),unit_name:base?.name||"Piece",unit_symbol:base?.symbol||"pcs",alternate_unit_name:alt.data?.name||"",alternate_unit_symbol:alt.data?.symbol||"",conversion_to_base:String(mapping?.conversion_to_base??1),alternate_purchase:mapping?.is_purchase_unit??true,alternate_sales:mapping?.is_sales_unit??true,track_batch:p.track_batch,track_expiry:p.track_expiry}));setShowForm(true);
   }
