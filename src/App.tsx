@@ -26,17 +26,18 @@ const TaxRegisterModule = lazy(() => import("./TaxRegisterModule"));
 const BatchExpiryModule = lazy(() => import("./BatchExpiryModule"));
 const AssetBudgetModule = lazy(() => import("./AssetBudgetModule"));
 const VanStockModule = lazy(() => import("./VanStockModule"));
+const VoucherHistoryModule = lazy(() => import("./VoucherHistoryModule"));
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 const db = url && key ? createClient(url, key) : null;
 
 type Organization = { id: string; name: string; city: string | null; currency: string };
-const nav = ["Overview","Sales","Booker App","Delivery Man App","Inventory","Batch & Expiry","Van Stock","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Recovery","Customer Credit Control","Accounts","Reports","Team & Employees","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Asset & Budget Control","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register","Audit Trail","Booker Product Access","Targets & Incentives","Settings"];
+const nav = ["Overview","Sales","Booker App","Delivery Man App","Inventory","Batch & Expiry","Van Stock","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Recovery","Customer Credit Control","Accounts","Reports","Team & Employees","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Asset & Budget Control","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register","Voucher Revision History","Audit Trail","Booker Product Access","Targets & Incentives","Settings"];
 const roleAccess: Record<string,string[]> = {
  owner: nav, admin: nav,
  manager: ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Recovery","Customer Credit Control","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Asset & Budget Control","Booker Product Access","Targets & Incentives"],
- accounts: ["Overview","Recovery","Accounts","Invoices","Vendor Invoices","Purchase Returns","Sales Returns","Payroll","Asset & Budget Control","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register","Customer Credit Control","Reports"],
+ accounts: ["Overview","Recovery","Accounts","Invoices","Vendor Invoices","Purchase Returns","Sales Returns","Payroll","Asset & Budget Control","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register","Voucher Revision History","Customer Credit Control","Reports"],
  purchase: ["Overview","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Vendors","Products","Inventory","Vendor Feeding","Reports"],
  sales: ["Overview","Sales","Booker App","Customers","Products","Routes","Invoices","Sales Returns","Reports","Booker Product Access","Targets & Incentives"],
  order_booker: ["Overview","Booker App","Sales","Customers","Products"],
@@ -168,6 +169,8 @@ export default function App() {
           ? <AssetBudgetModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Van Stock"
           ? <VanStockModule db={db} tenantId={organization.id} currentRole={currentRole} />
+        : active === "Voucher Revision History"
+          ? <VoucherHistoryModule db={db} tenantId={organization.id} />
         : active === "Vendor Feeding"
           ? <VendorCatalogModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Audit Trail"
