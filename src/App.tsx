@@ -67,6 +67,7 @@ export default function App() {
   const [tenantChoices,setTenantChoices] = useState<Array<Organization & {role:string}>>([]);
   const [currentRole,setCurrentRole] = useState("viewer");
   const [mode,setMode] = useState<"login"|"signup">("login");
+  const [recoveryMode,setRecoveryMode] = useState(false);
   const [email,setEmail] = useState("");
   const [password,setPassword] = useState("");
   const [fullName,setFullName] = useState("");
@@ -82,7 +83,7 @@ export default function App() {
   useEffect(() => {
     if (!db) { setLoading(false); return; }
     db.auth.getSession().then(({data}) => setSession(data.session));
-    const {data:{subscription}} = db.auth.onAuthStateChange((_event,next) => setSession(next));
+    const {data:{subscription}} = db.auth.onAuthStateChange((event,next) => {if(event==="PASSWORD_RECOVERY")setRecoveryMode(true);setSession(next);});
     return () => subscription.unsubscribe();
   },[]);
 
@@ -111,6 +112,7 @@ export default function App() {
   async function authenticate(e:FormEvent) {
     e.preventDefault(); if(!db)return; setBusy(true);setNotice("");
     try {
+      if(recoveryMode){const {error}=await db.auth.updateUser({password});if(error)throw error;await db.auth.signOut();setRecoveryMode(false);setPassword("");setNotice("Password updated successfully. Sign in with your new password.");return;}
       if(mode==="signup"){
         const {data,error}=await db.auth.signUp({email,password,options:{data:{full_name:fullName},emailRedirectTo:window.location.origin}});
         if(error)throw error;
@@ -121,6 +123,15 @@ export default function App() {
         if(error)throw error;setSession(data.session);
       }
     } catch(err){setNotice(err instanceof Error?err.message:"Login process failed.");}
+    finally{setBusy(false);}
+  }
+
+  async function sendPasswordReset(){
+    if(!db)return;
+    if(!email.trim()){setNotice("Enter your account email address first.");return;}
+    setBusy(true);setNotice("");
+    try{const {error}=await db.auth.resetPasswordForEmail(email.trim(),{redirectTo:window.location.origin});if(error)throw error;setNotice("Password recovery email sent. Open the link in that email on this device to set a new password.");}
+    catch(err){setNotice(err instanceof Error?err.message:"Password recovery email could not be sent.");}
     finally{setBusy(false);}
   }
 
@@ -139,10 +150,12 @@ export default function App() {
   if(!db)return <main className="center"><section className="setup"><div className="logo">E</div><h1>Connect EBS PRO</h1><p>Set the Supabase project URL and publishable key in your hosting environment:</p><code>VITE_SUPABASE_URL</code><code>VITE_SUPABASE_PUBLISHABLE_KEY</code><small>Never expose the service-role key in the browser.</small></section></main>;
   if(loading)return <main className="center"><div className="logo">E</div><p>Loading workspace…</p></main>;
 
+  if(recoveryMode) return <main className="auth"><section className="brand"><div className="brandline"><div className="logo">E</div><b>EBS <em>PRO</em></b></div><div><small>ACCOUNT SECURITY</small><h1>Secure your workspace.</h1><p>Choose a new password for your EBS PRO account.</p></div><footer>VERSION 01 · PAKISTAN · PKR</footer></section><section className="authside"><form onSubmit={authenticate} className="form"><small>RESET PASSWORD</small><h2>Set a new password</h2><p>Use at least 8 characters.</p><label>New password<input type="password" minLength={8} required value={password} onChange={e=>setPassword(e.target.value)} placeholder="New password"/></label>{notice&&<div className="notice">{notice}</div>}<button disabled={busy}>{busy?"Updating…":"Update password"} <span>→</span></button></form></section></main>;
   if(!session)return <main className="auth"><section className="brand"><div className="brandline"><div className="logo">E</div><b>EBS <em>PRO</em></b></div><div><small>WHOLESALE · DISTRIBUTION · CONTROL</small><h1>One workspace.<br/>Complete business control.</h1><p>Sales, stock, purchasing, recovery and field order booking — connected in one place.</p></div><footer>VERSION 01 · PAKISTAN · PKR</footer></section><section className="authside"><form onSubmit={authenticate} className="form"><small>WELCOME TO EBS PRO</small><h2>{mode==="login"?"Sign in to your account":"Create your account"}</h2><p>{mode==="login"?"Access your distribution workspace.":"Register your owner account to get started."}</p>
   {mode==="signup"&&<label>Full name<input required value={fullName} onChange={e=>setFullName(e.target.value)} placeholder="Your full name"/></label>}
   <label>Email address<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="name@company.com"/></label>
   <label>Password<input type="password" minLength={8} required value={password} onChange={e=>setPassword(e.target.value)} placeholder="At least 8 characters"/></label>
+  {mode==="login"&&<div className="switch"><a onClick={()=>void sendPasswordReset()}>Forgot password?</a></div>}
   {notice&&<div className="notice">{notice}</div>}<button disabled={busy}>{busy?"Please wait…":mode==="login"?"Sign in":"Create account"} <span>→</span></button>
   <div className="switch">{mode==="login"?"New to EBS PRO?":"Already registered?"} <a onClick={()=>{setMode(mode==="login"?"signup":"login");setNotice("");}}>{mode==="login"?"Create account":"Sign in"}</a></div></form></section></main>;
 
