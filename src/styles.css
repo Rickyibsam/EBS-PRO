@@ -146,3 +146,13 @@
 .launcher-links button{padding:9px 2px;font-size:10px}
 .launcher-toggle:hover strong{color:#159b7c}
 @media(max-width:700px){.launcher-toggle{padding:14px}.launcher-links{padding:0 14px 10px}}
+
+.recent-activity{margin-top:20px}
+.recent-activity .dashboard-section-head{margin:0 0 10px}
+.recent-activity-list{background:#fff;border:1px solid #e5eeeb;border-radius:13px;padding:0 15px}
+.recent-activity-list>div{display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid #eff3f1;font-size:10px;color:#829497}
+.recent-activity-list>div:last-child{border-bottom:0}
+.recent-activity-list b{font-size:10px;color:#37565a;text-transform:capitalize}
+.recent-activity-list time{margin-left:auto;color:#9aa9a8;white-space:nowrap}
+.activity-dot{color:#35bd9b;font-size:18px;line-height:1}
+@media(max-width:560px){.recent-activity-list>div{flex-wrap:wrap}.recent-activity-list time{margin-left:28px;width:100%}}
