@@ -94,7 +94,7 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
         let {data:altUnit,error:altReadError}=await db.from("units_of_measure").select("id").eq("tenant_id",tenantId).eq("symbol",altSymbol).maybeSingle();
         if(altReadError){setNotice("Product and base unit saved, but alternate unit lookup failed: "+altReadError.message);setSaving(false);await load();return;}
         if(!altUnit){const made=await db.from("units_of_measure").insert({tenant_id:tenantId,name:productForm.alternate_unit_name.trim()||altSymbol,symbol:altSymbol,unit_type:"quantity",decimal_places:3}).select("id").single();if(made.error){setNotice("Product and base unit saved, but alternate unit creation failed: "+made.error.message);setSaving(false);await load();return;}altUnit=made.data;}
-        const altLink=await db.from("product_units").insert({tenant_id:tenantId,product_id:createdProduct.id,unit_id:altUnit.id,conversion_to_base:conversion,is_purchase_unit:productForm.alternate_purchase,is_sales_unit:productForm.alternate_sales});
+        const altLink=await db.from("product_units").upsert({tenant_id:tenantId,product_id:createdProduct.id,unit_id:altUnit.id,conversion_to_base:conversion,is_purchase_unit:productForm.alternate_purchase,is_sales_unit:productForm.alternate_sales},{onConflict:"tenant_id,product_id,unit_id"});
         if(altLink.error){setNotice("Product and base unit saved, but alternate conversion failed: "+altLink.error.message);setSaving(false);await load();return;}
         setNotice("Product, base unit and alternate unit conversion saved.");
       }else setNotice("Product and base unit saved successfully.");
