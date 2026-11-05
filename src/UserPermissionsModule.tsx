@@ -3,7 +3,7 @@ import {useEffect,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 type Member={id:string;user_id:string;role:string;is_active:boolean;full_name?:string;employee_code?:string;email?:string};
 type Permission={can_view:boolean;can_create:boolean;can_update:boolean;can_delete:boolean};
-type PermissionRow=Permission&{id:string;tenant_id:string;user_id:string;module_key:string};
+type PermissionRow=Permission&{id:string;user_id:string;module_key:string};
 const modules=[
  {key:"dashboard_management",label:"Dashboard & Management"},
  {key:"sales_customer",label:"Sales & Customer Management"},
