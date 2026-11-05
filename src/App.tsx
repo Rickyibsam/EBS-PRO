@@ -69,8 +69,8 @@ export default function App() {
   const [fullName,setFullName] = useState("");
   const [companyName,setCompanyName] = useState("");
   const [city,setCity] = useState("");
-  const [active,setActive] = useState(()=>new URLSearchParams(window.location.search).get("app")==="booker"?"Booker App":"Overview");
-  const [expandedGroup,setExpandedGroup] = useState(()=>{const initial=new URLSearchParams(window.location.search).get("app")==="booker"?"Booker App":"Overview";return navGroups.find(g=>g.items.includes(initial))?.name||"Overview";});
+  const [active,setActive] = useState(()=>{const app=new URLSearchParams(window.location.search).get("app");return app==="booker"?"Booker App":app==="delivery"?"Delivery Man App":"Overview";});
+  const [expandedGroup,setExpandedGroup] = useState(()=>{const app=new URLSearchParams(window.location.search).get("app");const initial=app==="booker"?"Booker App":app==="delivery"?"Delivery Man App":"Overview";return navGroups.find(g=>g.items.includes(initial))?.name||"Overview";});
   const [busy,setBusy] = useState(false);
   const allowedNav = roleAccess[currentRole] || roleAccess.viewer;
   const [notice,setNotice] = useState("");
