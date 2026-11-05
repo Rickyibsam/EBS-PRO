@@ -19,7 +19,8 @@ export default function TargetsModule({db,tenantId,currentRole}:{db:SupabaseClie
  db.from("booker_visits").select("id,booker_employee_id,visit_at,visit_status").eq("tenant_id",tenantId),
  db.from("sales_invoices").select("id,sales_order_id,delivery_id,invoice_date,grand_total,status").eq("tenant_id",tenantId).eq("status","posted"),
  db.from("sales_invoice_lines").select("sales_invoice_id,product_id,quantity,line_total").eq("tenant_id",tenantId),
- db.from("sales_credit_note_lines").select("credit_note_id,product_id,quantity,line_total").eq("tenant_id",tenantId)
+ db.from("sales_credit_notes").select("id,sales_invoice_id,credit_note_date,status").eq("tenant_id",tenantId).eq("status","posted"),
+ db.from("sales_credit_note_lines").select("credit_note_id,product_id,quantity,conversion_to_base,line_total").eq("tenant_id",tenantId)
  ]);
  const err=[t,e,v,p,cat,o,ol,d,dl,vis,inv,il,cn,cnl].find(x=>x.error);if(err){setNotice(err.error.message);}else{setTargets(t.data??[]);setEmployees(e.data??[]);setVendors(v.data??[]);setProducts(p.data??[]);setCatalog(cat.data??[]);setActuals([{orders:o.data??[],orderLines:ol.data??[],deliveries:d.data??[],deliveryLines:dl.data??[],visits:vis.data??[],invoices:inv.data??[],invoiceLines:il.data??[],creditNotes:cn.data??[],creditLines:cnl.data??[]}]);}setLoading(false);}
  useEffect(()=>{void load();},[tenantId]);
