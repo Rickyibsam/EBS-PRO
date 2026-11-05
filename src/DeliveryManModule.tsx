@@ -2,10 +2,12 @@ import {FormEvent,useEffect,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 import {getQueuedDeliveryVisits,queueDeliveryVisit,removeQueuedDeliveryVisit,cacheDeliverySnapshot,getDeliverySnapshot} from "./deliveryOfflineQueue";
 type Row=Record<string,any>;
+let deferredInstallPrompt:any=null;
+if(typeof window!=="undefined")window.addEventListener("beforeinstallprompt",(event:Event)=>{event.preventDefault();deferredInstallPrompt=event;});
 export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenantId:string}){
  const [employee,setEmployee]=useState<Row|null>(null),[deliveries,setDeliveries]=useState<Row[]>([]),[orders,setOrders]=useState<Row[]>([]),[customers,setCustomers]=useState<Row[]>([]),[products,setProducts]=useState<Row[]>([]),[lines,setLines]=useState<Row[]>([]),[visits,setVisits]=useState<Row[]>([]);
  const [form,setForm]=useState({delivery_id:"",visit_status:"delivered",notes:""}),[lineQuantities,setLineQuantities]=useState<Record<string,{delivered:string;marketReturn:string;returnBatch:string;returnExpiry:string}>>({}),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[notice,setNotice]=useState("");
- const [installPrompt,setInstallPrompt]=useState<any>(null);
+ const [installPrompt,setInstallPrompt]=useState<any>(deferredInstallPrompt);
  useEffect(()=>{const handler=(event:Event)=>{event.preventDefault();setInstallPrompt(event as any);};window.addEventListener("beforeinstallprompt",handler);return()=>window.removeEventListener("beforeinstallprompt",handler);},[]);
  async function load(){
   setLoading(true);setNotice("");
