@@ -23,6 +23,9 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
   const [cart, setCart] = useState<CartLine[]>([{ product_id: "", unit_id: "", quantity: "1", is_free:false }]);
   const [productSearch,setProductSearch]=useState("");
   const [barcodeInput,setBarcodeInput]=useState("");
+  const [cameraOpen,setCameraOpen]=useState(false),[cameraError,setCameraError]=useState("");
+  const videoRef=useRef<HTMLVideoElement|null>(null);
+  const cameraStream=useRef<MediaStream|null>(null);
   const [deliveryDate, setDeliveryDate] = useState("");
   const [notes, setNotes] = useState("");
   const [orders, setOrders] = useState<Row[]>([]);
@@ -33,6 +36,34 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
   const [authUserId,setAuthUserId]=useState("");
   const [installPrompt,setInstallPrompt]=useState<any>(deferredInstallPrompt);
   useEffect(()=>{const handler=(event:Event)=>{event.preventDefault();setInstallPrompt(event as any);};window.addEventListener("beforeinstallprompt",handler);return()=>window.removeEventListener("beforeinstallprompt",handler);},[]);
+  useEffect(()=>{
+    if(!cameraOpen)return;
+    let active=true,frame=0,detector:any=null;
+    const stop=()=>{cameraStream.current?.getTracks().forEach(track=>track.stop());cameraStream.current=null;if(videoRef.current)videoRef.current.srcObject=null;};
+    async function start(){
+      try{
+        const BarcodeDetectorCtor=(window as any).BarcodeDetector;
+        if(!BarcodeDetectorCtor)throw new Error("This browser does not support camera barcode detection. Use Chrome on Android or scan with a handheld scanner.");
+        if(!navigator.mediaDevices?.getUserMedia)throw new Error("Camera access requires HTTPS and a browser with camera permission support.");
+        const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false});
+        if(!active){stream.getTracks().forEach(track=>track.stop());return;}
+        cameraStream.current=stream;
+        const video=videoRef.current;if(!video)throw new Error("Camera preview is not ready.");
+        video.srcObject=stream;await video.play();
+        detector=new BarcodeDetectorCtor({formats:["ean_13","ean_8","upc_a","upc_e","code_128","code_39","itf","qr_code"]});
+        const scan=async()=>{
+          if(!active)return;
+          try{
+            if(video.readyState>=2){const results=await detector.detect(video);const value=results?.[0]?.rawValue;if(value){addScannedProduct(value);setCameraOpen(false);return;}}
+          }catch(err){if(active)setCameraError(err instanceof Error?err.message:"Camera scanning failed.");}
+          if(active)frame=requestAnimationFrame(()=>void scan());
+        };
+        frame=requestAnimationFrame(()=>void scan());
+      }catch(err){if(active){setCameraError(err instanceof Error?err.message:"Unable to start camera scanner.");setCameraOpen(false);}stop();}
+    }
+    setCameraError("");void start();
+    return()=>{active=false;if(frame)cancelAnimationFrame(frame);stop();};
+  },[cameraOpen,products,productUnits]);
   const [pendingCount,setPendingCount]=useState(0);
   const [pendingVisitCount,setPendingVisitCount]=useState(0);
   const [syncing,setSyncing]=useState(false);
@@ -284,6 +315,9 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       {showNewCustomer&&<div className="transaction-form"><h3>Register route customer</h3><form className="form-grid" onSubmit={createRouteCustomer}><label>Customer name<input required value={newCustomer.name} onChange={e=>setNewCustomer({...newCustomer,name:e.target.value})}/></label><label>Phone<input value={newCustomer.phone} onChange={e=>setNewCustomer({...newCustomer,phone:e.target.value})}/></label><label>Address<input value={newCustomer.address} onChange={e=>setNewCustomer({...newCustomer,address:e.target.value})}/></label><label>City / Area<input value={newCustomer.city} onChange={e=>setNewCustomer({...newCustomer,city:e.target.value})}/></label><button disabled={saving}>Save customer to route</button></form></div>}
       <h3>Order items</h3>
       <div className="form-grid"><label>Search product<input type="search" value={productSearch} onChange={e=>setProductSearch(e.target.value)} placeholder="Search product, SKU or brand"/></label><label>Scan barcode / SKU<input value={barcodeInput} onChange={e=>setBarcodeInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();addScannedProduct(barcodeInput);}}} placeholder="Scan barcode then press Enter"/></label></div>
+      <div className="barcode-camera-controls"><button type="button" onClick={()=>{setCameraError("");setCameraOpen(v=>!v);}}>{cameraOpen?"Stop camera scanner":"▣ Scan with phone camera"}</button><small>Allow camera access and point the rear camera at the product barcode.</small></div>
+      {cameraError&&<div className="notice">{cameraError}</div>}
+      {cameraOpen&&<div className="barcode-camera-panel"><video ref={videoRef} autoPlay muted playsInline aria-label="Live barcode camera preview"/><p>Hold the barcode steady inside the camera view. Scanning stops after the first detected code.</p><button type="button" onClick={()=>setCameraOpen(false)}>Stop scanning</button></div>}
       {cart.map((line,i) => {
         const options = productUnits.filter(x => x.product_id === line.product_id);
         const price = linePrice(line);
