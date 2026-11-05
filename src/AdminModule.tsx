@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 type Row = Record<string, any>;
-const roles = ["owner","admin","manager","accounts","purchase","sales","order_booker","warehouse","cashier","viewer"];
+const roles = ["owner","admin","manager","accounts","purchase","sales","order_booker","delivery_man","warehouse","cashier","viewer"];
 
 export default function AdminModule({db,tenantId,module,currentRole}:{db:SupabaseClient;tenantId:string;module:string;currentRole:string}) {
  const [rows,setRows]=useState<Row[]>([]);
