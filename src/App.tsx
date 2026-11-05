@@ -20,17 +20,18 @@ const PurchaseReturnsModule = lazy(() => import("./PurchaseReturnsModule"));
 const DeliveryManModule = lazy(() => import("./DeliveryManModule"));
 const BankReconciliationModule = lazy(() => import("./BankReconciliationModule"));
 const VendorReconciliationModule = lazy(() => import("./VendorReconciliationModule"));
+const ChequeRegisterModule = lazy(() => import("./ChequeRegisterModule"));
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 const db = url && key ? createClient(url, key) : null;
 
 type Organization = { id: string; name: string; city: string | null; currency: string };
-const nav = ["Overview","Sales","Booker App","Delivery Man App","Inventory","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Recovery","Accounts","Reports","Team & Employees","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Bank Reconciliation","Vendor Statement Reconciliation","Audit Trail","Booker Product Access","Targets & Incentives","Settings"];
+const nav = ["Overview","Sales","Booker App","Delivery Man App","Inventory","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Recovery","Accounts","Reports","Team & Employees","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Audit Trail","Booker Product Access","Targets & Incentives","Settings"];
 const roleAccess: Record<string,string[]> = {
  owner: nav, admin: nav,
  manager: ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Recovery","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Booker Product Access","Targets & Incentives"],
- accounts: ["Overview","Recovery","Accounts","Invoices","Vendor Invoices","Purchase Returns","Sales Returns","Payroll","Bank Reconciliation","Vendor Statement Reconciliation","Reports"],
+ accounts: ["Overview","Recovery","Accounts","Invoices","Vendor Invoices","Purchase Returns","Sales Returns","Payroll","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Reports"],
  purchase: ["Overview","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Vendors","Products","Inventory","Vendor Feeding","Reports"],
  sales: ["Overview","Sales","Booker App","Customers","Products","Routes","Invoices","Sales Returns","Reports","Booker Product Access","Targets & Incentives"],
  order_booker: ["Overview","Booker App","Sales","Customers","Products"],
@@ -150,6 +151,8 @@ export default function App() {
           ? <BankReconciliationModule db={db} tenantId={organization.id} />
         : active === "Vendor Statement Reconciliation"
           ? <VendorReconciliationModule db={db} tenantId={organization.id} />
+        : active === "Cheque Register"
+          ? <ChequeRegisterModule db={db} tenantId={organization.id} />
         : active === "Vendor Feeding"
           ? <VendorCatalogModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Audit Trail"
