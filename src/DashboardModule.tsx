@@ -4,16 +4,20 @@ type Metric={label:string;value:string;detail:string;icon:string;tone:string};
 const money=(v:number)=>"PKR "+Number(v||0).toLocaleString("en-PK",{maximumFractionDigits:0});
 const localDate=(d:Date)=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");
 const launchers=[
- {title:"Sales & Customers",description:"Orders, invoices, returns and customer accounts",icon:"◈",modules:["Sales","Customers","Invoices","Sales Returns"]},
- {title:"Inventory & Warehouse",description:"Stock, batches, expiry and vehicle inventory",icon:"▦",modules:["Inventory","Batch & Expiry","Stock Take","Van Stock","Stock Transfers"]},
- {title:"Purchase & Vendors",description:"Procurement, GRN, supplier invoices and returns",icon:"⇩",modules:["Purchases","Goods Receiving","Vendor Invoices","Purchase Returns"]},
- {title:"Finance & Control",description:"Ledgers, reconciliation, payroll and budgets",icon:"◉",modules:["Accounts","Payroll","Asset & Budget Control","Bank Reconciliation"]},
- {title:"Distribution",description:"Booker orders, delivery routes and proof of delivery",icon:"⌖",modules:["Booker App","Delivery Man App","Distribution","Delivery Charges","Routes"]},
- {title:"Reports & Governance",description:"Performance, incentives, audit and voucher history",icon:"▤",modules:["Reports","Targets & Incentives","Audit Trail","Voucher Revision History"]}
+ {title:"1. Dashboard & Management",description:"Owner overview, business KPIs, alerts and activity monitoring",icon:"✦",modules:["Overview","Reports","Audit Trail","Login History"]},
+ {title:"2. Sales & Customer Management",description:"Customer accounts, orders, invoicing, returns and credit control",icon:"◈",modules:["Sales","Customers","Invoices","Sales Returns","Customer Credit Control","Recovery","Price Lists"]},
+ {title:"3. Order Booking App",description:"Salesman booking, customer visits, product access and incentives",icon:"▣",modules:["Booker App","Booker Product Access","Targets & Incentives"]},
+ {title:"4. Inventory & Warehouse",description:"Product masters, stock, batches, expiry, transfers and stock takes",icon:"▦",modules:["Inventory","Products","Batch & Expiry","Stock Take","Van Stock","Stock Transfers","Branches & Warehouses"]},
+ {title:"5. Purchase & Supplier Management",description:"Supplier accounts, purchasing, goods receiving and returns",icon:"⇩",modules:["Purchases","Vendors","Goods Receiving","Vendor Invoices","Purchase Returns","Vendor Feeding"]},
+ {title:"6. Accounts & Finance",description:"General ledger, cash/bank, reconciliation, assets and budgets",icon:"◉",modules:["Accounts","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register","Asset & Budget Control"]},
+ {title:"7. Distribution & Delivery",description:"Delivery assignments, route operations, drivers and charges",icon:"⌖",modules:["Delivery Man App","Distribution","Delivery Charges","Routes"]},
+ {title:"8. HR & Payroll",description:"Employee records, attendance, leave, payroll and commissions",icon:"♙",modules:["Team & Employees","HR & Attendance","Payroll","Targets & Incentives"]},
+ {title:"9. Reports & Analytics",description:"Sales, purchase, stock, recovery, profitability and audit reports",icon:"▤",modules:["Reports","Targets & Incentives","Audit Trail"]},
+ {title:"10. Administration & Security",description:"User access, roles, login history, settings and voucher controls",icon:"⚙",modules:["Team & Employees","Login History","Settings","Voucher Revision History","Audit Trail"]}
 ];
-export default function DashboardModule({db,tenantId,company,onNavigate}:{db:SupabaseClient;tenantId:string;company:string;onNavigate:(module:string)=>void}){
+export default function DashboardModule({db,tenantId,company,allowedModules,onNavigate}:{db:SupabaseClient;tenantId:string;company:string;allowedModules:string[];onNavigate:(module:string)=>void}){
  const [metrics,setMetrics]=useState<Metric[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState("");
- const [updatedAt,setUpdatedAt]=useState("");
+ const [updatedAt,setUpdatedAt]=useState("");\n const [expandedLauncher,setExpandedLauncher]=useState("1. Dashboard & Management");
  useEffect(()=>{let live=true;async function load(){setLoading(true);setError("");try{
   const now=new Date(),today=localDate(now),since=new Date(now.getTime()-24*60*60*1000).toISOString();
   const [sales,orders,purchases,purchaseInvoices,products,customers,vendors,receipts,deliveries,lowStock,activity,inventoryValuation,coa,journalLines]=await Promise.all([
@@ -70,7 +74,7 @@ export default function DashboardModule({db,tenantId,company,onNavigate}:{db:Sup
   <div className="dashboard-lower"><article className="pulse-card"><div className="pulse-heading"><span className="pulse-spark">✦</span><div><small>SMART BUSINESS PULSE</small><h3>Operations insight</h3></div><span className="pulse-live">LIVE</span></div><p>{loading?"Preparing your operations summary…":pulse}</p><div className="pulse-actions"><button onClick={()=>onNavigate(low>0?"Inventory":pending>0?"Distribution":"Sales")}>{low>0?"Review stock alerts":pending>0?"Review deliveries":"Open sales workspace"} <span>→</span></button><button onClick={()=>onNavigate("Reports")}>View reports <span>→</span></button></div></article>
    <article className="focus-card"><div><small>QUICK CREATE</small><h3>Start a workflow</h3><p>Jump into a frequently used task.</p></div><div className="focus-actions"><button onClick={()=>onNavigate("Sales")}>＋ New sales order</button><button onClick={()=>onNavigate("Customers")}>＋ Add customer</button><button onClick={()=>onNavigate("Products")}>＋ Add product</button><button onClick={()=>onNavigate("Purchases")}>＋ Purchase order</button></div></article></div>
   <div className="dashboard-section-head launcher-head"><div><span className="section-kicker">WORKSPACE</span><h2>Explore modules</h2><p>Choose a business area to open its tools</p></div></div>
-  <div className="launcher-grid">{launchers.map(group=><article className="launcher-card" key={group.title}><div className="launcher-top"><span>{group.icon}</span><b>↗</b></div><h3>{group.title}</h3><p>{group.description}</p><div className="launcher-links">{group.modules.map(module=><button key={module} onClick={()=>onNavigate(module)}>{module}<span>→</span></button>)}</div></article>)}</div>
+  <div className="launcher-grid">{launchers.map(group=>{const modules=group.modules.filter((module,index,all)=>allowedModules.includes(module)&&all.indexOf(module)===index);if(!modules.length)return null;const opened=expandedLauncher===group.title;return <article className={"launcher-card"+(opened?" expanded":"")} key={group.title}><button className="launcher-toggle" aria-expanded={opened} onClick={()=>setExpandedLauncher(opened?"":group.title)}><span className="launcher-top"><span>{group.icon}</span><b>{opened?"−":"+"}</b></span><strong>{group.title}</strong><small>{group.description}</small><span className="launcher-count">{modules.length} available options <i>{opened?"⌃":"⌄"}</i></span></button>{opened&&<div className="launcher-links">{modules.map(module=><button key={module} onClick={()=>onNavigate(module)}>{module}<span>→</span></button>)}</div>}</article>})}</div>
   <p className="dashboard-disclaimer">Operational indicators are read from your company database. They are not audited financial statements or AI-generated forecasts.</p>
  </section>;
 }
