@@ -6,6 +6,9 @@ type ReturnLine = Row & { product_name: string; unit_name: string; returned_quan
 
 export default function ReturnsModule({ db, tenantId, currentRole }: { db: SupabaseClient; tenantId: string; currentRole: string }) {
   const [invoices, setInvoices] = useState<Row[]>([]);
+  const [salesOrders, setSalesOrders] = useState<Row[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState("");
+  const [selectedOrderId, setSelectedOrderId] = useState("");
   const [customers, setCustomers] = useState<Row[]>([]);
   const [notes, setNotes] = useState<Row[]>([]);
   const [invoiceId, setInvoiceId] = useState("");
@@ -23,13 +26,14 @@ export default function ReturnsModule({ db, tenantId, currentRole }: { db: Supab
   async function load() {
     setLoading(true); setNotice("");
     try {
-      const [i,c,n] = await Promise.all([
-        db.from("sales_invoices").select("id,invoice_number,invoice_date,customer_id,grand_total,status").eq("tenant_id",tenantId).eq("status","posted").order("invoice_date",{ascending:false}).limit(300),
+      const [i,o,c,n] = await Promise.all([
+        db.from("sales_invoices").select("id,invoice_number,invoice_date,customer_id,sales_order_id,grand_total,status").eq("tenant_id",tenantId).eq("status","posted").order("invoice_date",{ascending:false}).limit(500),
+        db.from("sales_orders").select("id,order_number,customer_id,order_date,status").eq("tenant_id",tenantId).order("order_date",{ascending:false}).limit(500),
         db.from("parties").select("id,name,party_code").eq("tenant_id",tenantId).in("party_type",["customer","both"]).order("name"),
         db.from("sales_credit_notes").select("id,credit_note_number,credit_note_date,sales_invoice_id,customer_id,reason,status,grand_total,created_at").eq("tenant_id",tenantId).order("created_at",{ascending:false}).limit(100)
       ]);
-      const err=i.error||c.error||n.error;if(err)throw err;
-      setInvoices(i.data||[]);setCustomers(c.data||[]);setNotes(n.data||[]);
+      const err=i.error||o.error||c.error||n.error;if(err)throw err;
+      setInvoices(i.data||[]);setSalesOrders(o.data||[]);setCustomers(c.data||[]);setNotes(n.data||[]);
     } catch(e) { setNotice(e instanceof Error?e.message:"Returns could not be loaded."); }
     setLoading(false);
   }
@@ -69,7 +73,7 @@ export default function ReturnsModule({ db, tenantId, currentRole }: { db: Supab
       const {data,error}=await db.rpc("create_sales_credit_note",{p_invoice_id:invoiceId,p_lines:lines.map(x=>({invoice_line_id:x.id,quantity:Number(x.return_quantity),return_to_stock:x.return_to_stock})),p_reason:reason.trim(),p_credit_note_date:noteDate});
       if(error)throw error;
       setNotice("Credit note draft created: "+String(data).slice(0,8)+". Post it after review.");
-      setInvoiceId("");setInvoiceLines([]);setReason("");await load();
+      setInvoiceId("");setInvoiceLines([]);setSelectedOrderId("");setSelectedCustomerId("");setReason("");await load();
     }catch(e){setNotice(e instanceof Error?e.message:"Credit note could not be created.");}
     setSaving(false);
   }
@@ -102,7 +106,9 @@ export default function ReturnsModule({ db, tenantId, currentRole }: { db: Supab
     <form className="transaction-form" onSubmit={createDraft}>
       <h3>Create customer return / credit note</h3>
       <div className="form-grid">
-        <label>Posted sales invoice<select required value={invoiceId} onChange={e=>void selectInvoice(e.target.value)}><option value="">Select invoice</option>{invoices.map(x=><option key={x.id} value={x.id}>{x.invoice_number} · {customers.find(c=>c.id===x.customer_id)?.name||x.customer_id} · {money(x.grand_total)}</option>)}</select></label>
+        <label>Customer<select required value={selectedCustomerId} onChange={e=>{setSelectedCustomerId(e.target.value);setSelectedOrderId("");setInvoiceId("");setInvoiceLines([]);}}><option value="">Select customer</option>{customers.map(x=><option key={x.id} value={x.id}>{x.name} · {x.party_code}</option>)}</select></label>
+        <label>Sales Order<select required value={selectedOrderId} onChange={e=>{setSelectedOrderId(e.target.value);setInvoiceId("");setInvoiceLines([]);}} disabled={!selectedCustomerId}><option value="">Select sales order</option>{salesOrders.filter(x=>x.customer_id===selectedCustomerId).map(x=><option key={x.id} value={x.id}>{x.order_number} · {x.order_date?.slice(0,10)}</option>)}</select></label>
+        <label>Posted invoice<select required value={invoiceId} onChange={e=>void selectInvoice(e.target.value)} disabled={!selectedOrderId}><option value="">Select invoice</option>{invoices.filter(x=>x.customer_id===selectedCustomerId&&x.sales_order_id===selectedOrderId).map(x=><option key={x.id} value={x.id}>{x.invoice_number} · {money(x.grand_total)}</option>)}</select></label>
         <label>Credit note date<input type="date" value={noteDate} onChange={e=>setNoteDate(e.target.value)}/></label>
         <label>Reason<input required value={reason} onChange={e=>setReason(e.target.value)} placeholder="Damaged goods, short supply, expiry…"/></label>
       </div>
