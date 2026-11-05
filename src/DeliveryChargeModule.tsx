@@ -7,7 +7,8 @@ export default function DeliveryChargeModule({db,tenantId,currentRole}:{db:Supab
  const [routes,setRoutes]=useState<Row[]>([]),[deliveries,setDeliveries]=useState<Row[]>([]),[orders,setOrders]=useState<Row[]>([]),[parties,setParties]=useState<Row[]>([]),[rules,setRules]=useState<Row[]>([]),[charges,setCharges]=useState<Row[]>([]);
  const [form,setForm]=useState({route_id:"",customer_id:"",charge_type:"fixed",amount:"0",min_order_amount:"0",free_delivery_above:"",priority:"0",notes:""});
  const [collection,setCollection]=useState<Record<string,string>>({}),[method,setMethod]=useState<Record<string,string>>({}),[reference,setReference]=useState<Record<string,string>>({});
- const [accounts,setAccounts]=useState<Row[]>([]),[cashAccounts,setCashAccounts]=useState<string[]>([]),[collections,setCollections]=useState<Row[]>([]),[mapping,setMapping]=useState({revenue_account_id:"",cash_account_id:"",bank_account_id:""});\n const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[notice,setNotice]=useState("");
+ const [accounts,setAccounts]=useState<Row[]>([]),[cashAccounts,setCashAccounts]=useState<string[]>([]),[collections,setCollections]=useState<Row[]>([]),[mapping,setMapping]=useState({revenue_account_id:"",cash_account_id:"",bank_account_id:""});
+ const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[notice,setNotice]=useState("");
  async function load(){
   setLoading(true);setNotice("");
   const [r,d,o,p,ru,ch,ac,cm,co]=await Promise.all([
