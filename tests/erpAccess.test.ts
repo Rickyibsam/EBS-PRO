@@ -25,6 +25,7 @@ test("explicit module denial removes a module allowed by the role",()=>{
 test("owner retains full access and administrator cannot open owner-only permissions",()=>{
  assert.ok(resolveAllowedNavigation("owner",nav,roles,groups,{}).includes("User Permissions"));
  assert.ok(!resolveAllowedNavigation("admin",nav,roles,groups,{}).includes("User Permissions"));
+ assert.ok(!resolveAllowedNavigation("sales",nav,roles,groups,{administration_security:true}).includes("User Permissions"));
 });
 test("mutating actions require view permission",()=>{
  assert.equal(isModuleActionAllowed({can_view:false,can_create:true,can_update:true,can_delete:true},"can_create"),false);
