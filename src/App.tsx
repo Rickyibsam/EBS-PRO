@@ -25,7 +25,7 @@ const CustomerCreditControlModule = lazy(() => import("./CustomerCreditControlMo
 const TaxRegisterModule = lazy(() => import("./TaxRegisterModule"));
 const BatchExpiryModule = lazy(() => import("./BatchExpiryModule"));
 const AssetBudgetModule = lazy(() => import("./AssetBudgetModule"));
-const VanStockModule = lazy(() => import("./VanStockModule"));
+const VanStockModule = lazy(() => import("./VanStockModule"));\nconst StockTakeModule = lazy(() => import("./StockTakeModule"));
 const VoucherHistoryModule = lazy(() => import("./VoucherHistoryModule"));
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -33,12 +33,12 @@ const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 const db = url && key ? createClient(url, key) : null;
 
 type Organization = { id: string; name: string; city: string | null; currency: string };
-const nav = ["Overview","Sales","Booker App","Delivery Man App","Inventory","Batch & Expiry","Van Stock","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Recovery","Customer Credit Control","Accounts","Reports","Team & Employees","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Asset & Budget Control","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register","Voucher Revision History","Audit Trail","Booker Product Access","Targets & Incentives","Settings"];
+const nav = ["Overview","Sales","Booker App","Delivery Man App","Inventory","Batch & Expiry","Stock Take","Van Stock","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Recovery","Customer Credit Control","Accounts","Reports","Team & Employees","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Asset & Budget Control","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register","Voucher Revision History","Audit Trail","Booker Product Access","Targets & Incentives","Settings"];
 const navGroups = [
  {name:"Overview",icon:"✦",items:["Overview"]},
  {name:"Sales & Customers",icon:"◈",items:["Sales","Customers","Invoices","Sales Returns","Customer Credit Control","Recovery","Price Lists"]},
  {name:"Field Operations",icon:"⌖",items:["Booker App","Delivery Man App","Distribution","Routes"]},
- {name:"Inventory & Warehouse",icon:"▦",items:["Inventory","Batch & Expiry","Van Stock","Products","Stock Transfers","Branches & Warehouses"]},
+ {name:"Inventory & Warehouse",icon:"▦",items:["Inventory","Batch & Expiry","Stock Take","Van Stock","Products","Stock Transfers","Branches & Warehouses"]},
  {name:"Purchasing",icon:"⇩",items:["Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Vendors","Vendor Feeding"]},
  {name:"Finance",icon:"◉",items:["Accounts","Payroll","Asset & Budget Control","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register"]},
  {name:"People & Access",icon:"♙",items:["Team & Employees","Booker Product Access","Settings"]},
@@ -51,7 +51,7 @@ const roleAccess: Record<string,string[]> = {
  purchase: ["Overview","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Vendors","Products","Inventory","Vendor Feeding","Reports"],
  sales: ["Overview","Sales","Booker App","Customers","Products","Routes","Invoices","Sales Returns","Reports","Booker Product Access","Targets & Incentives"],
  order_booker: ["Overview","Booker App","Sales","Customers","Products"],
- warehouse: ["Overview","Inventory","Batch & Expiry","Van Stock","Distribution","Goods Receiving","Stock Transfers","Products","Purchases"],
+ warehouse: ["Overview","Inventory","Batch & Expiry","Stock Take","Van Stock","Distribution","Goods Receiving","Stock Transfers","Products","Purchases"],
  cashier: ["Overview","Sales","Invoices"],
  delivery_man: ["Overview","Delivery Man App"],
  viewer: ["Overview","Reports"]
