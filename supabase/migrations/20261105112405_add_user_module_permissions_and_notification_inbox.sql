@@ -171,6 +171,7 @@ begin
    when 'fixed_assets' then 'accounts_finance' when 'fixed_asset_account_mappings' then 'accounts_finance'
    when 'asset_depreciation_entries' then 'accounts_finance'
    when 'employee_advance_account_mappings' then 'accounts_finance'
+   when 'budgets' then 'accounts_finance' when 'budget_lines' then 'accounts_finance'
    when 'deliveries' then 'distribution_delivery' when 'delivery_lines' then 'distribution_delivery'
    when 'delivery_shop_visits' then 'distribution_delivery' when 'delivery_charges' then 'distribution_delivery'
    when 'delivery_charge_rules' then 'distribution_delivery'
