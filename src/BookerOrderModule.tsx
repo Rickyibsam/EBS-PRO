@@ -74,7 +74,8 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       if(stockRules&&visibleProducts.length){
         const stockResult=await db.rpc("get_booker_stock_balances",{p_tenant_id:tenantId});
         if(stockResult.error)throw stockResult.error;
-        const balances=(stockResult.data||[]).reduce((acc:Record<string,number>,row:{product_id:string;quantity_on_hand:number})=>{acc[row.product_id]=Number(row.quantity_on_hand||0);return acc;},{} as Record<string,number>);
+        const stockRows: Array<{product_id:string;quantity_on_hand:number}> = (stockResult.data||[]) as Array<{product_id:string;quantity_on_hand:number}>;
+        const balances=stockRows.reduce<Record<string,number>>((acc,row)=>{acc[row.product_id]=Number(row.quantity_on_hand||0);return acc;},{});
         visibleProducts=visibleProducts.filter(product=>{
           const applicable=rules.filter(rule=>rule.require_stock&&rule.is_allowed&&((rule.product_id&&rule.product_id===product.id)||(rule.brand&&rule.brand.toLowerCase()===(product.brand||"").toLowerCase())||(rule.vendor_id&&(vendorMap.data||[]).some(v=>v.product_id===product.id&&v.supplier_id===rule.vendor_id))));
           return !applicable.length||Number(balances[product.id]||0)>0;
