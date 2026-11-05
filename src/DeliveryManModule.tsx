@@ -5,6 +5,8 @@ type Row=Record<string,any>;
 export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenantId:string}){
  const [employee,setEmployee]=useState<Row|null>(null),[deliveries,setDeliveries]=useState<Row[]>([]),[orders,setOrders]=useState<Row[]>([]),[customers,setCustomers]=useState<Row[]>([]),[products,setProducts]=useState<Row[]>([]),[lines,setLines]=useState<Row[]>([]),[visits,setVisits]=useState<Row[]>([]);
  const [form,setForm]=useState({delivery_id:"",visit_status:"delivered",notes:""}),[lineQuantities,setLineQuantities]=useState<Record<string,{delivered:string;marketReturn:string}>>({}),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[notice,setNotice]=useState("");
+ const [installPrompt,setInstallPrompt]=useState<any>(null);
+ useEffect(()=>{const handler=(event:Event)=>{event.preventDefault();setInstallPrompt(event as any);};window.addEventListener("beforeinstallprompt",handler);return()=>window.removeEventListener("beforeinstallprompt",handler);},[]);
  async function load(){
   setLoading(true);setNotice("");
   try{
@@ -79,7 +81,7 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
  const customerFor=(delivery:Row)=>customers.find(x=>x.id===orders.find(o=>o.id===delivery.sales_order_id)?.customer_id);
  const selectedDeliveryLines=lines.filter(x=>x.delivery_id===form.delivery_id);
  return <section className="module-page">
-  <div className="module-toolbar"><div><h2>Delivery Man App</h2><p>Assigned deliveries, customer stops, product quantities and visit outcomes, with offline assignment snapshots and queued synchronization.</p></div><button onClick={()=>void load()}>↻ Refresh</button></div>
+  <div className="module-toolbar"><div><h2>Delivery Man App</h2><p>Assigned deliveries, customer stops, product quantities and visit outcomes, with offline assignment snapshots and queued synchronization.</p></div>{installPrompt&&<button onClick={async()=>{await installPrompt.prompt();setInstallPrompt(null);}}>Install Delivery App</button>}<button onClick={()=>void load()}>↻ Refresh</button></div>
   {notice&&<div className="notice">{notice}</div>}
   {loading?<div className="table-empty">Loading assigned deliveries…</div>:!employee?<div className="notice">Employee account is not linked.</div>:<>
    <p className="module-footnote">Signed in as {employee.full_name} · {employee.employee_code}</p>
