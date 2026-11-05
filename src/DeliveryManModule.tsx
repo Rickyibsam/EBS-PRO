@@ -1,5 +1,6 @@
 import {FormEvent,useEffect,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
+import {getQueuedDeliveryVisits,queueDeliveryVisit,removeQueuedDeliveryVisit} from "./deliveryOfflineQueue";
 type Row=Record<string,any>;
 export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenantId:string}){
  const [employee,setEmployee]=useState<Row|null>(null),[deliveries,setDeliveries]=useState<Row[]>([]),[orders,setOrders]=useState<Row[]>([]),[customers,setCustomers]=useState<Row[]>([]),[products,setProducts]=useState<Row[]>([]),[lines,setLines]=useState<Row[]>([]),[visits,setVisits]=useState<Row[]>([]);
@@ -31,7 +32,19 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
   }catch(e){setNotice(e instanceof Error?e.message:"Assigned deliveries could not be loaded.");}
   setLoading(false);
  }
- useEffect(()=>{void load();},[tenantId]);
+ async function syncPendingVisits(){
+  if(!navigator.onLine)return;
+  try{
+   const pending=await getQueuedDeliveryVisits(tenantId);
+   for(const item of pending){
+    const {error}=await db.from("delivery_shop_visits").upsert({tenant_id:item.tenant_id,delivery_id:item.delivery_id,delivery_man_employee_id:item.delivery_man_employee_id,customer_id:item.customer_id,visit_status:item.visit_status,shops_visited:item.shops_visited,line_quantities:item.line_quantities,notes:item.notes,created_by:item.created_by},{onConflict:"tenant_id,delivery_id"});
+    if(error)throw error;
+    await removeQueuedDeliveryVisit(item.id);
+   }
+   if(pending.length)setNotice(pending.length+" offline delivery visit(s) synchronized.");
+  }catch(e){setNotice(e instanceof Error?"Offline sync pending: "+e.message:"Offline sync will retry when connected.");}
+ }
+ useEffect(()=>{void load();const onOnline=()=>{void syncPendingVisits();};window.addEventListener("online",onOnline);return()=>window.removeEventListener("online",onOnline);},[tenantId]);
  async function saveVisit(e:FormEvent){
   e.preventDefault();if(!employee)return;setSaving(true);setNotice("");
   try{
@@ -41,8 +54,19 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
    const selectedLines=lines.filter(x=>x.delivery_id===d.id);
    const quantityReport=selectedLines.map(x=>({delivery_line_id:x.id,product_id:x.product_id,picked_quantity_base:Number(x.picked_quantity_base||0),delivered_quantity_base:Number(lineQuantities[x.id]?.delivered||0),market_return_quantity_base:Number(lineQuantities[x.id]?.marketReturn||0)}));
    for(const q of quantityReport){if(!Number.isFinite(q.delivered_quantity_base)||q.delivered_quantity_base<0||q.delivered_quantity_base>q.picked_quantity_base)throw new Error("Delivered quantity must be between zero and picked quantity.");if(!Number.isFinite(q.market_return_quantity_base)||q.market_return_quantity_base<0||q.market_return_quantity_base>q.delivered_quantity_base)throw new Error("Market return quantity cannot exceed delivered quantity.");}
-   const {error}=await db.from("delivery_shop_visits").upsert({tenant_id:tenantId,delivery_id:d.id,delivery_man_employee_id:employee.id,customer_id:o.customer_id,visit_status:form.visit_status,shops_visited:1,line_quantities:quantityReport,notes:form.notes.trim()||null,created_by:user.user?.id??null},{onConflict:"tenant_id,delivery_id"});
-   if(error)throw error;setNotice("Shop visit saved. Delivered quantities and invoice are finalized by the warehouse/manager confirmation.");setForm({delivery_id:"",visit_status:"delivered",notes:""});setLineQuantities({});await load();
+   const payload={tenant_id:tenantId,delivery_id:d.id,delivery_man_employee_id:employee.id,customer_id:o.customer_id,visit_status:form.visit_status,shops_visited:1,line_quantities:quantityReport,notes:form.notes.trim()||null,created_by:user.user?.id??null};
+   if(!navigator.onLine){
+    await queueDeliveryVisit({id:crypto.randomUUID(),...payload,created_by:payload.created_by||null,queued_at:new Date().toISOString()});
+    setNotice("No internet: delivery visit safely queued on this device. It will sync when connection returns.");
+   }else{
+    const {error}=await db.from("delivery_shop_visits").upsert(payload,{onConflict:"tenant_id,delivery_id"});
+    if(error){
+     if(/fetch|network|offline|connection/i.test(error.message||"")){
+      await queueDeliveryVisit({id:crypto.randomUUID(),...payload,created_by:payload.created_by||null,queued_at:new Date().toISOString()});
+      setNotice("Connection interrupted: delivery visit queued for automatic synchronization.");
+     }else throw error;
+    }else setNotice("Shop visit saved. Delivered quantities and invoice are finalized by the warehouse/manager confirmation.");
+   }setForm({delivery_id:"",visit_status:"delivered",notes:""});setLineQuantities({});await load();
   }catch(e){setNotice(e instanceof Error?e.message:"Shop visit could not be saved.");}
   setSaving(false);
  }
