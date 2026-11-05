@@ -67,7 +67,8 @@ export default function TargetsModule({db,tenantId,currentRole}:{db:SupabaseClie
    const selectedPeriod=importPeriod||periods.find(x=>{const [s,e]=x.split("|");return s<=new Date().toISOString().slice(0,10)&&e>=new Date().toISOString().slice(0,10);})||periods[0];
    if(!selectedPeriod)throw new Error("No target periods are available.");
    const [start,end]=selectedPeriod.split("|");
-   const settledTargetIds=new Set(accruals.filter(a=>a.status==="settled").map(a=>a.sales_target_id));\n   const completed=targets.filter(t=>t.employee_id&&t.period_start===start&&t.period_end===end&&progress(t).earned>0&&!settledTargetIds.has(t.id));
+   const settledTargetIds=new Set(accruals.filter(a=>a.status==="settled").map(a=>a.sales_target_id));
+   const completed=targets.filter(t=>t.employee_id&&t.period_start===start&&t.period_end===end&&progress(t).earned>0&&!settledTargetIds.has(t.id));
    if(!completed.length)throw new Error("No employee-specific earned incentives are ready for this period.");
    const {data:runs,error:runError}=await db.from("payroll_runs").select("id,period_start,period_end,status").eq("tenant_id",tenantId).eq("period_start",start).eq("period_end",end).eq("status","draft");
    if(runError)throw runError;if(!runs?.length)throw new Error("Create a draft payroll run with exactly the same start/end dates first.");
