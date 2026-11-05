@@ -1,7 +1,7 @@
 import {useEffect,useMemo,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 type Metric={label:string;value:string;detail:string;icon:string;tone:string};
-type Notice={id:string;title:string;detail:string;module:string;level:"warning"|"info"};
+type Notice={id:string;title:string;detail:string;module:string;level:"warning"|"info";read_at:string|null};
 const money=(v:number)=>"PKR "+Number(v||0).toLocaleString("en-PK",{maximumFractionDigits:0});
 const localDate=(d:Date)=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");
 const launchers=[
@@ -73,10 +73,41 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
   if(!pendingOrders.error&&(pendingOrders.data??[]).length>0&&allowedModules.includes("Sales"))notices.push({id:"sales-approval",title:"Sales orders awaiting approval",detail:(pendingOrders.data??[]).length+" draft or submitted order(s) are waiting for review.",module:"Sales",level:"info"});
   if(!overdueInvoices.error&&(overdueInvoices.data??[]).length>0&&allowedModules.includes("Invoices"))notices.push({id:"past-due-invoices",title:"Invoices past their due date",detail:(overdueInvoices.data??[]).length+" posted invoice(s) have a due date before today. Review balances before recovery.",module:"Invoices",level:"warning"});
   if(!deliveries.error&&(deliveries.count??0)>0&&allowedModules.includes("Distribution"))notices.push({id:"delivery-queue",title:"Deliveries in the dispatch queue",detail:(deliveries.count??0)+" delivery(ies) are pending, picked or dispatched.",module:"Distribution",level:"info"});
-  if(live){setMetrics(next);setRecentActivity(activity.data??[]);setNotifications(notices);setUpdatedAt(now.toLocaleTimeString("en-PK",{hour:"2-digit",minute:"2-digit"}));}
+  if(live){
+   const {data:authData}=await db.auth.getUser();
+   const userId=authData.user?.id;
+   if(userId&&notices.length){
+    const {error:upsertError}=await db.from("user_notifications").upsert(notices.map(item=>({
+     tenant_id:tenantId,user_id:userId,notification_key:item.id+":"+today,title:item.title,
+     body:item.detail,module_key:item.module,severity:item.level
+    })),{onConflict:"tenant_id,user_id,notification_key"});
+    if(upsertError)throw upsertError;
+   }
+   if(userId){
+    const {data:inbox,error:inboxError}=await db.from("user_notifications").select("id,title,body,module_key,severity,read_at,created_at").eq("tenant_id",tenantId).eq("user_id",userId).order("created_at",{ascending:false}).limit(30);
+    if(inboxError)throw inboxError;
+    setNotifications((inbox||[]).map(item=>({id:item.id,title:item.title,detail:item.body,module:item.module_key,level:item.severity==="warning"?"warning":"info",read_at:item.read_at})));
+   }
+   setMetrics(next);setRecentActivity(activity.data??[]);setUpdatedAt(now.toLocaleTimeString("en-PK",{hour:"2-digit",minute:"2-digit"}));
+  }
  }catch(e){if(live)setError(e instanceof Error?e.message:"Dashboard could not load.");}finally{if(live)setLoading(false);}}
  void load();return()=>{live=false;};
  },[db,tenantId]);
+ async function markNotificationRead(id:string){
+  const {data:auth}=await db.auth.getUser();if(!auth.user)return;
+  const readAt=new Date().toISOString();
+  const {error}=await db.from("user_notifications").update({read_at:readAt}).eq("id",id).eq("tenant_id",tenantId).eq("user_id",auth.user.id);
+  if(error){setError(error.message);return;}
+  setNotifications(items=>items.map(item=>item.id===id?{...item,read_at:readAt}:item));
+ }
+ async function markAllNotificationsRead(){
+  const {data:auth}=await db.auth.getUser();if(!auth.user)return;
+  const readAt=new Date().toISOString();
+  const {error}=await db.from("user_notifications").update({read_at:readAt}).eq("tenant_id",tenantId).eq("user_id",auth.user.id).is("read_at",null);
+  if(error){setError(error.message);return;}
+  setNotifications(items=>items.map(item=>({...item,read_at:item.read_at||readAt})));
+ }
+ const unreadNotifications=notifications.filter(item=>!item.read_at).length;
  const openOrders=Number(metrics.find(x=>x.label==="Open sales orders")?.value||0),pending=Number(metrics.find(x=>x.label==="Pending deliveries")?.value||0),low=Number(metrics.find(x=>x.label==="Low stock alerts")?.value||0);
  const pulse=useMemo(()=>low>0?low+" products are at or below their reorder threshold. Review replenishment before accepting more orders.":pending>0?pending+" deliveries are in the dispatch pipeline. Review assignments and proof of delivery.":openOrders>0?openOrders+" sales orders are waiting for the next processing step.":"Your current stock, sales and delivery indicators show no urgent queue.",[low,pending,openOrders]);
  const hour=new Date().getHours(),greeting=hour<12?"Good morning":hour<17?"Good afternoon":"Good evening";
@@ -85,7 +116,7 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
   <div className="dashboard-section-head"><div><span className="section-kicker">LIVE PERFORMANCE</span><h2>Business snapshot</h2><p>Posted invoices, open workflows and current stock signals</p></div><button className="dashboard-refresh" onClick={()=>window.location.reload()}>↻ Refresh view</button></div>
   {error&&<div className="notice">{error}</div>}
   {loading?<div className="dashboard-loading"><span className="loading-pulse"/> Reading live business data…</div>:<div className="ai-metric-grid">{metrics.map(m=><article className="ai-metric" key={m.label}><div className={"metric-icon "+m.tone}>{m.icon}</div><div className="metric-label">{m.label}</div><strong>{m.value}</strong><small>{m.detail}</small><span className="metric-glow"/></article>)}</div>}
-  {notifications.length>0&&<section className="recent-activity"><div className="dashboard-section-head"><div><span className="section-kicker">ACTION CENTRE</span><h2>Operational notifications</h2><p>{notifications.length} live item(s) need attention or review</p></div></div><div className="recent-activity-list">{notifications.map(item=><div key={item.id}><span className="activity-dot">{item.level==="warning"?"!":"•"}</span><b>{item.title}</b><span>{item.detail}</span><time><button className="dashboard-refresh" onClick={()=>onNavigate(item.module)}>Open →</button></time></div>)}</div></section>}
+  {notifications.length>0&&<section className="recent-activity"><div className="dashboard-section-head"><div><span className="section-kicker">ACTION CENTRE</span><h2>Notification inbox</h2><p>{unreadNotifications} unread · {notifications.length} saved notification(s)</p></div>{unreadNotifications>0&&<button className="dashboard-refresh" onClick={()=>void markAllNotificationsRead()}>Mark all read</button>}</div><div className="recent-activity-list">{notifications.map(item=><div key={item.id} className={item.read_at?"notification-read":"notification-unread"}><span className="activity-dot">{item.level==="warning"?"!":"•"}</span><b>{item.title}</b><span>{item.detail}</span><time><button className="dashboard-refresh" onClick={()=>onNavigate(item.module)}>Open →</button>{!item.read_at&&<button className="dashboard-refresh" onClick={()=>void markNotificationRead(item.id)}>Mark read</button>}</time></div>)}</div></section>}
   {recentActivity.length>0&&<section className="recent-activity"><div className="dashboard-section-head"><div><span className="section-kicker">AUDIT STREAM</span><h2>Recent activity</h2><p>Latest recorded workspace events</p></div>{allowedModules.includes("Audit Trail")&&<button className="dashboard-refresh" onClick={()=>onNavigate("Audit Trail")}>Open audit trail →</button>}</div><div className="recent-activity-list">{recentActivity.map(item=><div key={item.id}><span className="activity-dot">•</span><b>{String(item.action||"Activity").replaceAll("_"," ")}</b><span>{item.entity_type||"Business record"}</span><time>{new Date(item.created_at).toLocaleString("en-PK",{dateStyle:"short",timeStyle:"short"})}</time></div>)}</div></section>}
   <div className="dashboard-lower"><article className="pulse-card"><div className="pulse-heading"><span className="pulse-spark">✦</span><div><small>SMART BUSINESS PULSE</small><h3>Operations insight</h3></div><span className="pulse-live">LIVE</span></div><p>{loading?"Preparing your operations summary…":pulse}</p><div className="pulse-actions"><button onClick={()=>onNavigate(low>0?"Inventory":pending>0?"Distribution":"Sales")}>{low>0?"Review stock alerts":pending>0?"Review deliveries":"Open sales workspace"} <span>→</span></button><button onClick={()=>onNavigate("Reports")}>View reports <span>→</span></button></div></article>
    <article className="focus-card"><div><small>QUICK CREATE</small><h3>Start a workflow</h3><p>Jump into a frequently used task.</p></div><div className="focus-actions"><button onClick={()=>onNavigate("Sales")}>＋ New sales order</button><button onClick={()=>onNavigate("Customers")}>＋ Add customer</button><button onClick={()=>onNavigate("Products")}>＋ Add product</button><button onClick={()=>onNavigate("Purchases")}>＋ Purchase order</button></div></article></div>
