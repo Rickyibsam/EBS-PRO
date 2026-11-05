@@ -42,10 +42,13 @@
  .sidebar{width:62px;padding:14px 6px;overflow:visible}
  .sidebar .brandline b,.org,.caption{display:none}
  .module-nav{gap:7px}
- .nav-group{border:0;background:transparent;overflow:visible}
+ .nav-group{position:relative;border:0;background:transparent;overflow:visible}
  .nav-group-head{justify-content:center;padding:9px 4px}
- .nav-group-head b,.nav-chevron,.nav-group-items{display:none}
+ .nav-group-head b,.nav-chevron{display:none}
  .nav-group-icon{width:31px;height:31px;font-size:16px}
+ .nav-group-items{position:absolute;left:51px;top:0;z-index:80;width:205px;padding:8px;background:#153740;border:1px solid #ffffff20;border-radius:10px;box-shadow:0 14px 35px #061a2080;display:grid}
+ .nav-group-items button{border-left:0;border-radius:7px;padding:10px;color:#b7ccca}
+ .nav-group-items button.selected,.nav-group-items button:hover{background:#35bd9b18;color:#76e1c4}
 }
 /* AI-inspired business intelligence dashboard */
 .ai-dashboard{display:block}
