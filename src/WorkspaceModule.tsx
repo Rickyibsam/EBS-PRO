@@ -62,6 +62,7 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
     if(!productForm.sku.trim()||!productForm.name.trim()) {setNotice("SKU and product name are required.");setSaving(false);return;}
     const conversion=Number(productForm.conversion_to_base);
     if(productForm.alternate_unit_symbol.trim()&&(!Number.isFinite(conversion)||conversion<=0)){setNotice("Alternate unit conversion must be greater than zero.");setSaving(false);return;}
+    if(productForm.alternate_unit_symbol.trim().toLowerCase()===unitSymbol.toLowerCase()){setNotice("Alternate unit symbol must differ from the base unit symbol.");setSaving(false);return;}
     const { data: existingUnit, error: unitReadError } = await db.from("units_of_measure").select("id").eq("tenant_id", tenantId).eq("symbol", unitSymbol).maybeSingle();
     if (unitReadError) { setNotice(unitReadError.message); setSaving(false); return; }
     let unitId = existingUnit?.id as string | undefined;
@@ -78,11 +79,10 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
       else if(productForm.alternate_unit_symbol.trim()){
         const altSymbol=productForm.alternate_unit_symbol.trim();
         let {data:altUnit,error:altReadError}=await db.from("units_of_measure").select("id").eq("tenant_id",tenantId).eq("symbol",altSymbol).maybeSingle();
-        if(altReadError)throw altReadError;
-        if(!altUnit){const made=await db.from("units_of_measure").insert({tenant_id:tenantId,name:productForm.alternate_unit_name.trim()||altSymbol,symbol:altSymbol,unit_type:"quantity",decimal_places:3}).select("id").single();if(made.error)throw made.error;altUnit=made.data;}
-        if(altUnit.id===unitId)throw new Error("Alternate unit must differ from the base unit.");
+        if(altReadError){setNotice("Product and base unit saved, but alternate unit lookup failed: "+altReadError.message);setSaving(false);await load();return;}
+        if(!altUnit){const made=await db.from("units_of_measure").insert({tenant_id:tenantId,name:productForm.alternate_unit_name.trim()||altSymbol,symbol:altSymbol,unit_type:"quantity",decimal_places:3}).select("id").single();if(made.error){setNotice("Product and base unit saved, but alternate unit creation failed: "+made.error.message);setSaving(false);await load();return;}altUnit=made.data;}
         const altLink=await db.from("product_units").insert({tenant_id:tenantId,product_id:createdProduct.id,unit_id:altUnit.id,conversion_to_base:conversion,is_purchase_unit:productForm.alternate_purchase,is_sales_unit:productForm.alternate_sales});
-        if(altLink.error)throw altLink.error;
+        if(altLink.error){setNotice("Product and base unit saved, but alternate conversion failed: "+altLink.error.message);setSaving(false);await load();return;}
         setNotice("Product, base unit and alternate unit conversion saved.");
       }else setNotice("Product and base unit saved successfully.");
       setProductForm({ sku:"", name:"", brand:"", barcode:"", category_id:"", min_stock:"0", unit_name:"Piece", unit_symbol:"pcs", alternate_unit_name:"", alternate_unit_symbol:"", conversion_to_base:"1", alternate_purchase:true, alternate_sales:true, track_batch:false, track_expiry:false }); setShowForm(false); await load();
