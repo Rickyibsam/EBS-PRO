@@ -74,6 +74,7 @@ export default function App() {
   const [busy,setBusy] = useState(false);
   const allowedNav = roleAccess[currentRole] || roleAccess.viewer;
   const [notice,setNotice] = useState("");
+  useEffect(()=>{const group=navGroups.find(item=>item.items.includes(active));if(group)setExpandedGroup(group.name);},[active]);
 
   useEffect(() => {
     if (!db) { setLoading(false); return; }
