@@ -73,7 +73,7 @@ export default function TargetsModule({db,tenantId,currentRole}:{db:SupabaseClie
    const {data:existing,error:readError}=await db.from("sales_incentive_accruals").select("sales_target_id,status,earned_amount,settled_amount,return_adjustment_applied,settled_at,settled_by").eq("tenant_id",tenantId);
    if(readError)throw readError;
    const existingMap=new Map((existing||[]).map(x=>[x.sales_target_id,x]));
-   const eligible=targets.filter(t=>t.is_active&&(t.employee_id||t.vendor_id||t.brand||t.product_id)&&(progress(t).earned>0||existingMap.has(t.id)));
+   const eligible=targets.filter(t=>(t.is_active||existingMap.has(t.id))&&(t.employee_id||t.vendor_id||t.brand||t.product_id)&&(progress(t).earned>0||existingMap.has(t.id)));
    if(!eligible.length)throw new Error("No achieved employee, vendor, brand or product incentive targets are ready.");
    const payload=eligible.map(t=>{
     const p=progress(t),old=existingMap.get(t.id),settled=old?.status==="settled",paid=settled?Number(old?.settled_amount??old?.earned_amount??0):0,applied=settled?Number(old?.return_adjustment_applied||0):0,earned=Number(p.earned.toFixed(2));
