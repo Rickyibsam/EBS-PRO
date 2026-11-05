@@ -20,7 +20,6 @@ export default function TargetsModule({db,tenantId,currentRole}:{db:SupabaseClie
  db.from("sales_invoices").select("id,sales_order_id,delivery_id,invoice_date,grand_total,status").eq("tenant_id",tenantId).eq("status","posted"),
  db.from("sales_invoice_lines").select("sales_invoice_id,product_id,quantity,line_total").eq("tenant_id",tenantId),
  db.from("sales_credit_notes").select("id,sales_invoice_id,credit_note_date,status").eq("tenant_id",tenantId).eq("status","posted"),
- db.from("sales_credit_notes").select("id,sales_invoice_id,credit_note_date,status").eq("tenant_id",tenantId).eq("status","posted"),
  db.from("sales_credit_note_lines").select("credit_note_id,product_id,quantity,conversion_to_base,line_total").eq("tenant_id",tenantId)
  ]);
  const errors=[t,e,v,p,cat,o,ol,d,dl,vis,inv,il,cn,cnl].filter(x=>x.error);if(errors.length){setNotice(errors[0]?.error?.message||"Target data could not be loaded.");}else{setTargets(t.data??[]);setEmployees(e.data??[]);setVendors(v.data??[]);setProducts(p.data??[]);setCatalog(cat.data??[]);setActuals([{orders:o.data??[],orderLines:ol.data??[],deliveries:d.data??[],deliveryLines:dl.data??[],visits:vis.data??[],invoices:inv.data??[],invoiceLines:il.data??[],creditNotes:cn.data??[],creditLines:cnl.data??[]}]);}setLoading(false);}
