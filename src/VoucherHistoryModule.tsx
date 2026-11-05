@@ -95,7 +95,7 @@ export default function VoucherHistoryModule({db,tenantId,currentRole}:{db:Supab
    const {data,error}=await db.rpc(rpcName,{p_revision_id:revision.id});
    if(error)throw error;
    setNotice(isLine?"Voucher line restored and voucher totals recalculated. Current values were preserved in revision history.":"Draft voucher header restored from revision history. The previous current state was preserved as a new revision.");
-   if(isLine&&selectedId)await loadDraftLines(selectedId,table);else await loadDrafts(table);
+   if(isLine&&selectedId===data?.voucher_id&&table===data?.voucher_table)await loadDraftLines(selectedId,table);else await loadDrafts(table);
    await load();
   }catch(e){setNotice(e instanceof Error?e.message:"Revision restore failed.");}
   finally{setSaving(false);}
