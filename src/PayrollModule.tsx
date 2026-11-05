@@ -21,7 +21,7 @@ export default function PayrollModule({db,tenantId,currentRole}:{db:SupabaseClie
  }
  async function loadLines(id:string){
   if(!id){setLines([]);return;}
-  const {data,error}=await db.from("payroll_lines").select("id,employee_id,basic_salary,allowances,overtime,deductions,net_salary,payment_status,payment_method,payment_reference,paid_at").eq("tenant_id",tenantId).eq("payroll_run_id",id).order("created_at");
+  const {data,error}=await db.from("payroll_lines").select("id,employee_id,basic_salary,allowances,overtime,sales_incentive,deductions,net_salary,payment_status,payment_method,payment_reference,paid_at").eq("tenant_id",tenantId).eq("payroll_run_id",id).order("created_at");
   if(error){setNotice(error.message);return;}
   setLines((data??[]).map(x=>({...x,employee:employees.find(e=>e.id===x.employee_id)?.full_name||x.employee_id})));
  }
@@ -41,16 +41,16 @@ export default function PayrollModule({db,tenantId,currentRole}:{db:SupabaseClie
    const {data:auth}=await db.auth.getUser();const runNo="EBS-PR-"+Date.now().toString().slice(-10);
    const {data:head,error}=await db.from("payroll_runs").insert({tenant_id:tenantId,run_number:runNo,period_start:periodStart,period_end:periodEnd,pay_date:payDate,status:"draft",created_by:auth.user?.id??null}).select("id").single();
    if(error)throw error;
-   const payload=staff.map(x=>({tenant_id:tenantId,payroll_run_id:head.id,employee_id:x.id,basic_salary:Number(x.basic_salary),allowances:0,overtime:0,deductions:0,net_salary:Number(x.basic_salary)}));
+   const payload=staff.map(x=>({tenant_id:tenantId,payroll_run_id:head.id,employee_id:x.id,basic_salary:Number(x.basic_salary),allowances:0,overtime:0,sales_incentive:0,deductions:0,net_salary:Number(x.basic_salary)}));
    const {error:lineError}=await db.from("payroll_lines").insert(payload);
    if(lineError){await db.from("payroll_runs").delete().eq("id",head.id).eq("tenant_id",tenantId).eq("status","draft");throw new Error("Payroll lines could not be generated: "+lineError.message);}
    setSelected(head.id);setNotice("Draft payroll generated for "+staff.length+" active employees.");await load();
   }catch(err){setNotice(err instanceof Error?err.message:"Payroll run could not be created.");}
   finally{setSaving(false);}
  }
- async function updateLine(line:Row,field:"allowances"|"overtime"|"deductions",value:string){
+ async function updateLine(line:Row,field:"allowances"|"overtime"|"sales_incentive"|"deductions",value:string){
   const amount=Number(value);if(!Number.isFinite(amount)||amount<0){setNotice("Payroll adjustment must be non-negative.");return;}
-  const patch={ [field]:amount, net_salary:Number(line.basic_salary)+(field==="allowances"?amount:Number(line.allowances))+(field==="overtime"?amount:Number(line.overtime))-(field==="deductions"?amount:Number(line.deductions))};
+  const patch={ [field]:amount, net_salary:Number(line.basic_salary)+(field==="allowances"?amount:Number(line.allowances))+(field==="overtime"?amount:Number(line.overtime))+(field==="sales_incentive"?amount:Number(line.sales_incentive||0))-(field==="deductions"?amount:Number(line.deductions))};
   if(patch.net_salary<0){setNotice("Deductions cannot exceed gross salary.");return;}
   const {error}=await db.from("payroll_lines").update(patch).eq("tenant_id",tenantId).eq("id",line.id);
   if(error)setNotice(error.message);else{setLines(old=>old.map(x=>x.id===line.id?{...x,...patch}:x));setNotice("Payroll line updated.");}
@@ -76,7 +76,7 @@ export default function PayrollModule({db,tenantId,currentRole}:{db:SupabaseClie
   <h3>Payroll runs</h3>
   <div className="table-tools"><select value={selected} onChange={e=>setSelected(e.target.value)}><option value="">Select payroll run</option>{runs.map(x=><option key={x.id} value={x.id}>{x.run_number} · {x.period_start} to {x.period_end} · {x.status}</option>)}</select><span>{runs.length} runs</span></div>
   {activeRun&&<><div className="stats report-stats"><article><small>Gross salary</small><strong>{money(activeRun.gross_total)}</strong></article><article><small>Deductions</small><strong>{money(activeRun.deductions_total)}</strong></article><article><small>Net payroll</small><strong>{money(activeRun.net_total)}</strong></article><article><small>Status</small><strong>{activeRun.status}</strong></article></div>
-   <div className="data-table-wrap"><table className="data-table"><thead><tr><th>Employee</th><th>Basic</th><th>Allowances</th><th>Overtime</th><th>Deductions</th><th>Net</th><th>Payment</th><th>Action</th></tr></thead><tbody>{lines.map(x=><tr key={x.id}><td>{x.employee}</td><td>{money(x.basic_salary)}</td><td><input type="number" min="0" step="0.01" disabled={!canManage||activeRun.status!=="draft"} value={x.allowances} onBlur={e=>void updateLine(x,"allowances",e.target.value)}/></td><td><input type="number" min="0" step="0.01" disabled={!canManage||activeRun.status!=="draft"} value={x.overtime} onBlur={e=>void updateLine(x,"overtime",e.target.value)}/></td><td><input type="number" min="0" step="0.01" disabled={!canManage||activeRun.status!=="draft"} value={x.deductions} onBlur={e=>void updateLine(x,"deductions",e.target.value)}/></td><td>{money(x.net_salary)}</td><td>{x.payment_status}</td><td>{activeRun.status==="posted"&&x.payment_status==="unpaid"&&canManage?<button disabled={saving} onClick={()=>void payLine(x)}>Pay salary</button>:x.payment_status==="paid"?"Paid":"—"}</td></tr>)}{!lines.length&&<tr><td colSpan={8} className="table-empty">No payroll lines found.</td></tr>}</tbody></table></div>
+   <div className="data-table-wrap"><table className="data-table"><thead><tr><th>Employee</th><th>Basic</th><th>Allowances</th><th>Overtime</th><th>Sales / Delivery Incentive</th><th>Deductions</th><th>Net</th><th>Payment</th><th>Action</th></tr></thead><tbody>{lines.map(x=><tr key={x.id}><td>{x.employee}</td><td>{money(x.basic_salary)}</td><td><input type="number" min="0" step="0.01" disabled={!canManage||activeRun.status!=="draft"} value={x.allowances} onBlur={e=>void updateLine(x,"allowances",e.target.value)}/></td><td><input type="number" min="0" step="0.01" disabled={!canManage||activeRun.status!=="draft"} value={x.overtime} onBlur={e=>void updateLine(x,"overtime",e.target.value)}/></td><td><input type="number" min="0" step="0.01" disabled={!canManage||activeRun.status!=="draft"} value={x.sales_incentive??0} onBlur={e=>void updateLine(x,"sales_incentive",e.target.value)}/></td><td><input type="number" min="0" step="0.01" disabled={!canManage||activeRun.status!=="draft"} value={x.deductions} onBlur={e=>void updateLine(x,"deductions",e.target.value)}/></td><td>{money(x.net_salary)}</td><td>{x.payment_status}</td><td>{activeRun.status==="posted"&&x.payment_status==="unpaid"&&canManage?<button disabled={saving} onClick={()=>void payLine(x)}>Pay salary</button>:x.payment_status==="paid"?"Paid":"—"}</td></tr>)}{!lines.length&&<tr><td colSpan={9} className="table-empty">No payroll lines found.</td></tr>}</tbody></table></div>
    {activeRun.status==="draft"&&canManage&&<button disabled={saving||!lines.length} onClick={()=>void postRun()}>Post payroll to accounts</button>}
   </>}
  </section>;
