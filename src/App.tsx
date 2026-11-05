@@ -1,6 +1,7 @@
 import { FormEvent, lazy, Suspense, useEffect, useState } from "react";
 import { createClient, Session } from "@supabase/supabase-js";
 const WorkspaceModule = lazy(() => import("./WorkspaceModule"));
+const UserPermissionsModule = lazy(() => import("./UserPermissionsModule"));
 const TransactionsModule = lazy(() => import("./TransactionsModule"));
 const OperationsModule = lazy(() => import("./OperationsModule"));
 const AdminModule = lazy(() => import("./AdminModule"));
@@ -38,7 +39,7 @@ const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 const db = url && key ? createClient(url, key) : null;
 
 type Organization = { id: string; name: string; city: string | null; currency: string };
-const nav = ["Overview","Sales","Booker App","Delivery Man App","Inventory","Batch & Expiry","Stock Take","Van Stock","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Delivery Charges","Recovery","Customer Credit Control","Accounts","Reports","Team & Employees","HR & Attendance","Login History","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Asset & Budget Control","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register","Voucher Revision History","Audit Trail","Booker Product Access","Targets & Incentives","Settings","Backup & Restore"];
+const nav = ["Overview","User Permissions","Sales","Booker App","Delivery Man App","Inventory","Batch & Expiry","Stock Take","Van Stock","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Delivery Charges","Recovery","Customer Credit Control","Accounts","Reports","Team & Employees","HR & Attendance","Login History","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Asset & Budget Control","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register","Voucher Revision History","Audit Trail","Booker Product Access","Targets & Incentives","Settings","Backup & Restore"];
 const navGroups = [
  {name:"1. Dashboard & Management",icon:"✦",items:["Overview"]},
  {name:"2. Sales & Customer Management",icon:"◈",items:["Sales","Customers","Invoices","Sales Returns","Customer Credit Control","Recovery","Price Lists"]},
@@ -49,10 +50,10 @@ const navGroups = [
  {name:"7. Distribution & Delivery",icon:"⌖",items:["Delivery Man App","Distribution","Delivery Charges","Routes"]},
  {name:"8. HR & Payroll",icon:"♙",items:["Team & Employees","HR & Attendance","Payroll"]},
  {name:"9. Reports & Analytics",icon:"▤",items:["Reports","Targets & Incentives"]},
- {name:"10. Administration & Security",icon:"⚙",items:["Login History","Settings","Backup & Restore","Voucher Revision History","Audit Trail"]}
+ {name:"10. Administration & Security",icon:"⚙",items:["User Permissions","Login History","Settings","Backup & Restore","Voucher Revision History","Audit Trail"]}
 ];
 const roleAccess: Record<string,string[]> = {
- owner: nav, admin: nav,
+ owner: nav, admin: nav.filter(item=>item!=="User Permissions"),
  manager: ["Overview","Sales","Booker App","Inventory","Batch & Expiry","Stock Take","Van Stock","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Delivery Charges","Recovery","Customer Credit Control","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Asset & Budget Control","HR & Attendance","Login History","Booker Product Access","Targets & Incentives"],
  accounts: ["Overview","Recovery","Accounts","Invoices","Vendor Invoices","Purchase Returns","Sales Returns","Payroll","Asset & Budget Control","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register","Voucher Revision History","Customer Credit Control","Reports"],
  purchase: ["Overview","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Vendors","Products","Inventory","Vendor Feeding","Reports"],
@@ -72,6 +73,7 @@ export default function App() {
   const [organization,setOrganization] = useState<Organization|null>(null);
   const [tenantChoices,setTenantChoices] = useState<Array<Organization & {role:string}>>([]);
   const [currentRole,setCurrentRole] = useState("viewer");
+  const [modulePermissions,setModulePermissions] = useState<Record<string,boolean>>({});
   const [mode,setMode] = useState<"login"|"signup">("login");
   const [recoveryMode,setRecoveryMode] = useState(false);
   const [authEvent,setAuthEvent] = useState("");
@@ -83,9 +85,28 @@ export default function App() {
   const [active,setActive] = useState(()=>{const app=new URLSearchParams(window.location.search).get("app");return app==="booker"?"Booker App":app==="delivery"?"Delivery Man App":"Overview";});
   const [expandedGroup,setExpandedGroup] = useState(()=>{const app=new URLSearchParams(window.location.search).get("app");const initial=app==="booker"?"Booker App":app==="delivery"?"Delivery Man App":"Overview";return navGroups.find(g=>g.items.includes(initial))?.name||"Overview";});
   const [busy,setBusy] = useState(false);
-  const allowedNav = roleAccess[currentRole] || roleAccess.viewer;
+  const baseAllowedNav = roleAccess[currentRole] || roleAccess.viewer;
+  const moduleKeys = ["dashboard_management","sales_customer","order_booking","inventory","purchase_supplier","accounts_finance","distribution_delivery","hr_payroll","reports_analytics","administration_security"];
+  const allowedNav = currentRole==="owner"||currentRole==="admin" ? nav.filter(item=>currentRole==="owner"||item!=="User Permissions") : nav.filter(item=>{
+    const groupIndex=navGroups.findIndex(group=>group.items.includes(item));
+    const moduleKey=moduleKeys[groupIndex];
+    return moduleKey&&Object.prototype.hasOwnProperty.call(modulePermissions,moduleKey)?modulePermissions[moduleKey]:baseAllowedNav.includes(item);
+  });
   const [notice,setNotice] = useState("");
   useEffect(()=>{const group=navGroups.find(item=>item.items.includes(active));if(group)setExpandedGroup(group.name);},[active]);
+
+  useEffect(()=>{
+    let live=true;
+    async function loadOverrides(){
+      if(!db||!session||!organization||["owner","admin"].includes(currentRole)){if(live)setModulePermissions({});return;}
+      const {data,error}=await db.from("tenant_user_module_permissions").select("module_key,can_view").eq("tenant_id",organization.id).eq("user_id",session.user.id);
+      if(!live)return;
+      if(error){setNotice("Could not load individual module permissions: "+error.message);setModulePermissions({});return;}
+      setModulePermissions(Object.fromEntries((data||[]).map(row=>[row.module_key,Boolean(row.can_view)])));
+    }
+    void loadOverrides();
+    return()=>{live=false;};
+  },[organization?.id,session?.user.id,currentRole]);
 
   useEffect(() => {
     if (!db) { setLoading(false); return; }
@@ -224,6 +245,8 @@ export default function App() {
           ? <VendorCatalogModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Audit Trail"
           ? <AuditModule db={db} tenantId={organization.id} />
+        : active === "User Permissions"
+          ? <UserPermissionsModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : ["Inventory","Distribution","Recovery","Reports","Goods Receiving"].includes(active)
           ? <OperationsModule db={db} tenantId={organization.id} module={active} currentRole={currentRole} />
           : active === "Booker App" && currentRole === "order_booker"
