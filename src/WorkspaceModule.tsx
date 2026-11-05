@@ -16,7 +16,7 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
   const [categoryName,setCategoryName]=useState("");
   const [editingProductId,setEditingProductId]=useState<string|null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [productForm, setProductForm] = useState({ sku: "", name: "", brand: "", barcode: "", category_id:"", cost_price:"0", sale_price:"0", min_stock: "0", unit_name: "Piece", unit_symbol: "pcs", alternate_unit_name:"", alternate_unit_symbol:"", conversion_to_base:"1", alternate_purchase:true, alternate_sales:true, track_batch: false, track_expiry: false });
+  const [productForm, setProductForm] = useState({ sku: "", name: "", brand: "", barcode: "", category_id:"", description:"", cost_price:"0", sale_price:"0", purchase_tax_rate:"0", sales_tax_rate:"0", min_stock: "0", reorder_level:"0", unit_name: "Piece", unit_symbol: "pcs", alternate_unit_name:"", alternate_unit_symbol:"", conversion_to_base:"1", alternate_purchase:true, alternate_sales:true, track_batch: false, track_expiry: false });
   const [partyForm, setPartyForm] = useState({ party_code: "", party_type: "customer", name: "", contact_person: "", phone: "", email:"",address:"",tax_number:"",payment_terms_days:"0",city: "", credit_limit: "0", opening_balance: "0" });
 
   const isProducts = module === "Products";
@@ -26,7 +26,7 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
   async function load() {
     setLoading(true); setNotice("");
     if (isProducts) {
-      const [productResult,categoryResult,unitResult] = await Promise.all([db.from("products").select("id,sku,name,brand,barcode,category_id,base_unit_id,is_active,min_stock,cost_price,sale_price,track_expiry,track_batch").eq("tenant_id", tenantId).order("name").limit(250),db.from("product_categories").select("id,name").eq("tenant_id",tenantId).eq("is_active",true).order("name"),db.from("units_of_measure").select("id,name,symbol").eq("tenant_id",tenantId)]);
+      const [productResult,categoryResult,unitResult] = await Promise.all([db.from("products").select("id,sku,name,brand,barcode,category_id,base_unit_id,description,purchase_tax_rate,sales_tax_rate,reorder_level,is_active,min_stock,cost_price,sale_price,track_expiry,track_batch").eq("tenant_id", tenantId).order("name").limit(250),db.from("product_categories").select("id,name").eq("tenant_id",tenantId).eq("is_active",true).order("name"),db.from("units_of_measure").select("id,name,symbol").eq("tenant_id",tenantId)]);
       if (productResult.error||categoryResult.error||unitResult.error) setNotice(productResult.error?.message||categoryResult.error?.message||unitResult.error?.message||"Product master could not be loaded."); else {setProducts((productResult.data ?? []) as Product[]);setCategories(categoryResult.data??[]);setUnitCache(unitResult.data??[]);}
     } else if (isParties) {
       const { data, error } = await db.from("parties").select("id,party_code,party_type,name,contact_person,phone,email,address,tax_number,payment_terms_days,city,credit_limit,opening_balance,status").eq("tenant_id", tenantId).in("party_type", partyType === "supplier" ? ["supplier","both"] : ["customer","both"]).order("name").limit(250);
@@ -62,7 +62,7 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
     setNotice("");const base=unitCache.find(x=>x.id===p.base_unit_id);
     const {data:mapping}=await db.from("product_units").select("unit_id,conversion_to_base,is_purchase_unit,is_sales_unit").eq("tenant_id",tenantId).eq("product_id",p.id).neq("conversion_to_base",1).maybeSingle();
     const alt=mapping?await db.from("units_of_measure").select("name,symbol").eq("tenant_id",tenantId).eq("id",mapping.unit_id).maybeSingle():{data:null};
-    setEditingProductId(p.id);setProductForm(old=>({...old,sku:p.sku,name:p.name,brand:p.brand||"",barcode:p.barcode||"",category_id:p.category_id||"",cost_price:String(p.cost_price??0),sale_price:String(p.sale_price??0),min_stock:String(p.min_stock??0),unit_name:base?.name||"Piece",unit_symbol:base?.symbol||"pcs",alternate_unit_name:alt.data?.name||"",alternate_unit_symbol:alt.data?.symbol||"",conversion_to_base:String(mapping?.conversion_to_base??1),alternate_purchase:mapping?.is_purchase_unit??true,alternate_sales:mapping?.is_sales_unit??true,track_batch:p.track_batch,track_expiry:p.track_expiry}));setShowForm(true);
+    setEditingProductId(p.id);setProductForm(old=>({...old,sku:p.sku,name:p.name,brand:p.brand||"",barcode:p.barcode||"",category_id:p.category_id||"",description:p.description||"",cost_price:String(p.cost_price??0),sale_price:String(p.sale_price??0),purchase_tax_rate:String(p.purchase_tax_rate??0),sales_tax_rate:String(p.sales_tax_rate??0),min_stock:String(p.min_stock??0),reorder_level:String(p.reorder_level??0),unit_name:base?.name||"Piece",unit_symbol:base?.symbol||"pcs",alternate_unit_name:alt.data?.name||"",alternate_unit_symbol:alt.data?.symbol||"",conversion_to_base:String(mapping?.conversion_to_base??1),alternate_purchase:mapping?.is_purchase_unit??true,alternate_sales:mapping?.is_sales_unit??true,track_batch:p.track_batch,track_expiry:p.track_expiry}));setShowForm(true);
   }
 
   async function saveProduct(e: FormEvent) {
@@ -81,8 +81,8 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
       if (unitError) { setNotice(unitError.message); setSaving(false); return; }
       unitId = createdUnit.id;
     }
-    const productPayload={sku:productForm.sku.trim(),name:productForm.name.trim(),brand:productForm.brand.trim()||null,barcode:productForm.barcode.trim()||null,category_id:productForm.category_id||null,base_unit_id:unitId,cost_price:Number(productForm.cost_price),sale_price:Number(productForm.sale_price),min_stock:Number(productForm.min_stock)||0,track_batch:productForm.track_batch,track_expiry:productForm.track_expiry};
-    if(!Number.isFinite(productPayload.cost_price)||productPayload.cost_price<0||!Number.isFinite(productPayload.sale_price)||productPayload.sale_price<0){setNotice("Cost and sale prices must be valid non-negative amounts.");setSaving(false);return;}
+    const productPayload={sku:productForm.sku.trim(),name:productForm.name.trim(),brand:productForm.brand.trim()||null,barcode:productForm.barcode.trim()||null,category_id:productForm.category_id||null,description:productForm.description.trim()||null,base_unit_id:unitId,cost_price:Number(productForm.cost_price),sale_price:Number(productForm.sale_price),purchase_tax_rate:Number(productForm.purchase_tax_rate),sales_tax_rate:Number(productForm.sales_tax_rate),min_stock:Number(productForm.min_stock)||0,reorder_level:Number(productForm.reorder_level)||0,track_batch:productForm.track_batch,track_expiry:productForm.track_expiry};
+    if(!Number.isFinite(productPayload.cost_price)||productPayload.cost_price<0||!Number.isFinite(productPayload.sale_price)||productPayload.sale_price<0||!Number.isFinite(productPayload.purchase_tax_rate)||productPayload.purchase_tax_rate<0||!Number.isFinite(productPayload.sales_tax_rate)||productPayload.sales_tax_rate<0){setNotice("Cost and sale prices must be valid non-negative amounts.");setSaving(false);return;}
     const productWrite=editingProductId?await db.from("products").update(productPayload).eq("tenant_id",tenantId).eq("id",editingProductId).select("id").single():await db.from("products").insert({tenant_id:tenantId,...productPayload}).select("id").single();
     const createdProduct=productWrite.data;const error=productWrite.error;
     if (error) setNotice(error.message);
@@ -100,7 +100,7 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
         if(altLink.error){setNotice("Product and base unit saved, but alternate conversion failed: "+altLink.error.message);setSaving(false);await load();return;}
         setNotice("Product, base unit and alternate unit conversion saved.");
       }else setNotice("Product and base unit saved successfully.");
-      setProductForm({ sku:"", name:"", brand:"", barcode:"", category_id:"", cost_price:"0", sale_price:"0", min_stock:"0", unit_name:"Piece", unit_symbol:"pcs", alternate_unit_name:"", alternate_unit_symbol:"", conversion_to_base:"1", alternate_purchase:true, alternate_sales:true, track_batch:false, track_expiry:false }); setEditingProductId(null);setShowForm(false); await load();
+      setProductForm({ sku:"", name:"", brand:"", barcode:"", category_id:"", description:"", cost_price:"0", sale_price:"0", purchase_tax_rate:"0", sales_tax_rate:"0", min_stock:"0", reorder_level:"0", unit_name:"Piece", unit_symbol:"pcs", alternate_unit_name:"", alternate_unit_symbol:"", conversion_to_base:"1", alternate_purchase:true, alternate_sales:true, track_batch:false, track_expiry:false }); setEditingProductId(null);setShowForm(false); await load();
     }
     setSaving(false);
   }
@@ -121,10 +121,13 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
     {showForm && (isProducts ? <form className="data-form" onSubmit={saveProduct}>
       <label>SKU / Item code<input required value={productForm.sku} onChange={e=>setProductForm({...productForm,sku:e.target.value})} /></label>
       <label>Product name<input required value={productForm.name} onChange={e=>setProductForm({...productForm,name:e.target.value})} /></label>
+      <label>Description<input value={productForm.description} onChange={e=>setProductForm({...productForm,description:e.target.value})}/></label>
       <label>Brand<input value={productForm.brand} onChange={e=>setProductForm({...productForm,brand:e.target.value})} /></label>
       <label>Barcode<input value={productForm.barcode} onChange={e=>setProductForm({...productForm,barcode:e.target.value})} /></label>
       <label>Cost / Purchase price (PKR)<input required type="number" min="0" step="0.0001" value={productForm.cost_price} onChange={e=>setProductForm({...productForm,cost_price:e.target.value})}/></label>
       <label>Sale price (PKR)<input required type="number" min="0" step="0.0001" value={productForm.sale_price} onChange={e=>setProductForm({...productForm,sale_price:e.target.value})}/></label>
+      <label>Purchase tax %<input type="number" min="0" step="0.01" value={productForm.purchase_tax_rate} onChange={e=>setProductForm({...productForm,purchase_tax_rate:e.target.value})}/></label>
+      <label>Sales tax %<input type="number" min="0" step="0.01" value={productForm.sales_tax_rate} onChange={e=>setProductForm({...productForm,sales_tax_rate:e.target.value})}/></label>
       <label>Category<select value={productForm.category_id} onChange={e=>setProductForm({...productForm,category_id:e.target.value})}><option value="">Uncategorised</option>{categories.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>{["owner","admin","manager","purchase"].includes(currentRole)&&<div className="form-grid"><label>New category<input value={categoryName} onChange={e=>setCategoryName(e.target.value)} placeholder="Beverages / Grocery"/></label><button type="button" onClick={()=>void saveCategory()}>Add category</button></div>}
       <label>Base unit name<input required value={productForm.unit_name} onChange={e=>setProductForm({...productForm,unit_name:e.target.value})} /></label>
       <label>Unit symbol<input required value={productForm.unit_symbol} onChange={e=>setProductForm({...productForm,unit_symbol:e.target.value})} /></label>
@@ -135,6 +138,7 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
       <label className="check-label"><input type="checkbox" checked={productForm.alternate_purchase} onChange={e=>setProductForm({...productForm,alternate_purchase:e.target.checked})}/> Use alternate unit for purchases</label>
       <label className="check-label"><input type="checkbox" checked={productForm.alternate_sales} onChange={e=>setProductForm({...productForm,alternate_sales:e.target.checked})}/> Use alternate unit for sales</label>
       <label>Minimum stock<input type="number" min="0" step="0.001" value={productForm.min_stock} onChange={e=>setProductForm({...productForm,min_stock:e.target.value})} /></label>
+      <label>Reorder level<input type="number" min="0" step="0.001" value={productForm.reorder_level} onChange={e=>setProductForm({...productForm,reorder_level:e.target.value})}/></label>
       <label className="check-label"><input type="checkbox" checked={productForm.track_batch} onChange={e=>setProductForm({...productForm,track_batch:e.target.checked})}/> Track batches</label>
       <label className="check-label"><input type="checkbox" checked={productForm.track_expiry} onChange={e=>setProductForm({...productForm,track_expiry:e.target.checked})}/> Track expiry</label>
       <button disabled={saving}>{saving ? "Saving…" : "Save product"}</button>
