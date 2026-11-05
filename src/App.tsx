@@ -25,7 +25,8 @@ const CustomerCreditControlModule = lazy(() => import("./CustomerCreditControlMo
 const TaxRegisterModule = lazy(() => import("./TaxRegisterModule"));
 const BatchExpiryModule = lazy(() => import("./BatchExpiryModule"));
 const AssetBudgetModule = lazy(() => import("./AssetBudgetModule"));
-const VanStockModule = lazy(() => import("./VanStockModule"));\nconst StockTakeModule = lazy(() => import("./StockTakeModule"));
+const VanStockModule = lazy(() => import("./VanStockModule"));
+const StockTakeModule = lazy(() => import("./StockTakeModule"));
 const VoucherHistoryModule = lazy(() => import("./VoucherHistoryModule"));
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
