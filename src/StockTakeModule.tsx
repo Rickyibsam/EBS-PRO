@@ -27,7 +27,7 @@ export default function StockTakeModule({db,tenantId,currentRole}:{db:SupabaseCl
   if(!canEdit||!snapshot.length)return;
   setSaving(true);setNotice("");
   try{
-   const payload=snapshot.map(x=>({product_id:x.product_id,batch_number:x.batch_number,expiry_date:x.expiry_date,counted_quantity:Number(x.counted_quantity)}));
+   const payload=snapshot.map(x=>({product_id:x.product_id,batch_number:x.batch_number,expiry_date:x.expiry_date,expected_quantity:Number(x.expected_quantity),counted_quantity:Number(x.counted_quantity)}));
    if(payload.some(x=>!Number.isFinite(x.counted_quantity)||x.counted_quantity<0))throw new Error("Every physical count must be a valid non-negative quantity.");
    const {data,error}=await db.rpc("create_stock_take",{p_tenant_id:tenantId,p_warehouse_id:warehouseId,p_count_date:countDate,p_lines:payload,p_notes:notes.trim()||null});
    if(error)throw error;
