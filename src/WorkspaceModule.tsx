@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-type Product = { id: string; sku: string; name: string; brand: string | null; barcode: string | null; is_active: boolean; min_stock: number; track_expiry: boolean; track_batch: boolean };
+type Product = { id: string; sku: string; name: string; brand: string | null; barcode: string | null; is_active: boolean; min_stock: number; cost_price:number; sale_price:number; track_expiry: boolean; track_batch: boolean };
 type Party = { id: string; party_code: string; party_type: string; name: string; contact_person: string | null; phone: string | null; city: string | null; credit_limit: number; opening_balance: number; status: string };
 
 export default function WorkspaceModule({ db, tenantId, module, currentRole }: { db: SupabaseClient; tenantId: string; module: string; currentRole: string }) {
@@ -13,8 +13,9 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
   const [categoryName,setCategoryName]=useState("");
+  const [editingProductId,setEditingProductId]=useState<string|null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [productForm, setProductForm] = useState({ sku: "", name: "", brand: "", barcode: "", category_id:"", min_stock: "0", unit_name: "Piece", unit_symbol: "pcs", alternate_unit_name:"", alternate_unit_symbol:"", conversion_to_base:"1", alternate_purchase:true, alternate_sales:true, track_batch: false, track_expiry: false });
+  const [productForm, setProductForm] = useState({ sku: "", name: "", brand: "", barcode: "", category_id:"", cost_price:"0", sale_price:"0", min_stock: "0", unit_name: "Piece", unit_symbol: "pcs", alternate_unit_name:"", alternate_unit_symbol:"", conversion_to_base:"1", alternate_purchase:true, alternate_sales:true, track_batch: false, track_expiry: false });
   const [partyForm, setPartyForm] = useState({ party_code: "", party_type: "customer", name: "", contact_person: "", phone: "", city: "", credit_limit: "0", opening_balance: "0" });
 
   const isProducts = module === "Products";
@@ -24,7 +25,7 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
   async function load() {
     setLoading(true); setNotice("");
     if (isProducts) {
-      const [productResult,categoryResult] = await Promise.all([db.from("products").select("id,sku,name,brand,barcode,is_active,min_stock,track_expiry,track_batch").eq("tenant_id", tenantId).order("name").limit(250),db.from("product_categories").select("id,name").eq("tenant_id",tenantId).eq("is_active",true).order("name")]);
+      const [productResult,categoryResult] = await Promise.all([db.from("products").select("id,sku,name,brand,barcode,is_active,min_stock,cost_price,sale_price,track_expiry,track_batch").eq("tenant_id", tenantId).order("name").limit(250),db.from("product_categories").select("id,name").eq("tenant_id",tenantId).eq("is_active",true).order("name")]);
       if (productResult.error||categoryResult.error) setNotice(productResult.error?.message||categoryResult.error?.message||"Product master could not be loaded."); else {setProducts((productResult.data ?? []) as Product[]);setCategories(categoryResult.data??[]);}
     } else if (isParties) {
       const { data, error } = await db.from("parties").select("id,party_code,party_type,name,contact_person,phone,city,credit_limit,opening_balance,status").eq("tenant_id", tenantId).in("party_type", partyType === "supplier" ? ["supplier","both"] : ["customer","both"]).order("name").limit(250);
@@ -71,11 +72,15 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
       if (unitError) { setNotice(unitError.message); setSaving(false); return; }
       unitId = createdUnit.id;
     }
-    const { data: createdProduct, error } = await db.from("products").insert({ tenant_id: tenantId, sku: productForm.sku.trim(), name: productForm.name.trim(), brand: productForm.brand.trim() || null, barcode: productForm.barcode.trim() || null, category_id:productForm.category_id||null, base_unit_id: unitId, min_stock: Number(productForm.min_stock) || 0, track_batch: productForm.track_batch, track_expiry: productForm.track_expiry }).select("id").single();
+    const productPayload={sku:productForm.sku.trim(),name:productForm.name.trim(),brand:productForm.brand.trim()||null,barcode:productForm.barcode.trim()||null,category_id:productForm.category_id||null,base_unit_id:unitId,cost_price:Number(productForm.cost_price),sale_price:Number(productForm.sale_price),min_stock:Number(productForm.min_stock)||0,track_batch:productForm.track_batch,track_expiry:productForm.track_expiry};
+    if(!Number.isFinite(productPayload.cost_price)||productPayload.cost_price<0||!Number.isFinite(productPayload.sale_price)||productPayload.sale_price<0){setNotice("Cost and sale prices must be valid non-negative amounts.");setSaving(false);return;}
+    const productWrite=editingProductId?await db.from("products").update(productPayload).eq("tenant_id",tenantId).eq("id",editingProductId).select("id").single():await db.from("products").insert({tenant_id:tenantId,...productPayload}).select("id").single();
+    const createdProduct=productWrite.data;const error=productWrite.error;
     if (error) setNotice(error.message);
     else {
-      const { error: linkError } = await db.from("product_units").insert({ tenant_id: tenantId, product_id: createdProduct.id, unit_id: unitId, conversion_to_base: 1, is_purchase_unit: true, is_sales_unit: true });
-      if (linkError) {setNotice("Product saved, but base unit mapping failed: " + linkError.message);}
+      const { data:baseMapping }=await db.from("product_units").select("id").eq("tenant_id",tenantId).eq("product_id",createdProduct.id).eq("unit_id",unitId).maybeSingle();
+      const baseWrite=baseMapping?await db.from("product_units").update({conversion_to_base:1,is_purchase_unit:true,is_sales_unit:true}).eq("id",baseMapping.id):await db.from("product_units").insert({tenant_id:tenantId,product_id:createdProduct.id,unit_id:unitId,conversion_to_base:1,is_purchase_unit:true,is_sales_unit:true});
+      if (baseWrite.error) {setNotice("Product saved, but base unit mapping failed: " + baseWrite.error.message);}
       else if(productForm.alternate_unit_symbol.trim()){
         const altSymbol=productForm.alternate_unit_symbol.trim();
         let {data:altUnit,error:altReadError}=await db.from("units_of_measure").select("id").eq("tenant_id",tenantId).eq("symbol",altSymbol).maybeSingle();
@@ -85,7 +90,7 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
         if(altLink.error){setNotice("Product and base unit saved, but alternate conversion failed: "+altLink.error.message);setSaving(false);await load();return;}
         setNotice("Product, base unit and alternate unit conversion saved.");
       }else setNotice("Product and base unit saved successfully.");
-      setProductForm({ sku:"", name:"", brand:"", barcode:"", category_id:"", min_stock:"0", unit_name:"Piece", unit_symbol:"pcs", alternate_unit_name:"", alternate_unit_symbol:"", conversion_to_base:"1", alternate_purchase:true, alternate_sales:true, track_batch:false, track_expiry:false }); setShowForm(false); await load();
+      setProductForm({ sku:"", name:"", brand:"", barcode:"", category_id:"", cost_price:"0", sale_price:"0", min_stock:"0", unit_name:"Piece", unit_symbol:"pcs", alternate_unit_name:"", alternate_unit_symbol:"", conversion_to_base:"1", alternate_purchase:true, alternate_sales:true, track_batch:false, track_expiry:false }); setEditingProductId(null);setShowForm(false); await load();
     }
     setSaving(false);
   }
@@ -108,6 +113,8 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
       <label>Product name<input required value={productForm.name} onChange={e=>setProductForm({...productForm,name:e.target.value})} /></label>
       <label>Brand<input value={productForm.brand} onChange={e=>setProductForm({...productForm,brand:e.target.value})} /></label>
       <label>Barcode<input value={productForm.barcode} onChange={e=>setProductForm({...productForm,barcode:e.target.value})} /></label>
+      <label>Cost / Purchase price (PKR)<input required type="number" min="0" step="0.0001" value={productForm.cost_price} onChange={e=>setProductForm({...productForm,cost_price:e.target.value})}/></label>
+      <label>Sale price (PKR)<input required type="number" min="0" step="0.0001" value={productForm.sale_price} onChange={e=>setProductForm({...productForm,sale_price:e.target.value})}/></label>
       <label>Category<select value={productForm.category_id} onChange={e=>setProductForm({...productForm,category_id:e.target.value})}><option value="">Uncategorised</option>{categories.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>{["owner","admin","manager","purchase"].includes(currentRole)&&<div className="form-grid"><label>New category<input value={categoryName} onChange={e=>setCategoryName(e.target.value)} placeholder="Beverages / Grocery"/></label><button type="button" onClick={()=>void saveCategory()}>Add category</button></div>}
       <label>Base unit name<input required value={productForm.unit_name} onChange={e=>setProductForm({...productForm,unit_name:e.target.value})} /></label>
       <label>Unit symbol<input required value={productForm.unit_symbol} onChange={e=>setProductForm({...productForm,unit_symbol:e.target.value})} /></label>
@@ -132,7 +139,7 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
       <button disabled={saving}>{saving ? "Saving…" : "Save record"}</button>
     </form>)}
     <div className="table-tools"><input placeholder={isProducts ? "Search SKU, product, brand or barcode…" : "Search code, name, phone or city…"} value={search} onChange={e=>setSearch(e.target.value)}/><span>{isProducts ? filteredProducts.length : filteredParties.length} records</span><button onClick={()=>void load()}>↻ Refresh</button></div>
-    {loading ? <div className="table-empty">Loading records…</div> : isProducts ? <div className="data-table-wrap"><table className="data-table"><thead><tr><th>SKU</th><th>Product</th><th>Brand</th><th>Barcode</th><th>Min. stock</th><th>Tracking</th><th>Status</th><th>Action</th></tr></thead><tbody>{filteredProducts.map(p=><tr key={p.id}><td>{p.sku}</td><td>{p.name}</td><td>{p.brand || "—"}</td><td>{p.barcode || "—"}</td><td>{p.min_stock}</td><td>{[p.track_batch && "Batch",p.track_expiry && "Expiry"].filter(Boolean).join(" · ") || "—"}</td><td><span className={p.is_active ? "status-active":"status-inactive"}>{p.is_active ? "Active":"Inactive"}</span></td><td>{["owner","admin","manager","purchase"].includes(currentRole)?<button onClick={()=>void toggleActive(p.id,p.is_active)}>{p.is_active?"Deactivate":"Activate"}</button>:"—"}</td></tr>)}{!filteredProducts.length&&<tr><td colSpan={8} className="table-empty">No products found. Add your first product.</td></tr>}</tbody></table></div> : <div className="data-table-wrap"><table className="data-table"><thead><tr><th>Code</th><th>Name</th><th>Contact</th><th>Phone</th><th>City</th><th>Credit limit</th><th>Opening balance</th><th>Status</th><th>Action</th></tr></thead><tbody>{filteredParties.map(p=><tr key={p.id}><td>{p.party_code}</td><td>{p.name}</td><td>{p.contact_person || "—"}</td><td>{p.phone || "—"}</td><td>{p.city || "—"}</td><td>{Number(p.credit_limit).toLocaleString("en-PK")}</td><td>{Number(p.opening_balance).toLocaleString("en-PK")}</td><td><span className={p.status === "active" ? "status-active":"status-inactive"}>{p.status}</span></td><td>{["owner","admin","manager","accounts","purchase","sales"].includes(currentRole)?<button onClick={()=>void toggleActive(p.id,p.status==="active")}>{p.status==="active"?"Deactivate":"Activate"}</button>:"—"}</td></tr>)}{!filteredParties.length&&<tr><td colSpan={9} className="table-empty">No records found. Add your first record.</td></tr>}</tbody></table></div>}
+    {loading ? <div className="table-empty">Loading records…</div> : isProducts ? <div className="data-table-wrap"><table className="data-table"><thead><tr><th>SKU</th><th>Product</th><th>Brand</th><th>Barcode</th><th>Cost price</th><th>Sale price</th><th>Min. stock</th><th>Tracking</th><th>Status</th><th>Action</th></tr></thead><tbody>{filteredProducts.map(p=><tr key={p.id}><td>{p.sku}</td><td>{p.name}</td><td>{p.brand || "—"}</td><td>{p.barcode || "—"}</td><td>PKR {Number(p.cost_price||0).toLocaleString("en-PK",{minimumFractionDigits:2})}</td><td>PKR {Number(p.sale_price||0).toLocaleString("en-PK",{minimumFractionDigits:2})}</td><td>{p.min_stock}</td><td>{[p.track_batch && "Batch",p.track_expiry && "Expiry"].filter(Boolean).join(" · ") || "—"}</td><td><span className={p.is_active ? "status-active":"status-inactive"}>{p.is_active ? "Active":"Inactive"}</span></td><td>{["owner","admin","manager","purchase"].includes(currentRole)?<><button onClick={()=>{setEditingProductId(p.id);setProductForm(old=>({...old,sku:p.sku,name:p.name,brand:p.brand||"",barcode:p.barcode||"",cost_price:String(p.cost_price??0),sale_price:String(p.sale_price??0),min_stock:String(p.min_stock??0),track_batch:p.track_batch,track_expiry:p.track_expiry}));setShowForm(true);setNotice("");}}>Edit</button> <button onClick={()=>void toggleActive(p.id,p.is_active)}>{p.is_active?"Deactivate":"Activate"}</button></>:"—"}</td></tr>)}{!filteredProducts.length&&<tr><td colSpan={10} className="table-empty">No products found. Add your first product.</td></tr>}</tbody></table></div> : <div className="data-table-wrap"><table className="data-table"><thead><tr><th>Code</th><th>Name</th><th>Contact</th><th>Phone</th><th>City</th><th>Credit limit</th><th>Opening balance</th><th>Status</th><th>Action</th></tr></thead><tbody>{filteredParties.map(p=><tr key={p.id}><td>{p.party_code}</td><td>{p.name}</td><td>{p.contact_person || "—"}</td><td>{p.phone || "—"}</td><td>{p.city || "—"}</td><td>{Number(p.credit_limit).toLocaleString("en-PK")}</td><td>{Number(p.opening_balance).toLocaleString("en-PK")}</td><td><span className={p.status === "active" ? "status-active":"status-inactive"}>{p.status}</span></td><td>{["owner","admin","manager","accounts","purchase","sales"].includes(currentRole)?<button onClick={()=>void toggleActive(p.id,p.status==="active")}>{p.status==="active"?"Deactivate":"Activate"}</button>:"—"}</td></tr>)}{!filteredParties.length&&<tr><td colSpan={9} className="table-empty">No records found. Add your first record.</td></tr>}</tbody></table></div>}
     <p className="module-footnote">Records are restricted to this company workspace by Supabase Row Level Security.</p>
   </section>;
 }
