@@ -35,7 +35,7 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
    await cacheDeliverySnapshot(tenantId,user.user.id,{employee:emp,deliveries:deliveryRows,orders:o.data??[],lines:l.data??[],visits:v.data??[],customers:cu.data??[],products:pr.data??[]});
    }else{setOrders([]);setLines([]);setVisits([]);setCustomers([]);setProducts([]);}
   }catch(e){
-   if(!navigator.onLine){
+   if(!navigator.onLine||/fetch|network|offline|connection|timeout/i.test(e instanceof Error?e.message:"")){
     try{const {data:{session}}=await db.auth.getSession();const offlineUserId=session?.user.id||"";if(!offlineUserId)throw new Error("Sign in on this device before viewing offline delivery assignments.");setAuthUserId(offlineUserId);const cached=await getDeliverySnapshot(tenantId,offlineUserId);const d=cached?.data;if(d){setEmployee((d.employee as Row)||null);setDeliveries((d.deliveries as Row[])||[]);setOrders((d.orders as Row[])||[]);setLines((d.lines as Row[])||[]);setVisits((d.visits as Row[])||[]);setCustomers((d.customers as Row[])||[]);setProducts((d.products as Row[])||[]);setNotice("Offline mode: showing the last saved assigned deliveries. New visits are queued on this device until connection returns.");}else setNotice("Offline and no delivery assignment snapshot is saved. Connect once to download your assignments.");}
     catch(cacheError){setNotice(cacheError instanceof Error?cacheError.message:"Offline delivery data could not be loaded.");}
    }else setNotice(e instanceof Error?e.message:"Assigned deliveries could not be loaded.");
