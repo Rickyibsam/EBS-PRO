@@ -21,5 +21,5 @@ export async function cacheDeliverySnapshot(tenantId:string,userId:string,data:R
  const db=await openDb();await new Promise<void>((resolve,reject)=>{const tx=db.transaction(SNAPSHOTS,"readwrite");tx.objectStore(SNAPSHOTS).put({id:tenantId+"-"+userId,tenant_id:tenantId,user_id:userId,data,updated_at:new Date().toISOString()});tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error||new Error("Delivery snapshot could not be saved."));});db.close();
 }
 export async function getDeliverySnapshot(tenantId:string,userId:string):Promise<DeliverySnapshot|null>{
- const db=await openDb();const result=await new Promise<DeliverySnapshot|null>((resolve,reject)=>{const tx=db.transaction(SNAPSHOTS,"readonly");const req=tx.objectStore(SNAPSHOTS).get(tenantId);req.onsuccess=()=>resolve((req.result as DeliverySnapshot)||null);req.onerror=()=>reject(req.error||new Error("Delivery snapshot could not be loaded."));});db.close();return result;
+ const db=await openDb();const result=await new Promise<DeliverySnapshot|null>((resolve,reject)=>{const tx=db.transaction(SNAPSHOTS,"readonly");const req=tx.objectStore(SNAPSHOTS).get(tenantId+"-"+userId);req.onsuccess=()=>resolve((req.result as DeliverySnapshot)||null);req.onerror=()=>reject(req.error||new Error("Delivery snapshot could not be loaded."));});db.close();return result;
 }
