@@ -26,7 +26,7 @@ export default function PurchaseReturnsModule({db,tenantId,currentRole}:{db:Supa
   if(error){setNotice(error.message);return;}
   const used=new Map<string,number>();const {data:old,error:oldError}=await db.from("purchase_debit_note_lines").select("goods_receipt_line_id,quantity,purchase_debit_notes!inner(status)").eq("tenant_id",tenantId).in("goods_receipt_line_id",(data??[]).map(x=>x.id));
   if(oldError){setNotice(oldError.message);return;}
-  for(const x of old??[]){if(["draft","posted"].includes(x.purchase_debit_notes?.status))used.set(x.goods_receipt_line_id,(used.get(x.goods_receipt_line_id)||0)+Number(x.quantity));}
+  for(const x of old??[]){if(["draft","posted"].includes(x.purchase_debit_notes?.[0]?.status))used.set(x.goods_receipt_line_id,(used.get(x.goods_receipt_line_id)||0)+Number(x.quantity));}
   setLines((data??[]).map(x=>({...x,already_returned:used.get(x.id)||0,return_quantity:"0"})));
  }
  async function create(e:FormEvent){
