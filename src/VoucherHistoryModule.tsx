@@ -1,4 +1,5 @@
 import {useEffect,useMemo,useState} from "react";
+type Row=Record<string,any>;
 import type {SupabaseClient} from "@supabase/supabase-js";
 const TYPES=[
  {table:"sales_orders",label:"Sales orders",number:"order_number",date:"order_date",notes:"notes",approval:true,lines:"sales_order_lines",parentKey:"sales_order_id",lineKind:"taxedSales"},
