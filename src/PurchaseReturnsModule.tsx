@@ -2,21 +2,22 @@ import {FormEvent,useEffect,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 type Row=Record<string,any>;
 export default function PurchaseReturnsModule({db,tenantId,currentRole}:{db:SupabaseClient;tenantId:string;currentRole:string}){
- const [grns,setGrns]=useState<Row[]>([]),[orders,setOrders]=useState<Row[]>([]),[parties,setParties]=useState<Row[]>([]),[notes,setNotes]=useState<Row[]>([]),[lines,setLines]=useState<Row[]>([]);
+ const [grns,setGrns]=useState<Row[]>([]),[orders,setOrders]=useState<Row[]>([]),[parties,setParties]=useState<Row[]>([]),[products,setProducts]=useState<Row[]>([]),[notes,setNotes]=useState<Row[]>([]),[lines,setLines]=useState<Row[]>([]);
  const [selectedGrn,setSelectedGrn]=useState(""),[reason,setReason]=useState(""),[noteDate,setNoteDate]=useState(new Date().toISOString().slice(0,10));
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[show,setShow]=useState(false),[notice,setNotice]=useState("");
  const canCreate=["owner","admin","manager","purchase"].includes(currentRole),canPost=["owner","admin","manager","accounts","warehouse"].includes(currentRole);
  const money=(v:number)=>"PKR "+Number(v||0).toLocaleString("en-PK",{minimumFractionDigits:2,maximumFractionDigits:2});
  async function load(){
   setLoading(true);setNotice("");
-  const [g,o,p,n,l]=await Promise.all([
+  const [g,o,p,pr,n,l]=await Promise.all([
    db.from("goods_receipts").select("id,grn_number,received_date,purchase_order_id,warehouse_id,status").eq("tenant_id",tenantId).eq("status","posted").order("received_date",{ascending:false}).limit(300),
    db.from("purchase_orders").select("id,po_number,supplier_id").eq("tenant_id",tenantId),
    db.from("parties").select("id,name,party_code").eq("tenant_id",tenantId).in("party_type",["supplier","both"]).order("name"),
+   db.from("products").select("id,name,sku").eq("tenant_id",tenantId),
    db.from("purchase_debit_notes").select("id,goods_receipt_id,supplier_id,debit_note_number,note_date,reason,status,subtotal,warehouse_id").eq("tenant_id",tenantId).order("note_date",{ascending:false}).limit(300),
    db.from("purchase_debit_note_lines").select("goods_receipt_line_id,quantity").eq("tenant_id",tenantId)
   ]);
-  const err=g.error||o.error||p.error||n.error||l.error;if(err)setNotice(err.message);else{setGrns(g.data??[]);setOrders(o.data??[]);setParties(p.data??[]);setNotes(n.data??[]);setLines(l.data??[]);}
+  const err=g.error||o.error||p.error||pr.error||n.error||l.error;if(err)setNotice(err.message);else{setGrns(g.data??[]);setOrders(o.data??[]);setParties(p.data??[]);setProducts(pr.data??[]);setNotes(n.data??[]);setLines(l.data??[]);}
   setLoading(false);
  }
  useEffect(()=>{void load();},[tenantId]);
@@ -54,7 +55,7 @@ export default function PurchaseReturnsModule({db,tenantId,currentRole}:{db:Supa
    <label>Return date<input type="date" required value={noteDate} onChange={e=>setNoteDate(e.target.value)}/></label>
    <label>Reason<input required value={reason} onChange={e=>setReason(e.target.value)} placeholder="Damaged / expired / quality issue"/></label>
   </div>
-  {lines.length>0&&<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Product</th><th>Batch</th><th>Expiry</th><th>Accepted</th><th>Already returned</th><th>Return qty</th><th>Value</th></tr></thead><tbody>{lines.map(x=><tr key={x.id}><td>{x.product_id}</td><td>{x.batch_number||"—"}</td><td>{x.expiry_date||"—"}</td><td>{x.accepted_quantity}</td><td>{x.already_returned}</td><td><input type="number" min="0" max={Number(x.accepted_quantity)-Number(x.already_returned)} step="0.001" value={x.return_quantity} onChange={e=>setLines(old=>old.map(y=>y.id===x.id?{...y,return_quantity:e.target.value}:y))}/></td><td>{money(Number(x.return_quantity||0)*Number(x.unit_cost||0))}</td></tr>)}</tbody></table></div>}
+  {lines.length>0&&<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Product</th><th>Batch</th><th>Expiry</th><th>Accepted</th><th>Already returned</th><th>Return qty</th><th>Value</th></tr></thead><tbody>{lines.map(x=><tr key={x.id}><td>{products.find(p=>p.id===x.product_id)?.sku} · {products.find(p=>p.id===x.product_id)?.name||x.product_id}</td><td>{x.batch_number||"—"}</td><td>{x.expiry_date||"—"}</td><td>{x.accepted_quantity}</td><td>{x.already_returned}</td><td><input type="number" min="0" max={Number(x.accepted_quantity)-Number(x.already_returned)} step="0.001" value={x.return_quantity} onChange={e=>setLines(old=>old.map(y=>y.id===x.id?{...y,return_quantity:e.target.value}:y))}/></td><td>{money(Number(x.return_quantity||0)*Number(x.unit_cost||0))}</td></tr>)}</tbody></table></div>}
   <button disabled={saving||!lines.length}>{saving?"Creating…":"Create debit note draft"}</button></form>}
   <h3>Purchase return register</h3>
   {loading?<div className="table-empty">Loading supplier returns…</div>:<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Debit note</th><th>Supplier</th><th>GRN</th><th>Date</th><th>Reason</th><th>Value</th><th>Status</th><th>Action</th></tr></thead><tbody>{notes.map(n=>{const g=grns.find(x=>x.id===n.goods_receipt_id),po=orders.find(x=>x.id===g?.purchase_order_id),supplier=parties.find(x=>x.id===n.supplier_id||x.id===po?.supplier_id);return <tr key={n.id}><td>{n.debit_note_number}</td><td>{supplier?.name||"—"}</td><td>{g?.grn_number||"—"}</td><td>{n.note_date}</td><td>{n.reason}</td><td>{money(n.subtotal)}</td><td>{n.status}</td><td>{n.status==="draft"&&canPost?<button disabled={saving} onClick={()=>void post(n.id)}>Post return</button>:n.status==="posted"?"Posted":"—"}</td></tr>;})}{!notes.length&&<tr><td colSpan={8} className="table-empty">No supplier returns recorded.</td></tr>}</tbody></table></div>}
