@@ -6,7 +6,7 @@ export default function DeliveryChargeModule({db,tenantId,currentRole}:{db:Supab
  const canManage=["owner","admin","manager"].includes(currentRole),canConfigure=canManage||currentRole==="accounts",canCollect=canManage||["accounts","delivery_man"].includes(currentRole);
  const [routes,setRoutes]=useState<Row[]>([]),[deliveries,setDeliveries]=useState<Row[]>([]),[orders,setOrders]=useState<Row[]>([]),[parties,setParties]=useState<Row[]>([]),[rules,setRules]=useState<Row[]>([]),[charges,setCharges]=useState<Row[]>([]);
  const [form,setForm]=useState({route_id:"",customer_id:"",charge_type:"fixed",amount:"0",min_order_amount:"0",free_delivery_above:"",priority:"0",notes:""});
- const [collection,setCollection]=useState<Record<string,string>>({}),[method,setMethod]=useState<Record<string,string>>({}),[reference,setReference]=useState<Record<string,string>>({});
+ const [collection,setCollection]=useState<Record<string,string>>({}),[method,setMethod]=useState<Record<string,string>>({}),[reference,setReference]=useState<Record<string,string>>({}),[collectionKeys,setCollectionKeys]=useState<Record<string,string>>({});
  const [accounts,setAccounts]=useState<Row[]>([]),[cashAccounts,setCashAccounts]=useState<string[]>([]),[collections,setCollections]=useState<Row[]>([]),[mapping,setMapping]=useState({revenue_account_id:"",cash_account_id:"",bank_account_id:""});
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[notice,setNotice]=useState("");
  async function load(){
@@ -39,12 +39,13 @@ export default function DeliveryChargeModule({db,tenantId,currentRole}:{db:Supab
  }
  async function collect(charge:Row){
   const amount=Number(collection[charge.id]||0);if(!amount)return;setSaving(true);
-  const {error}=await db.rpc("settle_delivery_charge",{p_charge_id:charge.id,p_amount:amount,p_payment_method:method[charge.id]||"cash",p_payment_reference:reference[charge.id]||null,p_waive:false});
-  if(error)setNotice(error.message);else{setNotice("Delivery charge collection recorded.");setCollection(x=>({...x,[charge.id]:""}));await load();}setSaving(false);
+  const key=collectionKeys[charge.id]||crypto.randomUUID();setCollectionKeys(x=>({...x,[charge.id]:key}));
+  const {data,error}=await db.rpc("settle_delivery_charge",{p_charge_id:charge.id,p_amount:amount,p_payment_method:method[charge.id]||"cash",p_payment_reference:reference[charge.id]||null,p_waive:false,p_idempotency_key:key});
+  if(error)setNotice(error.message);else{setNotice("Delivery charge collection recorded and journal "+(data?.journal_entry_id||"posted")+".");setCollection(x=>({...x,[charge.id]:""}));setCollectionKeys(x=>({...x,[charge.id]:""}));await load();}setSaving(false);
  }
  async function waive(charge:Row){
   if(!canManage||!window.confirm("Waive this delivery charge?"))return;setSaving(true);
-  const {error}=await db.rpc("settle_delivery_charge",{p_charge_id:charge.id,p_amount:0,p_payment_method:null,p_payment_reference:null,p_waive:true});
+  const {error}=await db.rpc("settle_delivery_charge",{p_charge_id:charge.id,p_amount:0,p_payment_method:null,p_payment_reference:null,p_waive:true,p_idempotency_key:null});
   if(error)setNotice(error.message);else{setNotice("Delivery charge waived by manager.");await load();}setSaving(false);
  }
  const chargeFor=(id:string)=>charges.find(x=>x.delivery_id===id),deliveryName=(id:string)=>deliveries.find(x=>x.id===id)?.delivery_number||id,customerName=(id:string)=>parties.find(x=>x.id===id)?.name||"—";
