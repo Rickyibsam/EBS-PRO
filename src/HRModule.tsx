@@ -26,7 +26,7 @@ export default function HRModule({db,tenantId,currentRole}:{db:SupabaseClient;te
    db.from("departments").select("*").eq("tenant_id",tenantId).order("name"),
    db.from("designations").select("*").eq("tenant_id",tenantId).order("name")
   ]);
-  const err=[e,a,l,v,d,g].find(x=>x.error);if(err)setNotice(err.error.message);else{setEmployees(e.data||[]);setAttendance(a.data||[]);setLeaves(l.data||[]);setAdvances(v.data||[]);setDepartments(d.data||[]);setDesignations(g.data||[]);if(!employeeId&&e.data?.length)setEmployeeId(e.data[0].id);}
+  const err=[e,a,l,v,d,g].find(x=>x.error);if(err)setNotice(err.error?.message||"HR records could not be loaded.");else{setEmployees(e.data||[]);setAttendance(a.data||[]);setLeaves(l.data||[]);setAdvances(v.data||[]);setDepartments(d.data||[]);setDesignations(g.data||[]);if(!employeeId&&e.data?.length)setEmployeeId(e.data[0].id);}
   setLoading(false);
  }
  useEffect(()=>{void load();},[tenantId]);
