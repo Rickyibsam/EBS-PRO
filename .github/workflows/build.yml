@@ -22,5 +22,7 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      - name: Run automated unit tests
+        run: npm test
       - name: Build application
         run: npm run build
