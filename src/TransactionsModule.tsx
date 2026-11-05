@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, FormEvent } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-type Product={id:string;name:string;sku:string;is_active:boolean};
+type Product={id:string;name:string;sku:string;is_active:boolean;cost_price:number;sale_price:number};
 type Party={id:string;name:string;party_code:string};
 type Unit={id:string;name:string;symbol:string};
 type ProductUnit={id:string;product_id:string;unit_id:string;conversion_to_base:number;is_purchase_unit:boolean;is_sales_unit:boolean};
@@ -31,22 +31,23 @@ export default function TransactionsModule({db,tenantId,module,currentRole}:{db:
  useEffect(()=>{void loadAll();},[tenantId,module]);
  async function loadAll(){
   setLoading(true);setNotice("");
-  const [p,pa,u,pu,w,h]=await Promise.all([
-   db.from("products").select("id,name,sku,is_active").eq("tenant_id",tenantId).eq("is_active",true).order("name").limit(1000),
+  const [p,pa,u,pu,vc,w,h]=await Promise.all([
+   db.from("products").select("id,name,sku,is_active,cost_price,sale_price").eq("tenant_id",tenantId).eq("is_active",true).order("name").limit(1000),
    db.from("parties").select("id,name,party_code").eq("tenant_id",tenantId).in("party_type",purchase?["supplier","both"]:["customer","both"]).eq("status","active").order("name").limit(1000),
    db.from("units_of_measure").select("id,name,symbol").eq("tenant_id",tenantId).order("name"),
    db.from("product_units").select("id,product_id,unit_id,conversion_to_base,is_purchase_unit,is_sales_unit").eq("tenant_id",tenantId),
+    db.from("vendor_product_catalog").select("supplier_id,product_id,purchase_cost,is_preferred").eq("tenant_id",tenantId),
    db.from("warehouses").select("id,name").eq("tenant_id",tenantId).eq("is_active",true).order("name"),
    db.from(table).select("id,"+(purchase?"po_number":"order_number")+",order_date,status,grand_total").eq("tenant_id",tenantId).order("created_at",{ascending:false}).limit(200)
   ]);
-  const errors=[p.error,pa.error,u.error,pu.error,w.error,h.error].filter(Boolean);
+  const errors=[p.error,pa.error,u.error,pu.error,vc.error,w.error,h.error].filter(Boolean);
   if(errors.length)setNotice(errors.map(e=>e!.message).join(" · "));
-  setProducts((p.data??[]) as Product[]);setParties((pa.data??[]) as Party[]);setUnits((u.data??[]) as Unit[]);setProductUnits((pu.data??[]) as ProductUnit[]);setWarehouses((w.data??[]) as {id:string;name:string}[]);
+  setProducts((p.data??[]) as Product[]);setParties((pa.data??[]) as Party[]);setUnits((u.data??[]) as Unit[]);setProductUnits((pu.data??[]) as ProductUnit[]);setVendorCosts(vc.data??[]);setWarehouses((w.data??[]) as {id:string;name:string}[]);
   setRows((h.data??[]).map((r:any)=>({id:r.id,order_number:purchase?r.po_number:r.order_number,order_date:r.order_date,status:r.status,grand_total:Number(r.grand_total)})));
   setLoading(false);
  }
  function allowedUnits(productId:string){return productUnits.filter(x=>x.product_id===productId&&(purchase?x.is_purchase_unit:x.is_sales_unit));}
- function changeLine(i:number,key:keyof Line,value:string){setLines(old=>old.map((r,n)=>n===i?{...r,[key]:value,...(key==="product_id"?{unit_id:allowedUnits(value)[0]?.unit_id??""}:{})}:r));}
+ function changeLine(i:number,key:keyof Line,value:string){setLines(old=>old.map((r,n)=>{if(n!==i)return r;if(key==="product_id"){const p=products.find(x=>x.id===value);const supplierCost=vendorCosts.find(x=>x.supplier_id===partyId&&x.product_id===value);const preferredCost=vendorCosts.find(x=>x.product_id===value&&x.is_preferred);const rate=purchase?(supplierCost?.purchase_cost??preferredCost?.purchase_cost??p?.cost_price??0):(p?.sale_price??0);return {...r,product_id:value,unit_id:allowedUnits(value)[0]?.unit_id??"",rate:String(rate)};}return {...r,[key]:value};}));}
  const total=useMemo(()=>lines.reduce((s,l)=>{const base=(Number(l.quantity)||0)*(Number(l.rate)||0);return s+base+base*(Number(l.tax_rate)||0)/100-(Number(l.discount)||0);},0),[lines]);
  const filtered=rows.filter(r=>r.order_number.toLowerCase().includes(search.toLowerCase())||r.status.toLowerCase().includes(search.toLowerCase()));
  async function preparePrint(row:Header){setNotice("");try{const [lineResult,headResult]=await Promise.all([db.from("sales_order_lines").select("product_id,unit_id,quantity,unit_price,tax_rate,discount_amount,line_total").eq("tenant_id",tenantId).eq("sales_order_id",row.id),db.from("sales_orders").select("customer_id").eq("tenant_id",tenantId).eq("id",row.id).single()]);if(lineResult.error)throw lineResult.error;if(headResult.error)throw headResult.error;const {data:party,error}=await db.from("parties").select("name,phone,address").eq("tenant_id",tenantId).eq("id",headResult.data.customer_id).single();if(error)throw error;setPrintDoc(row);setPrintLines(lineResult.data??[]);setPrintParty(party);}catch(e){setNotice(e instanceof Error?e.message:"Sales order print preview could not be prepared.");}}
