@@ -1,8 +1,24 @@
-const CACHE_NAME = "ebs-pro-shell-v3";
-const APP_SHELL = ["/", "/manifest.webmanifest", "/icon.svg"];
+const CACHE_NAME = "ebs-pro-shell-v4";
+const APP_SHELL = ["/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", event => {
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.addAll(APP_SHELL);
+    const shell = await fetch("/");
+    if (!shell.ok) throw new Error("EBS PRO app shell could not be cached.");
+    await cache.put("/", shell.clone());
+    const html = await shell.text();
+    const assets = [...html.matchAll(/(?:src|href)=["']([^"']+\\.(?:js|css))["']/gi)]
+      .map(match => new URL(match[1], self.location.origin).href)
+      .filter(url => new URL(url).origin === self.location.origin);
+    await Promise.all(assets.map(async asset => {
+      try {
+        const response = await fetch(asset);
+        if (response.ok && response.type !== "opaque") await cache.put(asset, response.clone());
+      } catch { /* Keep the rest of the app shell installable if one optional asset fails. */ }
+    }));
+  })());
   self.skipWaiting();
 });
 
@@ -33,7 +49,7 @@ self.addEventListener("fetch", event => {
         return response;
       } catch {
         const cache = await caches.open(CACHE_NAME);
-        return (await cache.match(url.pathname === "/" ? "/" : "/")) ||
+        return (await cache.match("/")) ||
           new Response("EBS PRO is offline. Reconnect to synchronize business data.", {
             status: 503, headers: { "Content-Type": "text/plain; charset=utf-8" }
           });
@@ -43,7 +59,7 @@ self.addEventListener("fetch", event => {
   }
 
   // Cache only static build assets and the public app shell; never cache HTML/data fetches.
-  const isStaticAsset = /\.(?:js|css|svg|png|jpg|jpeg|webp|woff2?)$/i.test(url.pathname);
+  const isStaticAsset = /\\.(?:js|css|svg|png|jpg|jpeg|webp|woff2?)$/i.test(url.pathname);
   if (!isStaticAsset) return;
 
   event.respondWith((async () => {
