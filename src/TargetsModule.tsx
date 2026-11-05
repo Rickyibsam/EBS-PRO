@@ -58,7 +58,7 @@ export default function TargetsModule({db,tenantId,currentRole}:{db:SupabaseClie
   setSaving(true);setNotice("");
   try{
    const {data:user}=await db.auth.getUser();
-   const {data:existing,error:readError}=await db.from("sales_incentive_accruals").select("sales_target_id,status,earned_amount,settled_amount,settled_at,settled_by").eq("tenant_id",tenantId);
+   const {data:existing,error:readError}=await db.from("sales_incentive_accruals").select("sales_target_id,status,earned_amount,settled_amount,return_adjustment_applied,settled_at,settled_by").eq("tenant_id",tenantId);
    if(readError)throw readError;
    const existingMap=new Map((existing||[]).map(x=>[x.sales_target_id,x]));
    const eligible=targets.filter(t=>t.is_active&&(t.employee_id||t.vendor_id||t.brand||t.product_id)&&(progress(t).earned>0||existingMap.has(t.id)));
