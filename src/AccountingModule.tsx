@@ -217,3 +217,5 @@ export default function AccountingModule({ db, tenantId }: { db: SupabaseClient;
     </> : <>
     </>
 }
+  </section>;
+}
