@@ -29,7 +29,8 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
   const [authUserId,setAuthUserId]=useState("");
   const [installPrompt,setInstallPrompt]=useState<any>(deferredInstallPrompt);
   useEffect(()=>{const handler=(event:Event)=>{event.preventDefault();setInstallPrompt(event as any);};window.addEventListener("beforeinstallprompt",handler);return()=>window.removeEventListener("beforeinstallprompt",handler);},[]);
-  const [pendingCount,setPendingCount]=useState(0);\n  const [pendingVisitCount,setPendingVisitCount]=useState(0);
+  const [pendingCount,setPendingCount]=useState(0);
+  const [pendingVisitCount,setPendingVisitCount]=useState(0);
   const [syncing,setSyncing]=useState(false);
   const syncLock=useRef(false);
 
