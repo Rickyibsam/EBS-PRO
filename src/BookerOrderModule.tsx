@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {enqueueBookerOrder,getPendingBookerOrders,removePendingBookerOrder} from "./bookerOfflineQueue";
+import {enqueueBookerOrder,getPendingBookerOrders,removePendingBookerOrder,cacheBookerSnapshot,getBookerSnapshot} from "./bookerOfflineQueue";
 
 type Row = Record<string, any>;
 type CartLine = { product_id: string; unit_id: string; quantity: string };
@@ -64,7 +64,12 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       if (routeResult.error) throw routeResult.error;
       setRoutes(routeResult.data || []);
       if (!routeId && routeResult.data?.[0]) setRouteId(routeResult.data[0].id);
-    } catch (e) { setNotice(e instanceof Error ? e.message : "Booker workspace could not be loaded."); }
+    } catch (e) {
+      if(!navigator.onLine){
+        try{const cached=await getBookerSnapshot(tenantId);const d=cached?.data;if(d){setEmployee((d.employee as Row)||null);setProducts((d.products as Row[])||[]);setProductUnits((d.productUnits as Row[])||[]);setUnits((d.units as Row[])||[]);setOrders((d.orders as Row[])||[]);setRoutes((d.routes as Row[])||[]);setRouteId(String(d.routeId||""));setCustomers((d.customers as Row[])||[]);setCustomerId(String(d.customerId||""));setPrices((d.prices as Row[])||[]);setListId(String(d.listId||""));setNotice("Offline mode: using the last saved route, customer list and price list. Orders will sync when online.");}else setNotice("Offline and no saved Booker catalogue is available on this device. Connect once to cache route data.");}
+        catch(cacheError){setNotice(cacheError instanceof Error?cacheError.message:"Offline Booker data could not be loaded.");}
+      }else setNotice(e instanceof Error ? e.message : "Booker workspace could not be loaded.");
+    }
     setLoading(false);
   }
 
@@ -91,6 +96,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
   useEffect(() => {
     let cancelled = false;
     async function loadCustomers() {
+      if(!navigator.onLine)return;
       if (!routeId) { setCustomers([]); setCustomerId(""); return; }
       const { data: links, error } = await db.from("route_customers").select("customer_id,visit_order").eq("tenant_id", tenantId).eq("route_id", routeId).order("visit_order");
       if (error) { if (!cancelled) setNotice(error.message); return; }
@@ -98,7 +104,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       if (!ids.length) { if (!cancelled) { setCustomers([]); setCustomerId(""); } return; }
       const { data, error: partyError } = await db.from("parties").select("id,party_code,name,phone,credit_limit").eq("tenant_id", tenantId).in("id", ids).eq("status", "active").order("name");
       if (partyError) { if (!cancelled) setNotice(partyError.message); return; }
-      if (!cancelled) { setCustomers(data || []); setCustomerId(""); setPrices([]); setListId(""); }
+      if (!cancelled) { setCustomers(data || []); setCustomerId(""); setPrices([]); setListId(""); await cacheBookerSnapshot(tenantId,{customers:data||[],routeId,customerId:"",prices:[],listId:""}); }
     }
     void loadCustomers();
     return () => { cancelled = true; };
@@ -107,6 +113,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
   useEffect(() => {
     let cancelled = false;
     async function loadCustomerPrices() {
+      if(!navigator.onLine)return;
       if (!customerId) { setPrices([]); setListId(""); return; }
       const { data: assigned, error } = await db.from("customer_price_lists").select("price_list_id").eq("tenant_id", tenantId).eq("customer_id", customerId).limit(1);
       if (error) { if (!cancelled) setNotice(error.message); return; }
@@ -126,7 +133,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       if (!selected) { if (!cancelled) { setPrices([]); setListId(""); setNotice("No active customer/default price list is configured. Contact sales administration."); } return; }
       const { data, error: priceError } = await db.from("product_prices").select("product_id,unit_id,price,min_quantity").eq("tenant_id", tenantId).eq("price_list_id", selected);
       if (priceError) { if (!cancelled) setNotice(priceError.message); return; }
-      if (!cancelled) { setListId(selected); setPrices(data || []); setNotice(""); }
+      if (!cancelled) { setListId(selected); setPrices(data || []); setNotice(""); await cacheBookerSnapshot(tenantId,{customerId,prices:data||[],listId:selected}); }
     }
     void loadCustomerPrices();
     return () => { cancelled = true; };
@@ -159,7 +166,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       const valid = cart.filter(x => x.product_id && x.unit_id && Number.isFinite(Number(x.quantity)) && Number(x.quantity) > 0);
       if (!valid.length) throw new Error("Add at least one valid product line.");
       for (const line of valid) if (linePrice(line) == null) throw new Error("A valid price is missing for one or more product quantities. Ask sales administration to update the price list.");
-      const queuedOrder={id:requestId,tenantId,routeId,customerId,requestId,requiredDeliveryDate:deliveryDate||null,notes:notes.trim()||null,lines:valid.map(x=>({product_id:x.product_id,unit_id:x.unit_id,quantity:Number(x.quantity)})),createdAt:new Date().toISOString()};
+      const queuedOrder={id:requestId,kind:"order" as const,tenantId,routeId,customerId,requestId,requiredDeliveryDate:deliveryDate||null,notes:notes.trim()||null,lines:valid.map(x=>({product_id:x.product_id,unit_id:x.unit_id,quantity:Number(x.quantity)})),createdAt:new Date().toISOString()};
       if(!navigator.onLine){
         await enqueueBookerOrder(queuedOrder);setPendingCount(n=>n+1);setNotice("Order saved securely on this device. It will sync automatically when internet returns.");
       }else{
@@ -186,8 +193,8 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
     <form className="transaction-form" onSubmit={submit}>
       <h3>New customer order</h3>
       <div className="form-grid">
-        <label>Assigned route<select required value={routeId} onChange={e => setRouteId(e.target.value)}><option value="">Select route</option>{routes.map(r => <option key={r.id} value={r.id}>{r.route_code} · {r.name}</option>)}</select></label>
-        <label>Route customer<select required value={customerId} onChange={e => setCustomerId(e.target.value)}><option value="">Select assigned customer</option>{customers.map(c => <option key={c.id} value={c.id}>{c.party_code} · {c.name}</option>)}</select></label><label>Field visit<button type="button" disabled={saving||!customerId} onClick={()=>void recordVisit()}>GPS check-in</button></label>
+        <label>Assigned route<select required disabled={!navigator.onLine} value={routeId} onChange={e => setRouteId(e.target.value)}><option value="">Select route</option>{routes.map(r => <option key={r.id} value={r.id}>{r.route_code} · {r.name}</option>)}</select></label>
+        <label>Route customer<select required disabled={!navigator.onLine} value={customerId} onChange={e => setCustomerId(e.target.value)}><option value="">Select assigned customer</option>{customers.map(c => <option key={c.id} value={c.id}>{c.party_code} · {c.name}</option>)}</select></label><label>Field visit<button type="button" disabled={saving||!customerId} onClick={()=>void recordVisit()}>GPS check-in</button></label>
         <label>Required delivery date<input type="date" min={new Date().toISOString().slice(0,10)} value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)}/></label>
       </div>
       <h3>Order items</h3>
