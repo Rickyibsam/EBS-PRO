@@ -1,3 +1,4 @@
+import {findProductByBarcodeOrSku} from "./lib/erpAccess";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {enqueueBookerOrder,getPendingBookerOrders,removePendingBookerOrder,cacheBookerSnapshot,getBookerSnapshot,enqueueBookerVisit,getPendingBookerVisits,removePendingBookerVisit} from "./bookerOfflineQueue";
@@ -238,7 +239,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
   }
   function addScannedProduct(raw:string){
     const code=raw.trim();if(!code)return;
-    const product=products.find(p=>String(p.barcode||"").trim()===code||String(p.sku||"").trim().toLowerCase()===code.toLowerCase());
+    const product=findProductByBarcodeOrSku(code,products);
     if(!product){setNotice("No product matched barcode / SKU: "+code);setBarcodeInput("");return;}
     const unit=productUnits.find(x=>x.product_id===product.id);
     if(!unit){setNotice("No sales unit is configured for "+product.name+".");setBarcodeInput("");return;}
