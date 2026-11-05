@@ -61,7 +61,7 @@ The application has 10 module groups. The navigation and module screens are pres
 
 ## Newly completed gaps and workflow fixes
 
-- **Custom permissions:** the owner can enable per-user overrides for 10 module groups with View/Create/Update/Delete actions. If no override exists, the user's existing role rules remain the default. Owner/admin role access remains protected. Database RLS enforces explicit grants and denials on 77 tenant-scoped business tables.
+- **Custom permissions:** the owner can enable per-user overrides for 10 module groups with View/Create/Update/Delete actions. If no override exists, the user's existing role rules remain the default. Owner/admin role access remains protected. Database RLS enforces explicit grants and denials on 77 tenant-scoped business tables. Reports access grants read-only access to underlying report data without granting create/update/delete; budget tables are governed by Accounts & Finance permissions.
 - **Barcode camera:** the Booker order form can use the phone camera on supported secure-context browsers that expose the BarcodeDetector API. Handheld keyboard-wedge scanners and manual SKU/barcode entry remain available as fallbacks.
 - **Persistent notifications:** operational alerts are saved per user and tenant with read/unread state, mark-read and mark-all-read actions. Repeated daily alerts update the existing notification instead of creating duplicates.
 - **Automated tests:** `npm test` runs 12 tests for permission resolution, barcode matching, Booker IndexedDB queues/snapshots and deliveryman IndexedDB queues/snapshots. GitHub Actions runs the tests before the TypeScript/Vite production build.
