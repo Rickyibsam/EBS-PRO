@@ -189,6 +189,8 @@ begin
    when 'login_history' then 'administration_security' when 'voucher_revisions' then 'administration_security'
    when 'document_sequences' then 'administration_security'
    when 'tenant_memberships' then null
+   when 'tenant_user_module_permissions' then null
+   when 'user_notifications' then null
    else 'administration_security'
   end;
   if v_module is null then continue; end if;
