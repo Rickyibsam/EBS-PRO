@@ -29,6 +29,7 @@ const VanStockModule = lazy(() => import("./VanStockModule"));
 const StockTakeModule = lazy(() => import("./StockTakeModule"));
 const HRModule = lazy(() => import("./HRModule"));
 const DeliveryChargeModule = lazy(() => import("./DeliveryChargeModule"));
+const LoginHistoryModule = lazy(() => import("./LoginHistoryModule"));
 const VoucherHistoryModule = lazy(() => import("./VoucherHistoryModule"));
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -44,12 +45,12 @@ const navGroups = [
  {name:"Inventory & Warehouse",icon:"▦",items:["Inventory","Batch & Expiry","Stock Take","Van Stock","Products","Stock Transfers","Branches & Warehouses"]},
  {name:"Purchasing",icon:"⇩",items:["Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Vendors","Vendor Feeding"]},
  {name:"Finance",icon:"◉",items:["Accounts","Payroll","Asset & Budget Control","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register"]},
- {name:"People & Access",icon:"♙",items:["Team & Employees","HR & Attendance","Booker Product Access","Settings"]},
+ {name:"People & Access",icon:"♙",items:["Team & Employees","HR & Attendance","Login History","Booker Product Access","Settings"]},
  {name:"Reports & Governance",icon:"▤",items:["Reports","Targets & Incentives","Voucher Revision History","Audit Trail"]}
 ];
 const roleAccess: Record<string,string[]> = {
  owner: nav, admin: nav,
- manager: ["Overview","Sales","Booker App","Inventory","Batch & Expiry","Stock Take","Van Stock","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Delivery Charges","Recovery","Customer Credit Control","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Asset & Budget Control","HR & Attendance","Booker Product Access","Targets & Incentives"],
+ manager: ["Overview","Sales","Booker App","Inventory","Batch & Expiry","Stock Take","Van Stock","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Delivery Charges","Recovery","Customer Credit Control","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Asset & Budget Control","HR & Attendance","Login History","Booker Product Access","Targets & Incentives"],
  accounts: ["Overview","Recovery","Accounts","Invoices","Vendor Invoices","Purchase Returns","Sales Returns","Payroll","Asset & Budget Control","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register","Voucher Revision History","Customer Credit Control","Reports"],
  purchase: ["Overview","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Vendors","Products","Inventory","Vendor Feeding","Reports"],
  sales: ["Overview","Sales","Booker App","Customers","Products","Routes","Invoices","Sales Returns","Reports","Booker Product Access","Targets & Incentives"],
@@ -68,6 +69,7 @@ export default function App() {
   const [currentRole,setCurrentRole] = useState("viewer");
   const [mode,setMode] = useState<"login"|"signup">("login");
   const [recoveryMode,setRecoveryMode] = useState(false);
+  const [authEvent,setAuthEvent] = useState("");
   const [email,setEmail] = useState("");
   const [password,setPassword] = useState("");
   const [fullName,setFullName] = useState("");
@@ -83,9 +85,11 @@ export default function App() {
   useEffect(() => {
     if (!db) { setLoading(false); return; }
     db.auth.getSession().then(({data}) => setSession(data.session));
-    const {data:{subscription}} = db.auth.onAuthStateChange((event,next) => {if(event==="PASSWORD_RECOVERY")setRecoveryMode(true);setSession(next);});
+    const {data:{subscription}} = db.auth.onAuthStateChange((event,next) => {setAuthEvent(event);if(event==="PASSWORD_RECOVERY")setRecoveryMode(true);setSession(next);});
     return () => subscription.unsubscribe();
   },[]);
+
+  useEffect(()=>{if(db&&session&&["SIGNED_IN","INITIAL_SESSION"].includes(authEvent)){void db.rpc("record_login_history",{p_user_agent:typeof navigator!=="undefined"?navigator.userAgent.slice(0,500):""});}},[session?.user.id,authEvent]);
 
   useEffect(() => {
     let live = true;
@@ -193,6 +197,14 @@ export default function App() {
           ? <TaxRegisterModule db={db} tenantId={organization.id} />
         : active === "Batch & Expiry"
           ? <BatchExpiryModule db={db} tenantId={organization.id} />
+        : active === "Stock Take"
+          ? <StockTakeModule db={db} tenantId={organization.id} currentRole={currentRole} />
+        : active === "HR & Attendance"
+          ? <HRModule db={db} tenantId={organization.id} currentRole={currentRole} />
+        : active === "Delivery Charges"
+          ? <DeliveryChargeModule db={db} tenantId={organization.id} currentRole={currentRole} />
+        : active === "Login History"
+          ? <LoginHistoryModule db={db} tenantId={organization.id} />
         : active === "Asset & Budget Control"
           ? <AssetBudgetModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Van Stock"
