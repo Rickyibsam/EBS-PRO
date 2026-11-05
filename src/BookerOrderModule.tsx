@@ -4,6 +4,8 @@ import {enqueueBookerOrder,getPendingBookerOrders,removePendingBookerOrder,cache
 
 type Row = Record<string, any>;
 type CartLine = { product_id: string; unit_id: string; quantity: string };
+let deferredInstallPrompt:any=null;
+if(typeof window!=="undefined")window.addEventListener("beforeinstallprompt",(event:Event)=>{event.preventDefault();deferredInstallPrompt=event;});
 
 export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient; tenantId: string }) {
   const [employee, setEmployee] = useState<Row | null>(null);
@@ -24,7 +26,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
-  const [installPrompt,setInstallPrompt]=useState<any>(null);
+  const [installPrompt,setInstallPrompt]=useState<any>(deferredInstallPrompt);
   useEffect(()=>{const handler=(event:Event)=>{event.preventDefault();setInstallPrompt(event as any);};window.addEventListener("beforeinstallprompt",handler);return()=>window.removeEventListener("beforeinstallprompt",handler);},[]);
   const [pendingCount,setPendingCount]=useState(0);
   const [syncing,setSyncing]=useState(false);
