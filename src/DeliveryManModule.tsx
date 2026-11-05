@@ -1,6 +1,6 @@
 import {FormEvent,useEffect,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
-import {getQueuedDeliveryVisits,queueDeliveryVisit,removeQueuedDeliveryVisit} from "./deliveryOfflineQueue";
+import {getQueuedDeliveryVisits,queueDeliveryVisit,removeQueuedDeliveryVisit,cacheDeliverySnapshot,getDeliverySnapshot} from "./deliveryOfflineQueue";
 type Row=Record<string,any>;
 export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenantId:string}){
  const [employee,setEmployee]=useState<Row|null>(null),[deliveries,setDeliveries]=useState<Row[]>([]),[orders,setOrders]=useState<Row[]>([]),[customers,setCustomers]=useState<Row[]>([]),[products,setProducts]=useState<Row[]>([]),[lines,setLines]=useState<Row[]>([]),[visits,setVisits]=useState<Row[]>([]);
@@ -28,8 +28,14 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
      productIds.length?db.from("products").select("id,name,sku,barcode").eq("tenant_id",tenantId).in("id",productIds):Promise.resolve({data:[],error:null})
     ]);
     if(cu.error)throw cu.error;if(pr.error)throw pr.error;setCustomers(cu.data??[]);setProducts(pr.data??[]);
+   await cacheDeliverySnapshot(tenantId,{employee:emp,deliveries:deliveryRows,orders:o.data??[],lines:l.data??[],visits:v.data??[],customers:cu.data??[],products:pr.data??[]});
    }else{setOrders([]);setLines([]);setVisits([]);setCustomers([]);setProducts([]);}
-  }catch(e){setNotice(e instanceof Error?e.message:"Assigned deliveries could not be loaded.");}
+  }catch(e){
+   if(!navigator.onLine){
+    try{const cached=await getDeliverySnapshot(tenantId);const d=cached?.data;if(d){setEmployee((d.employee as Row)||null);setDeliveries((d.deliveries as Row[])||[]);setOrders((d.orders as Row[])||[]);setLines((d.lines as Row[])||[]);setVisits((d.visits as Row[])||[]);setCustomers((d.customers as Row[])||[]);setProducts((d.products as Row[])||[]);setNotice("Offline mode: showing the last saved assigned deliveries. New visits are queued on this device until connection returns.");}else setNotice("Offline and no delivery assignment snapshot is saved. Connect once to download your assignments.");}
+    catch(cacheError){setNotice(cacheError instanceof Error?cacheError.message:"Offline delivery data could not be loaded.");}
+   }else setNotice(e instanceof Error?e.message:"Assigned deliveries could not be loaded.");
+  }
   setLoading(false);
  }
  async function syncPendingVisits(){
@@ -44,7 +50,7 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
    if(pending.length)setNotice(pending.length+" offline delivery visit(s) synchronized.");
   }catch(e){setNotice(e instanceof Error?"Offline sync pending: "+e.message:"Offline sync will retry when connected.");}
  }
- useEffect(()=>{void load();const onOnline=()=>{void syncPendingVisits();};window.addEventListener("online",onOnline);return()=>window.removeEventListener("online",onOnline);},[tenantId]);
+ useEffect(()=>{void load();const onOnline=()=>{void syncPendingVisits().then(()=>load());};window.addEventListener("online",onOnline);return()=>window.removeEventListener("online",onOnline);},[tenantId]);
  async function saveVisit(e:FormEvent){
   e.preventDefault();if(!employee)return;setSaving(true);setNotice("");
   try{
@@ -73,7 +79,7 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
  const customerFor=(delivery:Row)=>customers.find(x=>x.id===orders.find(o=>o.id===delivery.sales_order_id)?.customer_id);
  const selectedDeliveryLines=lines.filter(x=>x.delivery_id===form.delivery_id);
  return <section className="module-page">
-  <div className="module-toolbar"><div><h2>Delivery Man App</h2><p>Assigned deliveries, customer stops, product quantities and visit outcomes.</p></div><button onClick={()=>void load()}>↻ Refresh</button></div>
+  <div className="module-toolbar"><div><h2>Delivery Man App</h2><p>Assigned deliveries, customer stops, product quantities and visit outcomes, with offline assignment snapshots and queued synchronization.</p></div><button onClick={()=>void load()}>↻ Refresh</button></div>
   {notice&&<div className="notice">{notice}</div>}
   {loading?<div className="table-empty">Loading assigned deliveries…</div>:!employee?<div className="notice">Employee account is not linked.</div>:<>
    <p className="module-footnote">Signed in as {employee.full_name} · {employee.employee_code}</p>
@@ -88,6 +94,6 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
    </div><button disabled={saving||!form.delivery_id}>{saving?"Saving…":"Save shop visit"}</button></form>
    <h3>Visit history</h3><div className="data-table-wrap"><table className="data-table"><thead><tr><th>Date</th><th>Delivery</th><th>Customer</th><th>Result</th><th>Notes</th></tr></thead><tbody>{visits.map(v=><tr key={v.id}><td>{new Date(v.visit_at).toLocaleString("en-PK")}</td><td>{deliveries.find(d=>d.id===v.delivery_id)?.delivery_number||"—"}</td><td>{customers.find(c=>c.id===v.customer_id)?.name||"—"}</td><td>{v.visit_status.replaceAll("_"," ")}{Array.isArray(v.line_quantities)&&v.line_quantities.length>0?<div>{v.line_quantities.map((q:Row,i:number)=><div key={i}>Delivered {q.delivered_quantity_base} · Market return {q.market_return_quantity_base}</div>)}</div>:null}</td><td>{v.notes||"—"}</td></tr>)}{!visits.length&&<tr><td colSpan={5} className="table-empty">No visits recorded yet.</td></tr>}</tbody></table></div>
   </>}
-  <p className="module-footnote">This field app records shop visits and delivery outcomes. The warehouse/manager still confirms final delivered quantities, short-stock return and invoice posting in Distribution.</p>
+  <p className="module-footnote">Assigned delivery data is cached locally for offline viewing on this device. Visit updates are queued and replayed with the tenant+delivery unique key when online. Final inventory issue, returns and invoice posting remain controlled by warehouse/manager confirmation.</p>
  </section>;
 }
