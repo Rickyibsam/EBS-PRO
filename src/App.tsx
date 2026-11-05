@@ -13,7 +13,8 @@ const InvoiceModule = lazy(() => import("./InvoiceModule"));
 const TransfersModule = lazy(() => import("./TransfersModule"));
 const AuditModule = lazy(() => import("./AuditModule"));
 const VendorCatalogModule = lazy(() => import("./VendorCatalogModule"));
-const PayrollModule = lazy(() => import("./PayrollModule"));\nconst TargetsModule = lazy(() => import("./TargetsModule"));
+const PayrollModule = lazy(() => import("./PayrollModule"));
+const TargetsModule = lazy(() => import("./TargetsModule"));
 const PurchaseInvoiceModule = lazy(() => import("./PurchaseInvoiceModule"));
 const PurchaseReturnsModule = lazy(() => import("./PurchaseReturnsModule"));
 
