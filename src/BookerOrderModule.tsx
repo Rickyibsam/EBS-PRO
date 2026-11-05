@@ -125,7 +125,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
     finally{syncLock.current=false;setSyncing(false);}
   }
 
-  useEffect(()=>{void void db.auth.getSession().then(({data})=>getPendingBookerOrders(tenantId,data.session?.user.id||"")).then(x=>setPendingCount(x.length)).catch(()=>{});const onOnline=()=>void syncQueuedOrders();window.addEventListener('online',onOnline);if(navigator.onLine)void syncQueuedOrders();return()=>window.removeEventListener('online',onOnline);},[tenantId]);
+  useEffect(()=>{void db.auth.getSession().then(({data})=>getPendingBookerOrders(tenantId,data.session?.user.id||"")).then(x=>setPendingCount(x.length)).catch(()=>{});const onOnline=()=>void syncQueuedOrders();window.addEventListener('online',onOnline);if(navigator.onLine)void syncQueuedOrders();return()=>window.removeEventListener('online',onOnline);},[tenantId]);
 
   useEffect(() => {
     let cancelled = false;
