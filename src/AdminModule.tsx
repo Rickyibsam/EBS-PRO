@@ -18,7 +18,7 @@ export default function AdminModule({db,tenantId,module,currentRole}:{db:Supabas
  const [products,setProducts]=useState<Row[]>([]);
  const [brands,setBrands]=useState<string[]>([]);
  const team=module==="Team & Employees", routes=module==="Routes", booker=module==="Booker App", config=module==="Settings", locations=module==="Branches & Warehouses";
- const title=team?"Team & Employee Directory":routes?"Sales Route Management":booker?"Booker App & Product Access":locations?"Branch & Warehouse Management":"Company Settings";
+ const title=team?"Team & Employee Directory":routes?"Sales Route Management":booker?"Booker App & Visit Register":module==="Booker Product Access"?"Booker Product Visibility":locations?"Branch & Warehouse Management":"Company Settings";
  const roleLabel=(r:string)=>r.replaceAll("_"," ").replace(/\b\w/g,x=>x.toUpperCase());
  async function load(){
   setLoading(true);setNotice("");
