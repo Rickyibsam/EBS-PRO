@@ -24,9 +24,9 @@ type Organization = { id: string; name: string; city: string | null; currency: s
 const nav = ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Supplier Invoices","Customers","Suppliers","Products","Distribution","Recovery","Accounts","Reports","Team & Employees","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Audit Trail","Settings"];
 const roleAccess: Record<string,string[]> = {
  owner: nav, admin: nav,
- manager: ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Customers","Suppliers","Products","Distribution","Recovery","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll"],
+ manager: ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Supplier Invoices","Customers","Suppliers","Products","Distribution","Recovery","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll"],
  accounts: ["Overview","Recovery","Accounts","Invoices","Supplier Invoices","Sales Returns","Payroll","Reports"],
- purchase: ["Overview","Purchases","Goods Receiving","Suppliers","Products","Inventory","Vendor Feeding","Reports"],
+ purchase: ["Overview","Purchases","Goods Receiving","Supplier Invoices","Suppliers","Products","Inventory","Vendor Feeding","Reports"],
  sales: ["Overview","Sales","Booker App","Customers","Products","Routes","Invoices","Sales Returns","Reports"],
  order_booker: ["Overview","Booker App","Sales","Customers","Products"],
  warehouse: ["Overview","Inventory","Distribution","Goods Receiving","Stock Transfers","Products","Purchases"],
