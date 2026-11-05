@@ -13,6 +13,9 @@ export default function AccountingModule({ db, tenantId }: { db: SupabaseClient;
   const [ledgerRows,setLedgerRows]=useState<Row[]>([]);
   const [ledgerType,setLedgerType]=useState("customer");
   const [selectedParty,setSelectedParty]=useState("");
+  const [cashAccounts,setCashAccounts]=useState<Row[]>([]);
+  const [cashRows,setCashRows]=useState<Row[]>([]);
+  const [cashAccountId,setCashAccountId]=useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
@@ -49,7 +52,7 @@ export default function AccountingModule({ db, tenantId }: { db: SupabaseClient;
   }
 
   useEffect(() => { void load(); }, [tenantId, trialDate]);
-  useEffect(()=>{if(tab==="ledger")void loadLedger();},[tab,tenantId,ledgerType]);
+  useEffect(()=>{if(tab==="ledger")void loadLedger();if(tab==="cash")void loadCashBook();},[tab,tenantId,ledgerType]);
 
   async function loadLedger(){
     setNotice("");
@@ -66,6 +69,23 @@ export default function AccountingModule({ db, tenantId }: { db: SupabaseClient;
     const codeMap=new Map((coa.data||[]).map(x=>[x.id,x.account_code]));
     setLedgerParties((party.data||[]).filter(x=>ledgerType==="customer"?["customer","both"].includes(x.party_type):["supplier","both"].includes(x.party_type)));
     setLedgerRows((lines||[]).filter(x=>journalMap.has(x.journal_entry_id)).map(x=>({...x,...journalMap.get(x.journal_entry_id),account_code:codeMap.get(x.account_id)})));
+  }
+
+  async function loadCashBook(){
+    setNotice("");
+    const {data:accountsData,error:accountError}=await db.from("chart_of_accounts").select("id,account_code,account_name").eq("tenant_id",tenantId).in("account_code",["1000","1010"]).eq("is_active",true);
+    if(accountError){setNotice(accountError.message);return;}
+    setCashAccounts(accountsData||[]);
+    if(!accountsData?.length){setNotice("Cash and bank control accounts are not configured.");return;}
+    const ids=accountsData.map(x=>x.id);
+    const [j,l]=await Promise.all([
+      db.from("journal_entries").select("id,journal_number,entry_date,narration").eq("tenant_id",tenantId).eq("status","posted").order("entry_date",{ascending:true}).limit(5000),
+      db.from("journal_lines").select("journal_entry_id,account_id,debit,credit,memo").eq("tenant_id",tenantId).in("account_id",ids).limit(20000)
+    ]);
+    if(j.error||l.error){setNotice(j.error?.message||l.error?.message||"Cashbook could not be loaded.");return;}
+    const jm=new Map((j.data||[]).map(x=>[x.id,x])),am=new Map(accountsData.map(x=>[x.id,x]));
+    setCashRows((l.data||[]).filter(x=>jm.has(x.journal_entry_id)).map(x=>({...x,...jm.get(x.journal_entry_id),...(am.get(x.account_id)||{})})).sort((a,b)=>String(a.entry_date).localeCompare(String(b.entry_date))||String(a.journal_number).localeCompare(String(b.journal_number))));
+    if(!cashAccountId)setCashAccountId(ids[0]);
   }
 
   async function postJournal(id: string) {
@@ -133,6 +153,7 @@ export default function AccountingModule({ db, tenantId }: { db: SupabaseClient;
       <button onClick={() => setTab("accounts")}>Chart of accounts</button>
       <button onClick={() => setTab("trial")}>Trial balance & statements</button>
       <button onClick={() => setTab("ledger")}>Customer / Supplier ledgers</button>
+      <button onClick={() => setTab("cash")}>Cash & Bank book</button>
     </div>
 
     {tab === "journals" ? <>
@@ -190,7 +211,9 @@ export default function AccountingModule({ db, tenantId }: { db: SupabaseClient;
       <div className="module-toolbar"><div><h3>Customer & Supplier Control Ledgers</h3><p>Posted receivables and payables, linked to individual customer and supplier accounts.</p></div><select value={ledgerType} onChange={e=>{setLedgerType(e.target.value);setSelectedParty("");}}><option value="customer">Customer ledger (AR)</option><option value="supplier">Supplier ledger (AP)</option></select></div>
       <div className="form-grid"><label>Select party<select value={selectedParty} onChange={e=>setSelectedParty(e.target.value)}><option value="">All parties</option>{ledgerParties.map(p=><option key={p.id} value={p.id}>{p.party_code} · {p.name}</option>)}</select></label></div>
       {(()=>{const code=ledgerType==="customer"?"1100":"2000";const items=ledgerRows.filter(x=>x.account_code===code&&(!selectedParty||x.party_id===selectedParty)).slice().sort((a,b)=>String(a.entry_date).localeCompare(String(b.entry_date))||String(a.journal_number).localeCompare(String(b.journal_number)));const debit=items.reduce((n,x)=>n+Number(x.debit||0),0),credit=items.reduce((n,x)=>n+Number(x.credit||0),0),balance=ledgerType==="customer"?debit-credit:credit-debit;return <><div className="stats report-stats"><article><small>Total debits</small><strong>{money(debit)}</strong></article><article><small>Total credits</small><strong>{money(credit)}</strong></article><article><small>{ledgerType==="customer"?"Receivable":"Payable"} balance</small><strong>{money(balance)}</strong></article></div><div className="data-table-wrap"><table className="data-table"><thead><tr><th>Date</th><th>Party</th><th>Journal</th><th>Description</th><th>Debit</th><th>Credit</th><th>Running balance</th></tr></thead><tbody>{items.map((x,i)=>{const p=ledgerParties.find(y=>y.id===x.party_id);const prior=items.slice(0,i+1).reduce((n,y)=>n+(ledgerType==="customer"?Number(y.debit)-Number(y.credit):Number(y.credit)-Number(y.debit)),0);return <tr key={x.journal_entry_id+":"+i}><td>{x.entry_date}</td><td>{p?.name||x.party_id}</td><td>{x.journal_number}</td><td>{x.narration||x.memo||"—"}</td><td>{money(x.debit)}</td><td>{money(x.credit)}</td><td>{money(prior)}</td></tr>;})}{!items.length&&<tr><td colSpan={7} className="table-empty">No posted ledger transactions for this party type.</td></tr>}</tbody></table></div></>;})()}
+    </> : tab === "cash" ? <>
+      <div className="module-toolbar"><div><h3>Cash & Bank Book</h3><p>Posted cash and bank journal movements with running balances.</p></div><select value={cashAccountId} onChange={e=>setCashAccountId(e.target.value)}>{cashAccounts.map(a=><option key={a.id} value={a.id}>{a.account_code} · {a.account_name}</option>)}</select><button onClick={()=>void loadCashBook()}>↻ Refresh</button></div>
+      {(()=>{const items=cashRows.filter(x=>x.account_id===cashAccountId);let balance=0;const ledger=items.map(x=>{balance+=Number(x.debit||0)-Number(x.credit||0);return {...x,running:balance};});return <><div className="stats report-stats"><article><small>Book balance</small><strong>{money(balance)}</strong></article><article><small>Money in</small><strong>{money(items.reduce((n,x)=>n+Number(x.debit||0),0))}</strong></article><article><small>Money out</small><strong>{money(items.reduce((n,x)=>n+Number(x.credit||0),0))}</strong></article></div><div className="data-table-wrap"><table className="data-table"><thead><tr><th>Date</th><th>Journal</th><th>Description</th><th>In</th><th>Out</th><th>Running balance</th></tr></thead><tbody>{ledger.slice().reverse().map(x=><tr key={x.journal_entry_id}><td>{x.entry_date}</td><td>{x.journal_number}</td><td>{x.narration||x.memo||"—"}</td><td>{money(x.debit)}</td><td>{money(x.credit)}</td><td>{money(x.running)}</td></tr>)}{!ledger.length&&<tr><td colSpan={6} className="table-empty">No posted cash or bank movements.</td></tr>}</tbody></table></div></>;})()}
     </> : <>
-    </>}
-  </section>;
+    </>
 }
