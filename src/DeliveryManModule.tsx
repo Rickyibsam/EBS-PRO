@@ -66,7 +66,7 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
       setNotice("Connection interrupted: delivery visit queued for automatic synchronization.");
      }else throw error;
     }else setNotice("Shop visit saved. Delivered quantities and invoice are finalized by the warehouse/manager confirmation.");
-   }setForm({delivery_id:"",visit_status:"delivered",notes:""});setLineQuantities({});await load();
+   }setForm({delivery_id:"",visit_status:"delivered",notes:""});setLineQuantities({});if(navigator.onLine)await load();
   }catch(e){setNotice(e instanceof Error?e.message:"Shop visit could not be saved.");}
   setSaving(false);
  }
