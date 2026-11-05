@@ -44,7 +44,7 @@ export default function VoucherHistoryModule({db,tenantId,currentRole}:{db:Supab
   setSaving(true);setNotice("");
   try{
    const fields=(LINE_FIELDS as any)[config.lineKind] as Array<[string,string,string]>;
-   const payload=lineRows.map(row=>Object.fromEntries([["id",row.id],...fields.map(([key])=>[key,row[key]??null])]));
+   const payload=lineRows.map(row=>Object.fromEntries([["id",row.id],...fields.map(([key])=>[key,row[key]===""?null:(row[key]??null)])]));
    const {data,error}=await db.rpc("update_draft_voucher_lines",{p_tenant_id:tenantId,p_voucher_table:table,p_voucher_id:selectedId,p_lines:payload});
    if(error)throw error;
    setNotice("All draft line items saved. Line totals and voucher totals were recalculated atomically.");
