@@ -30,6 +30,7 @@ const StockTakeModule = lazy(() => import("./StockTakeModule"));
 const HRModule = lazy(() => import("./HRModule"));
 const DeliveryChargeModule = lazy(() => import("./DeliveryChargeModule"));
 const LoginHistoryModule = lazy(() => import("./LoginHistoryModule"));
+const BackupRestoreModule = lazy(() => import("./BackupRestoreModule"));
 const VoucherHistoryModule = lazy(() => import("./VoucherHistoryModule"));
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -52,7 +53,7 @@ const navGroups = [
 ];
 const roleAccess: Record<string,string[]> = {
  owner: nav, admin: nav,
- manager: ["Overview","Sales","Booker App","Inventory","Batch & Expiry","Stock Take","Van Stock","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Delivery Charges","Recovery","Customer Credit Control","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Asset & Budget Control","HR & Attendance","Login History","Booker Product Access","Targets & Incentives"],
+ manager: ["Overview","Sales","Booker App","Inventory","Batch & Expiry","Stock Take","Van Stock","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Delivery Charges","Recovery","Customer Credit Control","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Asset & Budget Control","HR & Attendance","Login History","Backup & Restore","Booker Product Access","Targets & Incentives"],
  accounts: ["Overview","Recovery","Accounts","Invoices","Vendor Invoices","Purchase Returns","Sales Returns","Payroll","Asset & Budget Control","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register","Voucher Revision History","Customer Credit Control","Reports"],
  purchase: ["Overview","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Vendors","Products","Inventory","Vendor Feeding","Reports"],
  sales: ["Overview","Sales","Booker App","Customers","Products","Routes","Invoices","Sales Returns","Reports","Booker Product Access","Targets & Incentives"],
@@ -209,6 +210,8 @@ export default function App() {
           ? <DeliveryChargeModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Login History"
           ? <LoginHistoryModule db={db} tenantId={organization.id} />
+        : active === "Backup & Restore"
+          ? <BackupRestoreModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Asset & Budget Control"
           ? <AssetBudgetModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Van Stock"
