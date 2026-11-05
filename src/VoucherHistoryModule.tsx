@@ -22,6 +22,7 @@ export default function VoucherHistoryModule({db,tenantId,currentRole}:{db:Supab
  const [rows,setRows]=useState<any[]>([]),[loading,setLoading]=useState(true),[notice,setNotice]=useState(""),[filter,setFilter]=useState("all");
  const [table,setTable]=useState<string>("sales_orders"),[drafts,setDrafts]=useState<any[]>([]),[selectedId,setSelectedId]=useState(""),[draftDate,setDraftDate]=useState(""),[draftNotes,setDraftNotes]=useState(""),[lineRows,setLineRows]=useState<any[]>([]),[saving,setSaving]=useState(false);
  const canEdit=["owner","admin","manager","accounts"].includes(currentRole);
+ const canApprove=["owner","admin","manager"].includes(currentRole);
  const config=useMemo(()=>TYPES.find(x=>x.table===table)||TYPES[0],[table]);
  async function load(){setLoading(true);const {data,error}=await db.from("voucher_revisions").select("id,entity_table,entity_id,action,before_data,after_data,changed_by,changed_at").eq("tenant_id",tenantId).order("changed_at",{ascending:false}).limit(1000);if(error)setNotice(error.message);else setRows(data||[]);setLoading(false);}
  async function loadDrafts(nextTable=table){
@@ -72,7 +73,7 @@ export default function VoucherHistoryModule({db,tenantId,currentRole}:{db:Supab
   finally{setSaving(false);}
  }
  async function approveDraft(){
-  if(!canEdit||!selectedId||!config.approval)return;
+  if(!canApprove||!selectedId||!config.approval)return;
   setSaving(true);setNotice("");
   try{
    const {data:user}=await db.auth.getUser();
@@ -101,7 +102,7 @@ export default function VoucherHistoryModule({db,tenantId,currentRole}:{db:Supab
    {selected&&<label>Voucher date<input type="date" value={draftDate} onChange={e=>setDraftDate(e.target.value)}/></label>}
    {selected&&config.notes&&<label>Notes / narration<input value={draftNotes} onChange={e=>setDraftNotes(e.target.value)}/></label>}
   </div>
-  {selected&&<div className="table-tools"><span>Only draft vouchers can be edited. Line totals and header totals are recalculated in one database transaction.</span><button disabled={!canEdit||saving} onClick={()=>void saveDraft()}>Save draft header</button>{config.approval&&<button disabled={!canEdit||saving} onClick={()=>void approveDraft()}>Approve & lock draft</button>}{table==="journal_entries"&&<button disabled={!canEdit||saving} onClick={()=>void postJournal()}>Post journal</button>}</div>}
+  {selected&&<div className="table-tools"><span>Only draft vouchers can be edited. Line totals and header totals are recalculated in one database transaction.</span><button disabled={!canEdit||saving} onClick={()=>void saveDraft()}>Save draft header</button>{config.approval&&canApprove&&<button disabled={saving} onClick={()=>void approveDraft()}>Approve & lock draft</button>}{table==="journal_entries"&&<button disabled={!canEdit||saving} onClick={()=>void postJournal()}>Post journal</button>}</div>}
   {selected&&config.lines&&<div className="transaction-form"><h3>Draft line item editor</h3>{lineRows.map(row=><div className="form-grid" key={row.id}><strong>{row.product_id||row.account_id||row.id}</strong>{(LINE_FIELDS as any)[config.lineKind].map(([key,label,type]:[string,string,string])=><label key={key}>{label}<input type={type} step={type==="number"?"0.001":undefined} value={row[key]??""} onChange={e=>changeLine(row.id,key,type==="number"?(e.target.value===""?"":Number(e.target.value)):e.target.value)}/></label>)}</div>)}{!lineRows.length&&<p>No line items found for this draft.</p>}<button disabled={!canEdit||saving||!lineRows.length} onClick={()=>void saveLines()}>Save all line items</button></div>}
   {!drafts.length&&<p className="module-footnote">No draft vouchers available for this type.</p>}
   </div>
