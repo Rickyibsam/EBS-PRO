@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {enqueueBookerOrder,getPendingBookerOrders,removePendingBookerOrder,cacheBookerSnapshot,getBookerSnapshot} from "./bookerOfflineQueue";
+import {enqueueBookerOrder,getPendingBookerOrders,removePendingBookerOrder,cacheBookerSnapshot,getBookerSnapshot,enqueueBookerVisit,getPendingBookerVisits,removePendingBookerVisit} from "./bookerOfflineQueue";
 
 type Row = Record<string, any>;
 type CartLine = { product_id: string; unit_id: string; quantity: string };
@@ -29,7 +29,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
   const [authUserId,setAuthUserId]=useState("");
   const [installPrompt,setInstallPrompt]=useState<any>(deferredInstallPrompt);
   useEffect(()=>{const handler=(event:Event)=>{event.preventDefault();setInstallPrompt(event as any);};window.addEventListener("beforeinstallprompt",handler);return()=>window.removeEventListener("beforeinstallprompt",handler);},[]);
-  const [pendingCount,setPendingCount]=useState(0);
+  const [pendingCount,setPendingCount]=useState(0);\n  const [pendingVisitCount,setPendingVisitCount]=useState(0);
   const [syncing,setSyncing]=useState(false);
   const syncLock=useRef(false);
 
@@ -113,19 +113,28 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
     if(!navigator.onLine||syncLock.current)return;
     syncLock.current=true;setSyncing(true);
     try{
-      const pending=await getPendingBookerOrders(tenantId,authUserId||((await db.auth.getSession()).data.session?.user.id||""));setPendingCount(pending.length);
+      const {data:{session}}=await db.auth.getSession();const userId=authUserId||session?.user.id||"";
+      if(!userId)throw new Error("Sign in on this device before synchronizing offline Booker work.");
+      const pending=await getPendingBookerOrders(tenantId,userId);setPendingCount(pending.length);
       for(const order of pending){
         const {error}=await db.rpc("create_order_booker_order",{p_tenant_id:order.tenantId,p_route_id:order.routeId,p_customer_id:order.customerId,p_client_request_id:order.requestId,p_required_delivery_date:order.requiredDeliveryDate,p_notes:order.notes,p_lines:order.lines});
-        if(error){setNotice("Offline sync paused. "+error.message);break;}
-        await removePendingBookerOrder(order.id);setPendingCount(n=>Math.max(0,n-1));
+        if(error){setNotice("Offline order sync paused. "+error.message);break;}
+        await removePendingBookerOrder(order.id);
       }
-      const remaining=await getPendingBookerOrders(tenantId,authUserId||((await db.auth.getSession()).data.session?.user.id||""));setPendingCount(remaining.length);
-      if(remaining.length===0&&pending.length>0){setNotice("All saved offline orders have synced successfully.");await load();}
-    }catch(e){setNotice(e instanceof Error?e.message:"Offline order sync is waiting for a stable connection.");}
+      const queuedVisits=await getPendingBookerVisits(tenantId,userId);setPendingVisitCount(queuedVisits.length);
+      for(const visit of queuedVisits){
+        const {error}=await db.rpc("record_booker_visit",{p_tenant_id:visit.tenantId,p_route_id:visit.routeId,p_customer_id:visit.customerId,p_visit_at:visit.visitAt,p_latitude:visit.latitude,p_longitude:visit.longitude,p_idempotency_key:visit.requestId,p_notes:visit.notes});
+        if(error){setNotice("Offline visit sync paused. "+error.message);break;}
+        await removePendingBookerVisit(visit.id);
+      }
+      const [remainingOrders,remainingVisits]=await Promise.all([getPendingBookerOrders(tenantId,userId),getPendingBookerVisits(tenantId,userId)]);
+      setPendingCount(remainingOrders.length);setPendingVisitCount(remainingVisits.length);
+      if(pending.length+queuedVisits.length>0&&remainingOrders.length+remainingVisits.length===0){setNotice("All offline Booker orders and GPS visits have synchronized.");await load();}
+    }catch(e){setNotice(e instanceof Error?e.message:"Offline Booker synchronization is waiting for a stable connection.");}
     finally{syncLock.current=false;setSyncing(false);}
   }
 
-  useEffect(()=>{void db.auth.getSession().then(({data})=>getPendingBookerOrders(tenantId,data.session?.user.id||"")).then(x=>setPendingCount(x.length)).catch(()=>{});const onOnline=()=>void syncQueuedOrders();window.addEventListener('online',onOnline);if(navigator.onLine)void syncQueuedOrders();return()=>window.removeEventListener('online',onOnline);},[tenantId]);
+  useEffect(()=>{void db.auth.getSession().then(async({data})=>{const userId=data.session?.user.id||"";const [orders,visits]=await Promise.all([getPendingBookerOrders(tenantId,userId),getPendingBookerVisits(tenantId,userId)]);setPendingCount(orders.length);setPendingVisitCount(visits.length);}).catch(()=>{});const onOnline=()=>void syncQueuedOrders();window.addEventListener('online',onOnline);if(navigator.onLine)void syncQueuedOrders();return()=>window.removeEventListener('online',onOnline);},[tenantId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -186,9 +195,19 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
     setSaving(true);setNotice("");
     try{
       const position=await new Promise<GeolocationPosition>((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,timeout:15000,maximumAge:30000}));
-      const {data:auth,error:authError}=await db.auth.getUser();if(authError)throw authError;
-      const {error}=await db.from("booker_visits").insert({tenant_id:tenantId,route_id:routeId,booker_employee_id:employee.id,customer_id:customerId,visit_at:new Date().toISOString(),visit_status:"visited",latitude:position.coords.latitude,longitude:position.coords.longitude,notes:"GPS check-in",created_by:auth.user?.id??null});
-      if(error)throw error;setNotice("Customer visit check-in saved with GPS coordinates.");
+      const {data:{session}}=await db.auth.getSession();const userId=authUserId||session?.user.id||"";
+      if(!userId)throw new Error("Sign in on this device once while online before saving offline GPS visits.");
+      const requestId=crypto.randomUUID(),visitAt=new Date().toISOString();
+      const queued={id:requestId,kind:"visit" as const,tenantId,userId,routeId,customerId,requestId,visitAt,latitude:position.coords.latitude,longitude:position.coords.longitude,notes:"GPS check-in",createdAt:visitAt};
+      if(!navigator.onLine){
+       await enqueueBookerVisit(queued);setPendingVisitCount(n=>n+1);setNotice("GPS check-in saved offline. It will sync automatically when internet returns.");
+      }else{
+       const {error}=await db.rpc("record_booker_visit",{p_tenant_id:tenantId,p_route_id:routeId,p_customer_id:customerId,p_visit_at:visitAt,p_latitude:position.coords.latitude,p_longitude:position.coords.longitude,p_idempotency_key:requestId,p_notes:"GPS check-in"});
+       if(error){
+        if(!navigator.onLine||/fetch|network|offline|connection|timeout/i.test(error.message||"")){await enqueueBookerVisit(queued);setPendingVisitCount(n=>n+1);setNotice("Connection interrupted. GPS check-in queued for automatic synchronization.");}
+        else throw error;
+       }else setNotice("Customer visit check-in saved with GPS coordinates.");
+      }
     }catch(e){setNotice(e instanceof Error?e.message:"GPS check-in could not be saved.");}
     finally{setSaving(false);}
   }
@@ -224,7 +243,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
   return <section className="module-page">
     <div className="module-toolbar"><div><h2>Mobile Booker App</h2><p>Assigned route customers, live product pricing, offline order capture and automatic sync.</p></div>{installPrompt&&<button onClick={async()=>{await installPrompt.prompt();setInstallPrompt(null);}}>Install Booker App</button>}<button onClick={() => void syncQueuedOrders()}>↻ Sync now</button><button onClick={() => void load()}>Refresh</button></div>
     {notice && <div className="notice">{notice}</div>}
-    {employee && <><div className="table-tools"><strong>{employee.full_name}</strong><span>{employee.employee_code}</span><span>{activeRoute?.name || "Assigned route"}</span><span>{pendingCount} offline orders pending</span>{syncing&&<span>Syncing…</span>}</div>
+    {employee && <><div className="table-tools"><strong>{employee.full_name}</strong><span>{employee.employee_code}</span><span>{activeRoute?.name || "Assigned route"}</span><span>{pendingCount} offline orders · {pendingVisitCount} GPS visits pending</span>{syncing&&<span>Syncing…</span>}</div>
     <form className="transaction-form" onSubmit={submit}>
       <h3>New customer order</h3>
       <div className="form-grid">
