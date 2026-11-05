@@ -86,13 +86,16 @@ export default function VoucherHistoryModule({db,tenantId,currentRole}:{db:Supab
   finally{setSaving(false);}
  }
  async function restoreRevision(revision:Row){
-  if(!canEdit||revision.action!=="updated"||String(revision.entity_table).endsWith("_lines"))return;
-  if(!window.confirm("Restore this earlier header snapshot? The current draft values will be saved as a new revision."))return;
+  const isLine=String(revision.entity_table).endsWith("_lines");
+  if(!canEdit||!(revision.action==="updated"||(isLine&&revision.action==="deleted")))return;
+  if(!window.confirm(isLine?"Restore this earlier voucher line? Current draft lines will be recorded in revision history.":"Restore this earlier voucher header? The current draft values will be saved as a new revision."))return;
   setSaving(true);setNotice("");
   try{
-   const {data,error}=await db.rpc("restore_draft_voucher_revision",{p_revision_id:revision.id});
+   const rpcName=isLine?"restore_draft_voucher_line_revision":"restore_draft_voucher_revision";
+   const {data,error}=await db.rpc(rpcName,{p_revision_id:revision.id});
    if(error)throw error;
-   setNotice("Draft voucher header restored from revision history. The previous current state was preserved as a new revision.");
+   setNotice(isLine?"Voucher line restored and voucher totals recalculated. Current values were preserved in revision history.":"Draft voucher header restored from revision history. The previous current state was preserved as a new revision.");
+   if(isLine&&selectedId)await loadDraftLines(selectedId,table);else await loadDrafts(table);
    await load();
   }catch(e){setNotice(e instanceof Error?e.message:"Revision restore failed.");}
   finally{setSaving(false);}
@@ -120,7 +123,7 @@ export default function VoucherHistoryModule({db,tenantId,currentRole}:{db:Supab
   {!drafts.length&&<p className="module-footnote">No draft vouchers available for this type.</p>}
   </div>
   <div className="table-tools"><select value={filter} onChange={e=>setFilter(e.target.value)}><option value="all">All voucher types</option>{[...new Set(rows.map(x=>x.entity_table))].map(x=><option key={x}>{x}</option>)}</select><span>{shown.length} revisions</span></div>
-  {loading?<div className="table-empty">Loading revision history…</div>:<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Changed at</th><th>Voucher type</th><th>Record ID</th><th>Action</th><th>Before snapshot</th><th>After snapshot</th><th>Changed by</th><th>Restore</th></tr></thead><tbody>{shown.map(x=><tr key={x.id}><td>{new Date(x.changed_at).toLocaleString("en-PK")}</td><td>{x.entity_table}</td><td><code>{x.entity_id}</code></td><td>{x.action}</td><td><details><summary>View JSON</summary><pre>{JSON.stringify(x.before_data,null,2)}</pre></details></td><td>{x.after_data?<details><summary>View JSON</summary><pre>{JSON.stringify(x.after_data,null,2)}</pre></details>:"—"}</td><td>{x.changed_by||"System"}</td><td>{canEdit&&x.action==="updated"&&!String(x.entity_table).endsWith("_lines")?<button disabled={saving} onClick={()=>void restoreRevision(x)}>Restore before</button>:"—"}</td></tr>)}{!shown.length&&<tr><td colSpan={8} className="table-empty">No draft voucher revisions recorded.</td></tr>}</tbody></table></div>}
+  {loading?<div className="table-empty">Loading revision history…</div>:<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Changed at</th><th>Voucher type</th><th>Record ID</th><th>Action</th><th>Before snapshot</th><th>After snapshot</th><th>Changed by</th><th>Restore</th></tr></thead><tbody>{shown.map(x=><tr key={x.id}><td>{new Date(x.changed_at).toLocaleString("en-PK")}</td><td>{x.entity_table}</td><td><code>{x.entity_id}</code></td><td>{x.action}</td><td><details><summary>View JSON</summary><pre>{JSON.stringify(x.before_data,null,2)}</pre></details></td><td>{x.after_data?<details><summary>View JSON</summary><pre>{JSON.stringify(x.after_data,null,2)}</pre></details>:"—"}</td><td>{x.changed_by||"System"}</td><td>{canEdit&&(x.action==="updated"||(String(x.entity_table).endsWith("_lines")&&x.action==="deleted"))?<button disabled={saving} onClick={()=>void restoreRevision(x)}>Restore before</button>:"—"}</td></tr>)}{!shown.length&&<tr><td colSpan={8} className="table-empty">No draft voucher revisions recorded.</td></tr>}</tbody></table></div>}
   <p className="module-footnote">Posted voucher headers and lines are protected at database level. Draft headers and supported line items can be edited here with atomic total recalculation and automatic revision snapshots. Earlier header snapshots can be restored while the voucher remains draft; line snapshots remain available for review. Approval is enabled for sales and purchase orders; other documents use their dedicated posting workflows.</p>
  </section>;
 }
