@@ -64,7 +64,7 @@ const roleAccess: Record<string,string[]> = {
  viewer: ["Overview","Reports"]
 };
 
-const isStrongPassword=(value:string)=>value.length>=12&&/[a-z]/.test(value)&&/[A-Z]/.test(value)&&/\\d/.test(value)&&/[^A-Za-z0-9]/.test(value);
+const isStrongPassword=(value:string)=>value.length>=12&&/[a-z]/.test(value)&&/[A-Z]/.test(value)&&/\d/.test(value)&&/[^A-Za-z0-9]/.test(value);
 
 export default function App() {
   const [session,setSession] = useState<Session|null>(null);
