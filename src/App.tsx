@@ -47,7 +47,7 @@ export default function App() {
   const [fullName,setFullName] = useState("");
   const [companyName,setCompanyName] = useState("");
   const [city,setCity] = useState("");
-  const [active,setActive] = useState("Overview");
+  const [active,setActive] = useState(()=>new URLSearchParams(window.location.search).get("app")==="booker"?"Booker App":"Overview");
   const [busy,setBusy] = useState(false);
   const allowedNav = roleAccess[currentRole] || roleAccess.viewer;
   const [notice,setNotice] = useState("");
