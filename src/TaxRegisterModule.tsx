@@ -4,14 +4,13 @@ type TaxRow={id:string;number:string;date:string;party:string;tax:number;gross:n
 const money=(v:number)=>"PKR "+Number(v||0).toLocaleString("en-PK",{minimumFractionDigits:2,maximumFractionDigits:2});
 const today=new Date().toISOString().slice(0,10),monthStart=today.slice(0,8)+"01";
 export default function TaxRegisterModule({db,tenantId}:{db:SupabaseClient;tenantId:string}){
- const [rows,setRows]=useState<TaxRow[]>([]),[parties,setParties]=useState<Array<{id:string;name:string}>>([]),[loading,setLoading]=useState(true),[notice,setNotice]=useState(""),[from,setFrom]=useState(monthStart),[to,setTo]=useState(today),[kind,setKind]=useState("all");
- async function load(){setLoading(true);setNotice("");const [s,p,c,v,party]=await Promise.all([
+ const [rows,setRows]=useState<TaxRow[]>([]),[loading,setLoading]=useState(true),[notice,setNotice]=useState(""),[from,setFrom]=useState(monthStart),[to,setTo]=useState(today),[kind,setKind]=useState("all");
+ async function load(){setLoading(true);setNotice("");const [s,p,c,party]=await Promise.all([
   db.from("sales_invoices").select("id,invoice_number,invoice_date,customer_id,tax_total,grand_total").eq("tenant_id",tenantId).eq("status","posted").gte("invoice_date",from).lte("invoice_date",to).order("invoice_date",{ascending:false}).limit(10000),
   db.from("purchase_invoices").select("id,supplier_invoice_no,invoice_date,supplier_id,tax_amount,grand_total").eq("tenant_id",tenantId).eq("status","posted").gte("invoice_date",from).lte("invoice_date",to).order("invoice_date",{ascending:false}).limit(10000),
   db.from("sales_credit_notes").select("id,credit_note_number,credit_note_date,customer_id,tax_total,grand_total").eq("tenant_id",tenantId).eq("status","posted").gte("credit_note_date",from).lte("credit_note_date",to).order("credit_note_date",{ascending:false}).limit(10000),
-  db.from("parties").select("id,name").eq("tenant_id",tenantId),
   db.from("parties").select("id,name").eq("tenant_id",tenantId)
- ]);const err=s.error||p.error||c.error||v.error||party.error;if(err)setNotice(err.message);else{const names=new Map((party.data||[]).map(x=>[x.id,x.name]));setParties(party.data||[]);setRows([
+ ]);const err=s.error||p.error||c.error||party.error;if(err)setNotice(err.message);else{const names=new Map((party.data||[]).map(x=>[x.id,x.name]));setRows([
   ...(s.data||[]).map(x=>({id:x.id,number:x.invoice_number,date:x.invoice_date,party:names.get(x.customer_id)||"Customer",tax:Number(x.tax_total||0),gross:Number(x.grand_total||0),kind:"Output" as const})),
   ...(p.data||[]).map(x=>({id:x.id,number:x.supplier_invoice_no,date:x.invoice_date,party:names.get(x.supplier_id)||"Vendor",tax:Number(x.tax_amount||0),gross:Number(x.grand_total||0),kind:"Input" as const})),
   ...(c.data||[]).map(x=>({id:x.id,number:x.credit_note_number,date:x.credit_note_date,party:names.get(x.customer_id)||"Customer",tax:Number(x.tax_total||0),gross:Number(x.grand_total||0),kind:"Credit note" as const}))
