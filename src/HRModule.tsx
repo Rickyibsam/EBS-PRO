@@ -1,4 +1,4 @@
-import {useEffect,useMemo,useState} from "react";
+import {useEffect,useMemo,useState,type FormEvent} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 type Row=Record<string,any>;
 const localDate=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");};
@@ -30,7 +30,7 @@ export default function HRModule({db,tenantId,currentRole}:{db:SupabaseClient;te
   setLoading(false);
  }
  useEffect(()=>{void load();},[tenantId]);
- async function saveAttendance(e:React.FormEvent){
+ async function saveAttendance(e:FormEvent){
   e.preventDefault();if(!activeEmployeeId)return;setSaving(true);setNotice("");
   try{
    const checkin=checkIn?new Date(attendanceDate+"T"+checkIn+":00+05:00").toISOString():null,checkout=checkOut?new Date(attendanceDate+"T"+checkOut+":00+05:00").toISOString():null;
