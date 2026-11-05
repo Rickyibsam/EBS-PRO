@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {enqueueBookerOrder,getPendingBookerOrders,removePendingBookerOrder} from "./bookerOfflineQueue";
 
@@ -26,6 +26,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
   const [notice, setNotice] = useState("");
   const [pendingCount,setPendingCount]=useState(0);
   const [syncing,setSyncing]=useState(false);
+  const syncLock=useRef(false);
 
   const money = (n: number) => "PKR " + Number(n || 0).toLocaleString("en-PK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const activeRoute = routes.find(x => x.id === routeId);
@@ -70,8 +71,8 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
   useEffect(() => { void load(); }, [tenantId]);
 
   async function syncQueuedOrders(){
-    if(!navigator.onLine||syncing)return;
-    setSyncing(true);
+    if(!navigator.onLine||syncLock.current)return;
+    syncLock.current=true;setSyncing(true);
     try{
       const pending=await getPendingBookerOrders(tenantId);setPendingCount(pending.length);
       for(const order of pending){
@@ -82,7 +83,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       const remaining=await getPendingBookerOrders(tenantId);setPendingCount(remaining.length);
       if(remaining.length===0&&pending.length>0){setNotice("All saved offline orders have synced successfully.");await load();}
     }catch(e){setNotice(e instanceof Error?e.message:"Offline order sync is waiting for a stable connection.");}
-    finally{setSyncing(false);}
+    finally{syncLock.current=false;setSyncing(false);}
   }
 
   useEffect(()=>{void getPendingBookerOrders(tenantId).then(x=>setPendingCount(x.length)).catch(()=>{});const onOnline=()=>void syncQueuedOrders();window.addEventListener('online',onOnline);if(navigator.onLine)void syncQueuedOrders();return()=>window.removeEventListener('online',onOnline);},[tenantId]);
@@ -138,6 +139,19 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
     const qty = Number(line.quantity);
     return prices.filter(p => p.product_id === line.product_id && p.unit_id === line.unit_id && Number(p.min_quantity) <= qty).sort((a,b) => Number(b.min_quantity)-Number(a.min_quantity))[0]?.price;
   }
+  async function recordVisit(){
+    if(!employee||!routeId||!customerId){setNotice("Select an assigned route and customer before check-in.");return;}
+    if(!navigator.geolocation){setNotice("GPS is not supported by this device/browser.");return;}
+    setSaving(true);setNotice("");
+    try{
+      const position=await new Promise<GeolocationPosition>((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,timeout:15000,maximumAge:30000}));
+      const {data:auth,error:authError}=await db.auth.getUser();if(authError)throw authError;
+      const {error}=await db.from("booker_visits").insert({tenant_id:tenantId,route_id:routeId,booker_employee_id:employee.id,customer_id:customerId,visit_at:new Date().toISOString(),visit_status:"visited",latitude:position.coords.latitude,longitude:position.coords.longitude,notes:"GPS check-in",created_by:auth.user?.id??null});
+      if(error)throw error;setNotice("Customer visit check-in saved with GPS coordinates.");
+    }catch(e){setNotice(e instanceof Error?e.message:"GPS check-in could not be saved.");}
+    finally{setSaving(false);}
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault(); setSaving(true); setNotice("");
     try {
@@ -173,7 +187,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       <h3>New customer order</h3>
       <div className="form-grid">
         <label>Assigned route<select required value={routeId} onChange={e => setRouteId(e.target.value)}><option value="">Select route</option>{routes.map(r => <option key={r.id} value={r.id}>{r.route_code} · {r.name}</option>)}</select></label>
-        <label>Route customer<select required value={customerId} onChange={e => setCustomerId(e.target.value)}><option value="">Select assigned customer</option>{customers.map(c => <option key={c.id} value={c.id}>{c.party_code} · {c.name}</option>)}</select></label>
+        <label>Route customer<select required value={customerId} onChange={e => setCustomerId(e.target.value)}><option value="">Select assigned customer</option>{customers.map(c => <option key={c.id} value={c.id}>{c.party_code} · {c.name}</option>)}</select></label><label>Field visit<button type="button" disabled={saving||!customerId} onClick={()=>void recordVisit()}>GPS check-in</button></label>
         <label>Required delivery date<input type="date" min={new Date().toISOString().slice(0,10)} value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)}/></label>
       </div>
       <h3>Order items</h3>
