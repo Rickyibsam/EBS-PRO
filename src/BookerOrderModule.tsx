@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {enqueueBookerOrder,getPendingBookerOrders,removePendingBookerOrder} from "./bookerOfflineQueue";
 
 type Row = Record<string, any>;
 type CartLine = { product_id: string; unit_id: string; quantity: string };
@@ -23,6 +24,8 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
+  const [pendingCount,setPendingCount]=useState(0);
+  const [syncing,setSyncing]=useState(false);
 
   const money = (n: number) => "PKR " + Number(n || 0).toLocaleString("en-PK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const activeRoute = routes.find(x => x.id === routeId);
@@ -65,6 +68,24 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
   }
 
   useEffect(() => { void load(); }, [tenantId]);
+
+  async function syncQueuedOrders(){
+    if(!navigator.onLine||syncing)return;
+    setSyncing(true);
+    try{
+      const pending=await getPendingBookerOrders(tenantId);setPendingCount(pending.length);
+      for(const order of pending){
+        const {error}=await db.rpc("create_order_booker_order",{p_tenant_id:order.tenantId,p_route_id:order.routeId,p_customer_id:order.customerId,p_client_request_id:order.requestId,p_required_delivery_date:order.requiredDeliveryDate,p_notes:order.notes,p_lines:order.lines});
+        if(error){setNotice("Offline sync paused. "+error.message);break;}
+        await removePendingBookerOrder(order.id);setPendingCount(n=>Math.max(0,n-1));
+      }
+      const remaining=await getPendingBookerOrders(tenantId);setPendingCount(remaining.length);
+      if(remaining.length===0&&pending.length>0){setNotice("All saved offline orders have synced successfully.");await load();}
+    }catch(e){setNotice(e instanceof Error?e.message:"Offline order sync is waiting for a stable connection.");}
+    finally{setSyncing(false);}
+  }
+
+  useEffect(()=>{void getPendingBookerOrders(tenantId).then(x=>setPendingCount(x.length)).catch(()=>{});const onOnline=()=>void syncQueuedOrders();window.addEventListener('online',onOnline);if(navigator.onLine)void syncQueuedOrders();return()=>window.removeEventListener('online',onOnline);},[tenantId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -124,25 +145,30 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       const valid = cart.filter(x => x.product_id && x.unit_id && Number.isFinite(Number(x.quantity)) && Number(x.quantity) > 0);
       if (!valid.length) throw new Error("Add at least one valid product line.");
       for (const line of valid) if (linePrice(line) == null) throw new Error("A valid price is missing for one or more product quantities. Ask sales administration to update the price list.");
-      const { data, error } = await db.rpc("create_order_booker_order", {
-        p_tenant_id: tenantId, p_route_id: routeId, p_customer_id: customerId,
-        p_client_request_id: requestId, p_required_delivery_date: deliveryDate || null,
-        p_notes: notes.trim() || null,
-        p_lines: valid.map(x => ({ product_id: x.product_id, unit_id: x.unit_id, quantity: Number(x.quantity) }))
-      });
-      if (error) throw error;
-      setNotice("Order submitted successfully. Reference: " + String(data).slice(0, 8));
+      const queuedOrder={id:requestId,tenantId,routeId,customerId,requestId,requiredDeliveryDate:deliveryDate||null,notes:notes.trim()||null,lines:valid.map(x=>({product_id:x.product_id,unit_id:x.unit_id,quantity:Number(x.quantity)})),createdAt:new Date().toISOString()};
+      if(!navigator.onLine){
+        await enqueueBookerOrder(queuedOrder);setPendingCount(n=>n+1);setNotice("Order saved securely on this device. It will sync automatically when internet returns.");
+      }else{
+        try{
+          const {data,error}=await db.rpc("create_order_booker_order",{p_tenant_id:tenantId,p_route_id:routeId,p_customer_id:customerId,p_client_request_id:requestId,p_required_delivery_date:deliveryDate||null,p_notes:notes.trim()||null,p_lines:queuedOrder.lines});
+          if(error)throw error;
+          setNotice("Order submitted successfully. Reference: "+String(data).slice(0,8));
+        }catch(networkError){
+          if(navigator.onLine)throw networkError;
+          await enqueueBookerOrder(queuedOrder);setPendingCount(n=>n+1);setNotice("Connection dropped. Order saved on this device and will sync automatically.");
+        }
+      }
       setCart([{ product_id: "", unit_id: "", quantity: "1" }]); setNotes(""); setDeliveryDate(""); setRequestId(crypto.randomUUID());
-      await load();
+      if(navigator.onLine)await load();
     } catch (e) { setNotice(e instanceof Error ? e.message : "Order could not be submitted."); }
     setSaving(false);
   }
 
   if (loading) return <section className="module-page"><div className="table-empty">Loading Booker workspace…</div></section>;
   return <section className="module-page">
-    <div className="module-toolbar"><div><h2>Mobile Booker App</h2><p>Assigned route customers, live product pricing and secure order submission.</p></div><button onClick={() => void load()}>↻ Refresh</button></div>
+    <div className="module-toolbar"><div><h2>Mobile Booker App</h2><p>Assigned route customers, live product pricing, offline order capture and automatic sync.</p></div><button onClick={() => void syncQueuedOrders()}>↻ Sync now</button><button onClick={() => void load()}>Refresh</button></div>
     {notice && <div className="notice">{notice}</div>}
-    {employee && <><div className="table-tools"><strong>{employee.full_name}</strong><span>{employee.employee_code}</span><span>{activeRoute?.name || "Assigned route"}</span></div>
+    {employee && <><div className="table-tools"><strong>{employee.full_name}</strong><span>{employee.employee_code}</span><span>{activeRoute?.name || "Assigned route"}</span><span>{pendingCount} offline orders pending</span>{syncing&&<span>Syncing…</span>}</div>
     <form className="transaction-form" onSubmit={submit}>
       <h3>New customer order</h3>
       <div className="form-grid">
