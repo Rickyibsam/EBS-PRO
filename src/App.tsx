@@ -18,12 +18,12 @@ const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 const db = url && key ? createClient(url, key) : null;
 
 type Organization = { id: string; name: string; city: string | null; currency: string };
-const nav = ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Customers","Products","Distribution","Recovery","Accounts","Reports","Team & Employees","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Sales Returns","Audit Trail","Settings"];
+const nav = ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Customers","Suppliers","Products","Distribution","Recovery","Accounts","Reports","Team & Employees","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Sales Returns","Audit Trail","Settings"];
 const roleAccess: Record<string,string[]> = {
  owner: nav, admin: nav,
  manager: ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Customers","Products","Distribution","Recovery","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices","Sales Returns"],
  accounts: ["Overview","Recovery","Accounts","Invoices","Sales Returns","Reports"],
- purchase: ["Overview","Purchases","Goods Receiving","Products","Inventory","Reports"],
+ purchase: ["Overview","Purchases","Goods Receiving","Suppliers","Products","Inventory","Reports"],
  sales: ["Overview","Sales","Booker App","Customers","Products","Routes","Invoices","Sales Returns","Reports"],
  order_booker: ["Overview","Booker App","Sales","Customers","Products"],
  warehouse: ["Overview","Inventory","Distribution","Goods Receiving","Stock Transfers","Products","Purchases"],
