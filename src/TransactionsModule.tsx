@@ -82,7 +82,7 @@ export default function TransactionsModule({db,tenantId,module,currentRole}:{db:
    const subtotal=clean.reduce((s,l)=>s+Number(l.quantity)*Number(l.rate),0);
    const tax=clean.reduce((s,l)=>s+Math.max(0,Number(l.quantity)*Number(l.rate)-Number(l.discount))*Number(l.tax_rate)/100,0);
    const discount=clean.reduce((s,l)=>s+Number(l.discount),0);
-   const doc=(purchase?"EBS-PO-":"EBS-SO-")+Date.now().toString().slice(-10);
+   const {data:doc,error:docError}=await db.rpc("next_document_number",{p_tenant_id:tenantId,p_document_type:purchase?"purchase_order":"sales_order"});if(docError)throw docError;if(typeof doc!=="string"||!doc)throw new Error("Document number could not be generated.");
    const {data:userData}=await db.auth.getUser();
    const header:any={tenant_id:tenantId,order_date:new Date().toISOString(),status:"draft",subtotal,tax_total:tax,discount_total:discount,grand_total:subtotal+tax-discount,notes:notes.trim()||null,created_by:userData.user?.id??null};
    if(purchase){header.po_number=doc;header.supplier_id=partyId;if(warehouseId)header.warehouse_id=warehouseId;}
