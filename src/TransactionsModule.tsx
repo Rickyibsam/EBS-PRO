@@ -43,7 +43,9 @@ export default function TransactionsModule({db,tenantId,module,currentRole}:{db:
    db.from("product_units").select("id,product_id,unit_id,conversion_to_base,is_purchase_unit,is_sales_unit").eq("tenant_id",tenantId),
     db.from("vendor_product_catalog").select("supplier_id,product_id,purchase_cost,is_preferred").eq("tenant_id",tenantId),
    db.from("warehouses").select("id,name").eq("tenant_id",tenantId).eq("is_active",true).order("name"),
-   db.from(table).select("id,"+(purchase?"po_number":"order_number")+",order_date,status,grand_total").eq("tenant_id",tenantId).order("created_at",{ascending:false}).limit(200)
+   db.from(table).select("id,"+(purchase?"po_number":"order_number")+",order_date,status,grand_total"+(purchase?"":",booker_employee_id,route_id,delivery_man_employee_id")).eq("tenant_id",tenantId).order("created_at",{ascending:false}).limit(200),
+   db.from("employees").select("id,full_name,job_title").eq("tenant_id",tenantId).eq("employment_status","active").order("full_name"),
+   db.from("sales_routes").select("id,name,route_code").eq("tenant_id",tenantId).eq("is_active",true).order("name")
   ]);
   const errors=[p.error,pa.error,u.error,pu.error,vc.error,w.error,h.error,emp.error,rt.error].filter(Boolean);
   if(errors.length)setNotice(errors.map(e=>e!.message).join(" · "));
