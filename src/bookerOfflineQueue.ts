@@ -4,9 +4,9 @@ export type OfflineBookerOrder = {
   lines:Array<{product_id:string;unit_id:string;quantity:number}>;
   createdAt:string;
 };
-const DB_NAME="ebs-pro-offline";const STORE="booker-orders";
+const DB_NAME="ebs-pro-offline";const STORE="booker-orders";const VISITS="booker-visits";
 function openDb():Promise<IDBDatabase>{
- return new Promise((resolve,reject)=>{const request=indexedDB.open(DB_NAME,1);request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE,{keyPath:"id"});};request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error||new Error("Offline storage could not be opened."));});
+ return new Promise((resolve,reject)=>{const request=indexedDB.open(DB_NAME,2);request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE,{keyPath:"id"});if(!db.objectStoreNames.contains(VISITS))db.createObjectStore(VISITS,{keyPath:"id"});};request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error||new Error("Offline storage could not be opened."));});
 }
 export async function enqueueBookerOrder(order:OfflineBookerOrder):Promise<void>{
  const db=await openDb();await new Promise<void>((resolve,reject)=>{const tx=db.transaction(STORE,"readwrite");tx.objectStore(STORE).put(order);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error||new Error("Offline order could not be saved."));tx.onabort=()=>reject(tx.error||new Error("Offline order save was cancelled."));});db.close();
@@ -29,4 +29,15 @@ export async function cacheBookerSnapshot(tenantId:string,userId:string,patch:Re
 }
 export async function getBookerSnapshot(tenantId:string,userId:string):Promise<BookerOfflineSnapshot|null>{
  const db=await openDb();const value=await new Promise<BookerOfflineSnapshot|null>((resolve,reject)=>{const tx=db.transaction(STORE,"readonly"),request=tx.objectStore(STORE).get("snapshot-"+tenantId+"-"+userId);request.onsuccess=()=>resolve((request.result as BookerOfflineSnapshot)||null);request.onerror=()=>reject(request.error||new Error("Offline Booker snapshot could not be loaded."));});db.close();return value;
+}
+
+export type OfflineBookerVisit={id:string;kind:"visit";tenantId:string;userId:string;routeId:string;customerId:string;requestId:string;visitAt:string;latitude:number|null;longitude:number|null;notes:string|null;createdAt:string};
+export async function enqueueBookerVisit(visit:OfflineBookerVisit):Promise<void>{
+ const db=await openDb();await new Promise<void>((resolve,reject)=>{const tx=db.transaction(VISITS,"readwrite");tx.objectStore(VISITS).put(visit);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error||new Error("Offline Booker visit could not be queued."));tx.onabort=()=>reject(tx.error||new Error("Offline Booker visit queue was cancelled."));});db.close();
+}
+export async function getPendingBookerVisits(tenantId:string,userId:string):Promise<OfflineBookerVisit[]>{
+ const db=await openDb();const rows=await new Promise<OfflineBookerVisit[]>((resolve,reject)=>{const tx=db.transaction(VISITS,"readonly");const req=tx.objectStore(VISITS).getAll();req.onsuccess=()=>resolve((req.result as OfflineBookerVisit[]).filter(x=>x.tenantId===tenantId&&x.userId===userId).sort((a,b)=>a.createdAt.localeCompare(b.createdAt)));req.onerror=()=>reject(req.error||new Error("Queued Booker visits could not be read."));});db.close();return rows;
+}
+export async function removePendingBookerVisit(id:string):Promise<void>{
+ const db=await openDb();await new Promise<void>((resolve,reject)=>{const tx=db.transaction(VISITS,"readwrite");tx.objectStore(VISITS).delete(id);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error||new Error("Synced Booker visit could not be removed."));});db.close();
 }
