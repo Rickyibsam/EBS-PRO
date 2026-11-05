@@ -185,6 +185,8 @@ export default function App() {
           ? <PurchaseReturnsModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Vendor Invoices"
           ? <PurchaseInvoiceModule db={db} tenantId={organization.id} currentRole={currentRole} />
+        : active === "Targets & Incentives"
+          ? <TargetsModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Payroll"
           ? <PayrollModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Bank Reconciliation"
