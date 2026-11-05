@@ -43,7 +43,7 @@ self.addEventListener("fetch", event => {
   }
 
   // Cache only static build assets and the public app shell; never cache HTML/data fetches.
-  const isStaticAsset = /\\.(?:js|css|svg|png|jpg|jpeg|webp|woff2?)$/i.test(url.pathname);
+  const isStaticAsset = /\.(?:js|css|svg|png|jpg|jpeg|webp|woff2?)$/i.test(url.pathname);
   if (!isStaticAsset) return;
 
   event.respondWith((async () => {
