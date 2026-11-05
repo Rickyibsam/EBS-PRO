@@ -17,7 +17,7 @@ export default function TargetsModule({db,tenantId,currentRole}:{db:SupabaseClie
  db.from("deliveries").select("id,sales_order_id,delivery_date,status,delivery_man_employee_id,route_id").eq("tenant_id",tenantId),
  db.from("delivery_lines").select("delivery_id,product_id,delivered_quantity_base").eq("tenant_id",tenantId),
  db.from("booker_visits").select("id,booker_employee_id,visit_at,visit_status").eq("tenant_id",tenantId),
- db.from("sales_invoices").select("id,sales_order_id,invoice_date,grand_total,status").eq("tenant_id",tenantId).eq("status","posted"),
+ db.from("sales_invoices").select("id,sales_order_id,delivery_id,invoice_date,grand_total,status").eq("tenant_id",tenantId).eq("status","posted"),
  db.from("sales_invoice_lines").select("sales_invoice_id,product_id,quantity,line_total").eq("tenant_id",tenantId),
  db.from("sales_credit_note_lines").select("credit_note_id,product_id,quantity,line_total").eq("tenant_id",tenantId)
  ]);
