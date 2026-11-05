@@ -35,6 +35,7 @@ export default function App() {
   const [session,setSession] = useState<Session|null>(null);
   const [loading,setLoading] = useState(true);
   const [organization,setOrganization] = useState<Organization|null>(null);
+  const [tenantChoices,setTenantChoices] = useState<Array<Organization & {role:string}>>([]);
   const [currentRole,setCurrentRole] = useState("viewer");
   const [mode,setMode] = useState<"login"|"signup">("login");
   const [email,setEmail] = useState("");
@@ -63,13 +64,13 @@ export default function App() {
         .select("tenant_id,role").eq("user_id",session.user.id).eq("is_active",true);
       if(error){if(live)setNotice(error.message);setLoading(false);return;}
       const ids = (memberships ?? []).map(row => row.tenant_id);
-      if(live)setCurrentRole((memberships?.[0]?.role as string) || "viewer");
       if(ids.length){
         const {data,error:orgError} = await db.from("organizations")
-          .select("id,name,city,currency").in("id",ids).limit(1);
+          .select("id,name,city,currency").in("id",ids).order("name");
         if(orgError){if(live)setNotice(orgError.message);}
-        if(live)setOrganization((data?.[0] as Organization|undefined) ?? null);
-      } else if(live) setOrganization(null);
+        const choices=(data??[]).map(org=>({...org,role:String(memberships?.find(m=>m.tenant_id===org.id)?.role||"viewer")}));
+        if(live){setTenantChoices(choices);setOrganization(choices[0]??null);setCurrentRole(choices[0]?.role??"viewer");}
+      } else if(live){setOrganization(null);setTenantChoices([]);setCurrentRole("viewer");}
       if(live)setLoading(false);
     }
     void load();
@@ -99,7 +100,7 @@ export default function App() {
       const {data,error}=await db.rpc("create_tenant",{p_name:companyName.trim(),p_slug:slug,p_city:city.trim()||null,p_phone:null});
       if(error)throw error;
       const {data:org,error:readError}=await db.from("organizations").select("id,name,city,currency").eq("id",data).single();
-      if(readError)throw readError;setOrganization(org as Organization);
+      if(readError)throw readError;setOrganization(org as Organization);setTenantChoices([{...(org as Organization),role:"owner"}]);setCurrentRole("owner");
     } catch(err){setNotice(err instanceof Error?err.message:"Company setup failed.");}
     finally{setBusy(false);}
   }
@@ -142,5 +143,5 @@ export default function App() {
               ? <WorkspaceModule db={db} tenantId={organization.id} module={active} />
               : <DashboardModule db={db} tenantId={organization.id} company={organization.name} onNavigate={setActive} />;
 
-  return <div className="shell"><aside className="sidebar"><div className="brandline"><div className="logo">E</div><b>EBS <em>PRO</em><small>V.01</small></b></div><div className="org"><strong>{organization.name}</strong><small>{organization.city||"Pakistan"} · {organization.currency}</small></div><small className="caption">WORKSPACE</small><nav>{nav.filter(item=>allowedNav.includes(item)).map((item,i)=><button className={active===item?"selected":""} key={item} onClick={()=>setActive(item)}><span>{["⌂","▤","◉","▦","⇩","♙","▣","➜","₨","∑","▥","⚙"][i]}</span>{item}</button>)}</nav><div className="account"><b>{session.user.email}</b><button onClick={()=>void db.auth.signOut()}>Sign out ↗</button></div></aside><main className="main"><header><span>EBS PRO / <b>{active}</b></span><span className="live">● {currentRole.replaceAll("_"," ").toUpperCase()} ACCESS</span></header><section className="content"><Suspense fallback={<div className="table-empty">Loading module…</div>}>{moduleContent}</Suspense></section></main></div>;
+  return <div className="shell"><aside className="sidebar"><div className="brandline"><div className="logo">E</div><b>EBS <em>PRO</em><small>V.01</small></b></div><div className="org"><strong>{organization.name}</strong><small>{organization.city||"Pakistan"} · {organization.currency}</small>{tenantChoices.length>1&&<select aria-label="Switch company workspace" value={organization.id} onChange={e=>{const choice=tenantChoices.find(x=>x.id===e.target.value);if(choice){setOrganization(choice);setCurrentRole(choice.role);setActive("Overview");}}}>{tenantChoices.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select>}</div><small className="caption">WORKSPACE</small><nav>{nav.filter(item=>allowedNav.includes(item)).map((item,i)=><button className={active===item?"selected":""} key={item} onClick={()=>setActive(item)}><span>{["⌂","▤","◉","▦","⇩","♙","▣","➜","₨","∑","▥","⚙"][i]}</span>{item}</button>)}</nav><div className="account"><b>{session.user.email}</b><button onClick={()=>void db.auth.signOut()}>Sign out ↗</button></div></aside><main className="main"><header><span>EBS PRO / <b>{active}</b></span><span className="live">● {currentRole.replaceAll("_"," ").toUpperCase()} ACCESS</span></header><section className="content"><Suspense fallback={<div className="table-empty">Loading module…</div>}>{moduleContent}</Suspense></section></main></div>;
 }
