@@ -52,7 +52,7 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
    if(pending.length)setNotice(pending.length+" offline delivery visit(s) synchronized.");
   }catch(e){setNotice(e instanceof Error?"Offline sync pending: "+e.message:"Offline sync will retry when connected.");}
  }
- useEffect(()=>{void load();const onOnline=()=>{void syncPendingVisits().then(()=>load());};window.addEventListener("online",onOnline);return()=>window.removeEventListener("online",onOnline);},[tenantId]);
+ useEffect(()=>{void load();if(navigator.onLine)void syncPendingVisits();const onOnline=()=>{void syncPendingVisits().then(()=>load());};window.addEventListener("online",onOnline);return()=>window.removeEventListener("online",onOnline);},[tenantId]);
  async function saveVisit(e:FormEvent){
   e.preventDefault();if(!employee)return;setSaving(true);setNotice("");
   try{
