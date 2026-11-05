@@ -64,6 +64,8 @@ const roleAccess: Record<string,string[]> = {
  viewer: ["Overview","Reports"]
 };
 
+const isStrongPassword=(value:string)=>value.length>=12&&/[a-z]/.test(value)&&/[A-Z]/.test(value)&&/\\d/.test(value)&&/[^A-Za-z0-9]/.test(value);
+
 export default function App() {
   const [session,setSession] = useState<Session|null>(null);
   const [loading,setLoading] = useState(true);
@@ -117,7 +119,7 @@ export default function App() {
   },[session]);
 
   async function authenticate(e:FormEvent) {
-    e.preventDefault(); if(!db)return; setBusy(true);setNotice("");
+    e.preventDefault(); if(!db)return; if((recoveryMode||mode==="signup")&&!isStrongPassword(password)){setNotice("Use at least 12 characters with uppercase, lowercase, a number and a symbol.");return;} setBusy(true);setNotice("");
     try {
       if(recoveryMode){const {error}=await db.auth.updateUser({password});if(error)throw error;await db.auth.signOut();setRecoveryMode(false);setPassword("");setNotice("Password updated successfully. Sign in with your new password.");return;}
       if(mode==="signup"){
@@ -157,11 +159,11 @@ export default function App() {
   if(!db)return <main className="center"><section className="setup"><div className="logo">E</div><h1>Connect EBS PRO</h1><p>Set the Supabase project URL and publishable key in your hosting environment:</p><code>VITE_SUPABASE_URL</code><code>VITE_SUPABASE_PUBLISHABLE_KEY</code><small>Never expose the service-role key in the browser.</small></section></main>;
   if(loading)return <main className="center"><div className="logo">E</div><p>Loading workspace…</p></main>;
 
-  if(recoveryMode) return <main className="auth"><section className="brand"><div className="brandline"><div className="logo">E</div><b>EBS <em>PRO</em></b></div><div><small>ACCOUNT SECURITY</small><h1>Secure your workspace.</h1><p>Choose a new password for your EBS PRO account.</p></div><footer>VERSION 01 · PAKISTAN · PKR</footer></section><section className="authside"><form onSubmit={authenticate} className="form"><small>RESET PASSWORD</small><h2>Set a new password</h2><p>Use at least 8 characters.</p><label>New password<input type="password" minLength={8} required value={password} onChange={e=>setPassword(e.target.value)} placeholder="New password"/></label>{notice&&<div className="notice">{notice}</div>}<button disabled={busy}>{busy?"Updating…":"Update password"} <span>→</span></button></form></section></main>;
+  if(recoveryMode) return <main className="auth"><section className="brand"><div className="brandline"><div className="logo">E</div><b>EBS <em>PRO</em></b></div><div><small>ACCOUNT SECURITY</small><h1>Secure your workspace.</h1><p>Choose a new password for your EBS PRO account.</p></div><footer>VERSION 01 · PAKISTAN · PKR</footer></section><section className="authside"><form onSubmit={authenticate} className="form"><small>RESET PASSWORD</small><h2>Set a new password</h2><p>Use at least 12 characters with uppercase, lowercase, a number and a symbol.</p><label>New password<input type="password" minLength={12} required value={password} onChange={e=>setPassword(e.target.value)} placeholder="Strong new password"/></label>{notice&&<div className="notice">{notice}</div>}<button disabled={busy}>{busy?"Updating…":"Update password"} <span>→</span></button></form></section></main>;
   if(!session)return <main className="auth"><section className="brand"><div className="brandline"><div className="logo">E</div><b>EBS <em>PRO</em></b></div><div><small>WHOLESALE · DISTRIBUTION · CONTROL</small><h1>One workspace.<br/>Complete business control.</h1><p>Sales, stock, purchasing, recovery and field order booking — connected in one place.</p></div><footer>VERSION 01 · PAKISTAN · PKR</footer></section><section className="authside"><form onSubmit={authenticate} className="form"><small>WELCOME TO EBS PRO</small><h2>{mode==="login"?"Sign in to your account":"Create your account"}</h2><p>{mode==="login"?"Access your distribution workspace.":"Register your owner account to get started."}</p>
   {mode==="signup"&&<label>Full name<input required value={fullName} onChange={e=>setFullName(e.target.value)} placeholder="Your full name"/></label>}
   <label>Email address<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="name@company.com"/></label>
-  <label>Password<input type="password" minLength={8} required value={password} onChange={e=>setPassword(e.target.value)} placeholder="At least 8 characters"/></label>
+  <label>Password<input type="password" minLength={mode==="signup"?12:1} required value={password} onChange={e=>setPassword(e.target.value)} placeholder={mode==="signup"?"12+ chars · upper/lower · number · symbol":"Your password"}/></label>{mode==="signup"&&<p className="password-hint">12+ characters, uppercase and lowercase letters, a number and a symbol.</p>}
   {mode==="login"&&<div className="switch"><a onClick={()=>void sendPasswordReset()}>Forgot password?</a></div>}
   {notice&&<div className="notice">{notice}</div>}<button disabled={busy}>{busy?"Please wait…":mode==="login"?"Sign in":"Create account"} <span>→</span></button>
   <div className="switch">{mode==="login"?"New to EBS PRO?":"Already registered?"} <a onClick={()=>{setMode(mode==="login"?"signup":"login");setNotice("");}}>{mode==="login"?"Create account":"Sign in"}</a></div></form></section></main>;
