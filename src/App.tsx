@@ -170,7 +170,7 @@ export default function App() {
         : active === "Van Stock"
           ? <VanStockModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Voucher Revision History"
-          ? <VoucherHistoryModule db={db} tenantId={organization.id} />
+          ? <VoucherHistoryModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Vendor Feeding"
           ? <VendorCatalogModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Audit Trail"
