@@ -80,7 +80,7 @@ The following database smoke workflows were run as authenticated owner/staff con
 - Booker: offline order RPC sync and replay idempotency; GPS visit RPC sync and replay idempotency.
 - Deliveryman: batch-aware warehouse-to-van load → van dispatch/reservation → offline delivery visit sync → invoice creation and replay idempotency.
 - Backup: tenant backup export + no-op additive restore returned zero errors/skipped tables; a separate temporary-tenant restore inserted one missing row, and a second restore inserted zero duplicates. Both test runs were rolled back.
-- Security: per-user module denial/grant enforcement, owner-managed permission row access, personal notification inbox access, and an organization visibility isolation check.
+- Security: per-user module denial/grant enforcement, owner-managed permission row access, personal notification inbox access, and a cross-company customer-record read/write isolation check.
 - Client offline storage: all Booker and deliveryman IndexedDB unit tests passed.
 
 The latest GitHub Actions run completed successfully: **12/12 tests passed**, TypeScript checks passed and Vite production build passed. The latest code also includes browser-supported BarcodeDetector format detection. Render auto-deploys from `main`; confirm the newest deploy status before treating a just-pushed commit as live.
