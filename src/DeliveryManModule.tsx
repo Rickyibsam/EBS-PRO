@@ -69,13 +69,13 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
     await queueDeliveryVisit({...payload,id:crypto.randomUUID(),created_by:payload.created_by||null});
     setNotice("No internet: delivery visit safely queued on this device. It will sync when connection returns.");
    }else{
-    const {error}=await db.rpc("record_van_delivery_visit",{p_delivery_id:d.id,p_visit_status:form.visit_status,p_line_quantities:quantityReport,p_notes:form.notes.trim()||null,p_idempotency_key:payload.idempotency_key});
+    const {data:result,error}=await db.rpc("record_van_delivery_visit",{p_delivery_id:d.id,p_visit_status:form.visit_status,p_line_quantities:quantityReport,p_notes:form.notes.trim()||null,p_idempotency_key:payload.idempotency_key});
     if(error){
      if(/fetch|network|offline|connection/i.test(error.message||"")){
       await queueDeliveryVisit({...payload,id:crypto.randomUUID(),created_by:payload.created_by||null});
       setNotice("Connection interrupted: delivery visit queued for automatic synchronization.");
      }else throw error;
-    }else setNotice("Delivery completed. Van stock, customer returns, COGS journal and posted sales invoice were recorded together in one transaction.");
+    }else setNotice(result?.invoice_number?"Delivery completed. Invoice "+result.invoice_number+" posted · PKR "+Number(result.invoice_total||0).toLocaleString("en-PK")+". Van stock, returns and COGS journal are synchronized.":"Delivery outcome saved. Returned stock and vehicle ledger are synchronized; no invoice was required for this failed/returned delivery.");
    }setForm({delivery_id:"",visit_status:"delivered",notes:""});setLineQuantities({});if(navigator.onLine)await load();
   }catch(e){setNotice(e instanceof Error?e.message:"Shop visit could not be saved.");}
   setSaving(false);
