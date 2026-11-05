@@ -144,7 +144,7 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
       <button disabled={saving}>{saving ? "Saving…" : "Save product"}</button>
     </form> : <form className="data-form" onSubmit={saveParty}>
       <label>Party code<input required value={partyForm.party_code} onChange={e=>setPartyForm({...partyForm,party_code:e.target.value})}/></label>
-      <label>{partyType === "supplier" ? "Supplier name" : "Customer name"}<input required value={partyForm.name} onChange={e=>setPartyForm({...partyForm,name:e.target.value})}/></label>
+      <label>{partyType === "supplier" ? "Vendor name" : "Customer name"}<input required value={partyForm.name} onChange={e=>setPartyForm({...partyForm,name:e.target.value})}/></label>
       <label>Contact person<input value={partyForm.contact_person} onChange={e=>setPartyForm({...partyForm,contact_person:e.target.value})}/></label>
       <label>Phone<input value={partyForm.phone} onChange={e=>setPartyForm({...partyForm,phone:e.target.value})}/></label>
        <label>Email<input type="email" value={partyForm.email} onChange={e=>setPartyForm({...partyForm,email:e.target.value})}/></label>
