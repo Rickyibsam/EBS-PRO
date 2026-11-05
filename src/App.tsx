@@ -21,7 +21,7 @@ type Organization = { id: string; name: string; city: string | null; currency: s
 const nav = ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Customers","Suppliers","Products","Distribution","Recovery","Accounts","Reports","Team & Employees","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Sales Returns","Audit Trail","Settings"];
 const roleAccess: Record<string,string[]> = {
  owner: nav, admin: nav,
- manager: ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Customers","Products","Distribution","Recovery","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices","Sales Returns"],
+ manager: ["Overview","Sales","Booker App","Inventory","Purchases","Goods Receiving","Customers","Suppliers","Products","Distribution","Recovery","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices","Sales Returns"],
  accounts: ["Overview","Recovery","Accounts","Invoices","Sales Returns","Reports"],
  purchase: ["Overview","Purchases","Goods Receiving","Suppliers","Products","Inventory","Reports"],
  sales: ["Overview","Sales","Booker App","Customers","Products","Routes","Invoices","Sales Returns","Reports"],
