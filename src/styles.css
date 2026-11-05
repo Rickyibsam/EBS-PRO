@@ -124,3 +124,11 @@
 .inline-form{display:flex;gap:6px;align-items:center;min-width:160px}
 .inline-form input{width:95px;min-width:0}
 @media(max-width:760px){.hr-organization{grid-template-columns:1fr}.inline-form{flex-wrap:wrap}}
+
+
+.pod-signature{display:grid;gap:9px;margin:12px 0 16px;padding:13px;border:1px solid #e1ebe7;border-radius:12px;background:#f9fcfa}
+.pod-signature>div{display:flex;flex-direction:column;gap:3px}
+.pod-signature b{font-size:11px;color:#315057}
+.pod-signature span{font-size:9px;color:#8a9c9c}
+.signature-canvas{width:100%;height:140px;border:1px dashed #9ab7ad;border-radius:8px;background:#fff;touch-action:none;cursor:crosshair}
+.pod-signature button{justify-self:start;border:1px solid #d9e7e1;background:#fff;color:#53726d;border-radius:7px;padding:7px 10px;font-size:10px}
