@@ -10,7 +10,8 @@ export default function AdminModule({db,tenantId,module,currentRole}:{db:Supabas
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[notice,setNotice]=useState("");
  const [showForm,setShowForm]=useState(false),[search,setSearch]=useState("");
  const [form,setForm]=useState<Record<string,string>>({});
- const [settings,setSettings]=useState("{}");\n const [logoUploading,setLogoUploading]=useState(false);
+ const [settings,setSettings]=useState("{}");
+ const [logoUploading,setLogoUploading]=useState(false);
  const [companyProfile,setCompanyProfile]=useState<Record<string,string>>({});
  const [visibility,setVisibility]=useState<Row[]>([]);
  const [bookerEmployees,setBookerEmployees]=useState<Row[]>([]);
