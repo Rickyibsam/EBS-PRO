@@ -26,6 +26,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
+  const [authUserId,setAuthUserId]=useState("");
   const [installPrompt,setInstallPrompt]=useState<any>(deferredInstallPrompt);
   useEffect(()=>{const handler=(event:Event)=>{event.preventDefault();setInstallPrompt(event as any);};window.addEventListener("beforeinstallprompt",handler);return()=>window.removeEventListener("beforeinstallprompt",handler);},[]);
   const [pendingCount,setPendingCount]=useState(0);
@@ -49,6 +50,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       const { data: auth, error: authError } = await db.auth.getUser();
       if (authError) throw authError;
       if (!auth.user) throw new Error("Please sign in again.");
+      setAuthUserId(auth.user.id);
       const [emp, prod, pu, u, recent] = await Promise.all([
         db.from("employees").select("id,employee_code,full_name,branch_id").eq("tenant_id", tenantId).eq("user_id", auth.user.id).eq("employment_status", "active").maybeSingle(),
         db.from("products").select("id,sku,name,brand,sales_tax_rate").eq("tenant_id", tenantId).eq("is_active", true).order("name"),
@@ -95,10 +97,10 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       setRoutes(routeResult.data || []);
       const effectiveRouteId=routeId||routeResult.data?.[0]?.id||"";
       if (!routeId && routeResult.data?.[0]) setRouteId(routeResult.data[0].id);
-      await cacheBookerSnapshot(tenantId,{employee:emp.data,products:visibleProducts,productUnits:pu.data||[],units:u.data||[],orders:recent.data||[],routes:routeResult.data||[],routeId:effectiveRouteId});
+      await cacheBookerSnapshot(tenantId,auth.user.id,{employee:emp.data,products:visibleProducts,productUnits:pu.data||[],units:u.data||[],orders:recent.data||[],routes:routeResult.data||[],routeId:effectiveRouteId});
     } catch (e) {
       if(!navigator.onLine){
-        try{const cached=await getBookerSnapshot(tenantId);const d=cached?.data;if(d){setEmployee((d.employee as Row)||null);setProducts((d.products as Row[])||[]);setProductUnits((d.productUnits as Row[])||[]);setUnits((d.units as Row[])||[]);setOrders((d.orders as Row[])||[]);setRoutes((d.routes as Row[])||[]);setRouteId(String(d.routeId||""));setCustomers((d.customers as Row[])||[]);setCustomerId(String(d.customerId||""));setPrices((d.prices as Row[])||[]);setListId(String(d.listId||""));setNotice("Offline mode: using the last saved route, customer list and price list. Orders will sync when online.");}else setNotice("Offline and no saved Booker catalogue is available on this device. Connect once to cache route data.");}
+        try{const {data:{session}}=await db.auth.getSession();const offlineUserId=session?.user.id||"";if(!offlineUserId)throw new Error("Sign in on this device before using offline Booker data.");setAuthUserId(offlineUserId);const cached=await getBookerSnapshot(tenantId,offlineUserId);const d=cached?.data;if(d){setEmployee((d.employee as Row)||null);setProducts((d.products as Row[])||[]);setProductUnits((d.productUnits as Row[])||[]);setUnits((d.units as Row[])||[]);setOrders((d.orders as Row[])||[]);setRoutes((d.routes as Row[])||[]);setRouteId(String(d.routeId||""));setCustomers((d.customers as Row[])||[]);setCustomerId(String(d.customerId||""));setPrices((d.prices as Row[])||[]);setListId(String(d.listId||""));setNotice("Offline mode: using the last saved route, customer list and price list. Orders will sync when online.");}else setNotice("Offline and no saved Booker catalogue is available on this device. Connect once to cache route data.");}
         catch(cacheError){setNotice(cacheError instanceof Error?cacheError.message:"Offline Booker data could not be loaded.");}
       }else setNotice(e instanceof Error ? e.message : "Booker workspace could not be loaded.");
     }
@@ -111,19 +113,19 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
     if(!navigator.onLine||syncLock.current)return;
     syncLock.current=true;setSyncing(true);
     try{
-      const pending=await getPendingBookerOrders(tenantId);setPendingCount(pending.length);
+      const pending=await getPendingBookerOrders(tenantId,authUserId||((await db.auth.getSession()).data.session?.user.id||""));setPendingCount(pending.length);
       for(const order of pending){
         const {error}=await db.rpc("create_order_booker_order",{p_tenant_id:order.tenantId,p_route_id:order.routeId,p_customer_id:order.customerId,p_client_request_id:order.requestId,p_required_delivery_date:order.requiredDeliveryDate,p_notes:order.notes,p_lines:order.lines});
         if(error){setNotice("Offline sync paused. "+error.message);break;}
         await removePendingBookerOrder(order.id);setPendingCount(n=>Math.max(0,n-1));
       }
-      const remaining=await getPendingBookerOrders(tenantId);setPendingCount(remaining.length);
+      const remaining=await getPendingBookerOrders(tenantId,authUserId||((await db.auth.getSession()).data.session?.user.id||""));setPendingCount(remaining.length);
       if(remaining.length===0&&pending.length>0){setNotice("All saved offline orders have synced successfully.");await load();}
     }catch(e){setNotice(e instanceof Error?e.message:"Offline order sync is waiting for a stable connection.");}
     finally{syncLock.current=false;setSyncing(false);}
   }
 
-  useEffect(()=>{void getPendingBookerOrders(tenantId).then(x=>setPendingCount(x.length)).catch(()=>{});const onOnline=()=>void syncQueuedOrders();window.addEventListener('online',onOnline);if(navigator.onLine)void syncQueuedOrders();return()=>window.removeEventListener('online',onOnline);},[tenantId]);
+  useEffect(()=>{void void db.auth.getSession().then(({data})=>getPendingBookerOrders(tenantId,data.session?.user.id||"")).then(x=>setPendingCount(x.length)).catch(()=>{});const onOnline=()=>void syncQueuedOrders();window.addEventListener('online',onOnline);if(navigator.onLine)void syncQueuedOrders();return()=>window.removeEventListener('online',onOnline);},[tenantId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -136,7 +138,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       if (!ids.length) { if (!cancelled) { setCustomers([]); setCustomerId(""); } return; }
       const { data, error: partyError } = await db.from("parties").select("id,party_code,name,phone,credit_limit").eq("tenant_id", tenantId).in("id", ids).eq("status", "active").order("name");
       if (partyError) { if (!cancelled) setNotice(partyError.message); return; }
-      if (!cancelled) { setCustomers(data || []); setCustomerId(""); setPrices([]); setListId(""); await cacheBookerSnapshot(tenantId,{customers:data||[],routeId,customerId:"",prices:[],listId:""}); }
+      if (!cancelled) { setCustomers(data || []); setCustomerId(""); setPrices([]); setListId(""); await cacheBookerSnapshot(tenantId,authUserId,{customers:data||[],routeId,customerId:"",prices:[],listId:""}); }
     }
     void loadCustomers();
     return () => { cancelled = true; };
@@ -165,7 +167,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       if (!selected) { if (!cancelled) { setPrices([]); setListId(""); setNotice("No active customer/default price list is configured. Contact sales administration."); } return; }
       const { data, error: priceError } = await db.from("product_prices").select("product_id,unit_id,price,min_quantity").eq("tenant_id", tenantId).eq("price_list_id", selected);
       if (priceError) { if (!cancelled) setNotice(priceError.message); return; }
-      if (!cancelled) { setListId(selected); setPrices(data || []); setNotice(""); await cacheBookerSnapshot(tenantId,{customerId,prices:data||[],listId:selected}); }
+      if (!cancelled) { setListId(selected); setPrices(data || []); setNotice(""); await cacheBookerSnapshot(tenantId,authUserId,{customerId,prices:data||[],listId:selected}); }
     }
     void loadCustomerPrices();
     return () => { cancelled = true; };
@@ -198,7 +200,8 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       const valid = cart.filter(x => x.product_id && x.unit_id && Number.isFinite(Number(x.quantity)) && Number(x.quantity) > 0);
       if (!valid.length) throw new Error("Add at least one valid product line.");
       for (const line of valid) if (linePrice(line) == null) throw new Error("A valid price is missing for one or more product quantities. Ask sales administration to update the price list.");
-      const queuedOrder={id:requestId,kind:"order" as const,tenantId,routeId,customerId,requestId,requiredDeliveryDate:deliveryDate||null,notes:notes.trim()||null,lines:valid.map(x=>({product_id:x.product_id,unit_id:x.unit_id,quantity:Number(x.quantity)})),createdAt:new Date().toISOString()};
+      const {data:{session}}=await db.auth.getSession();const offlineUserId=authUserId||session?.user.id||"";if(!offlineUserId)throw new Error("Please sign in before saving an offline order.");
+      const queuedOrder={id:requestId,kind:"order" as const,tenantId,userId:offlineUserId,routeId,customerId,requestId,requiredDeliveryDate:deliveryDate||null,notes:notes.trim()||null,lines:valid.map(x=>({product_id:x.product_id,unit_id:x.unit_id,quantity:Number(x.quantity)})),createdAt:new Date().toISOString()};
       if(!navigator.onLine){
         await enqueueBookerOrder(queuedOrder);setPendingCount(n=>n+1);setNotice("Order saved securely on this device. It will sync automatically when internet returns.");
       }else{
