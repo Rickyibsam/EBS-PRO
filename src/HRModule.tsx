@@ -5,11 +5,11 @@ const localDate=()=>{const d=new Date();return [d.getFullYear(),String(d.getMont
 const money=(n:number)=>"PKR "+Number(n||0).toLocaleString("en-PK",{maximumFractionDigits:2});
 export default function HRModule({db,tenantId,currentRole}:{db:SupabaseClient;tenantId:string;currentRole:string}){
  const canManage=["owner","admin","manager"].includes(currentRole);
- const [employees,setEmployees]=useState<Row[]>([]),[attendance,setAttendance]=useState<Row[]>([]),[leaves,setLeaves]=useState<Row[]>([]),[advances,setAdvances]=useState<Row[]>([]),[departments,setDepartments]=useState<Row[]>([]),[designations,setDesignations]=useState<Row[]>([]);
+ const [employees,setEmployees]=useState<Row[]>([]),[attendance,setAttendance]=useState<Row[]>([]),[leaves,setLeaves]=useState<Row[]>([]),[advances,setAdvances]=useState<Row[]>([]),[repaymentHistory,setRepaymentHistory]=useState<Row[]>([]),[departments,setDepartments]=useState<Row[]>([]),[designations,setDesignations]=useState<Row[]>([]),[accounts,setAccounts]=useState<Row[]>([]),[cashAccounts,setCashAccounts]=useState<string[]>([]);
  const [employeeId,setEmployeeId]=useState(""),[attendanceDate,setAttendanceDate]=useState(localDate()),[attendanceStatus,setAttendanceStatus]=useState("present"),[checkIn,setCheckIn]=useState(""),[checkOut,setCheckOut]=useState(""),[attendanceNotes,setAttendanceNotes]=useState("");
  const [leaveType,setLeaveType]=useState("Annual"),[leaveStart,setLeaveStart]=useState(localDate()),[leaveEnd,setLeaveEnd]=useState(localDate()),[leaveReason,setLeaveReason]=useState("");
  const [departmentCode,setDepartmentCode]=useState(""),[departmentName,setDepartmentName]=useState(""),[designationCode,setDesignationCode]=useState(""),[designationName,setDesignationName]=useState(""),[designationDepartment,setDesignationDepartment]=useState("");
- const [advanceAmount,setAdvanceAmount]=useState(""),[advanceDate,setAdvanceDate]=useState(localDate()),[advanceNotes,setAdvanceNotes]=useState(""),[repayments,setRepayments]=useState<Record<string,string>>({});
+ const [advanceAmount,setAdvanceAmount]=useState(""),[advanceDate,setAdvanceDate]=useState(localDate()),[advanceNotes,setAdvanceNotes]=useState(""),[repayments,setRepayments]=useState<Record<string,string>>({}),[repaymentMethods,setRepaymentMethods]=useState<Record<string,string>>({});\n const [advanceMapping,setAdvanceMapping]=useState({receivable_account_id:"",cash_account_id:"",bank_account_id:""});
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[notice,setNotice]=useState(""),[tab,setTab]=useState("attendance");
  const [currentUserId,setCurrentUserId]=useState("");
  const ownEmployee=employees.find(x=>x.user_id===currentUserId);
@@ -18,15 +18,18 @@ export default function HRModule({db,tenantId,currentRole}:{db:SupabaseClient;te
  async function load(){
   setLoading(true);setNotice("");
   const {data:{session}}=await db.auth.getSession();setCurrentUserId(session?.user.id||"");
-  const [e,a,l,v,d,g]=await Promise.all([
+  const [e,a,l,v,d,g,rp,ac,cm]=await Promise.all([
    db.from("employees").select("id,user_id,employee_code,full_name,job_title,department_id,designation_id,employment_status").eq("tenant_id",tenantId).eq("employment_status","active").order("full_name"),
    db.from("employee_attendance").select("*").eq("tenant_id",tenantId).order("attendance_date",{ascending:false}).limit(200),
    db.from("employee_leaves").select("*").eq("tenant_id",tenantId).order("created_at",{ascending:false}).limit(100),
    db.from("employee_advances").select("*").eq("tenant_id",tenantId).order("issue_date",{ascending:false}).limit(100),
    db.from("departments").select("*").eq("tenant_id",tenantId).order("name"),
-   db.from("designations").select("*").eq("tenant_id",tenantId).order("name")
+   db.from("designations").select("*").eq("tenant_id",tenantId).order("name"),
+   db.from("employee_advance_repayments").select("*").eq("tenant_id",tenantId).order("repayment_date",{ascending:false}).limit(200),
+   db.from("chart_of_accounts").select("id,account_code,account_name,account_type").eq("tenant_id",tenantId).eq("is_active",true).order("account_code"),
+   db.from("cash_flow_account_mappings").select("account_id").eq("tenant_id",tenantId).eq("classification","cash_bank")
   ]);
-  const err=[e,a,l,v,d,g].find(x=>x.error);if(err)setNotice(err.error?.message||"HR records could not be loaded.");else{setEmployees(e.data||[]);setAttendance(a.data||[]);setLeaves(l.data||[]);setAdvances(v.data||[]);setDepartments(d.data||[]);setDesignations(g.data||[]);if(!employeeId&&e.data?.length)setEmployeeId(e.data[0].id);}
+  const err=[e,a,l,v,d,g,rp,ac,cm].find(x=>x.error);if(err)setNotice(err.error?.message||"HR records could not be loaded.");else{setEmployees(e.data||[]);setAttendance(a.data||[]);setLeaves(l.data||[]);setAdvances(v.data||[]);setDepartments(d.data||[]);setDesignations(g.data||[]);setRepaymentHistory(rp.data||[]);setAccounts(ac.data||[]);setCashAccounts((cm.data||[]).map(x=>x.account_id));if(!employeeId&&e.data?.length)setEmployeeId(e.data[0].id);const m=await db.from("employee_advance_account_mappings").select("*").eq("tenant_id",tenantId).maybeSingle();if(!m.error&&m.data)setAdvanceMapping({receivable_account_id:m.data.receivable_account_id,cash_account_id:m.data.cash_account_id,bank_account_id:m.data.bank_account_id});}
   setLoading(false);
  }
  useEffect(()=>{void load();},[tenantId]);
