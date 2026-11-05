@@ -24,6 +24,8 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
+  const [installPrompt,setInstallPrompt]=useState<any>(null);
+  useEffect(()=>{const handler=(event:Event)=>{event.preventDefault();setInstallPrompt(event as any);};window.addEventListener("beforeinstallprompt",handler);return()=>window.removeEventListener("beforeinstallprompt",handler);},[]);
   const [pendingCount,setPendingCount]=useState(0);
   const [syncing,setSyncing]=useState(false);
   const syncLock=useRef(false);
@@ -215,7 +217,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
 
   if (loading) return <section className="module-page"><div className="table-empty">Loading Booker workspace…</div></section>;
   return <section className="module-page">
-    <div className="module-toolbar"><div><h2>Mobile Booker App</h2><p>Assigned route customers, live product pricing, offline order capture and automatic sync.</p></div><button onClick={() => void syncQueuedOrders()}>↻ Sync now</button><button onClick={() => void load()}>Refresh</button></div>
+    <div className="module-toolbar"><div><h2>Mobile Booker App</h2><p>Assigned route customers, live product pricing, offline order capture and automatic sync.</p></div>{installPrompt&&<button onClick={async()=>{await installPrompt.prompt();setInstallPrompt(null);}}>Install Booker App</button>}<button onClick={() => void syncQueuedOrders()}>↻ Sync now</button><button onClick={() => void load()}>Refresh</button></div>
     {notice && <div className="notice">{notice}</div>}
     {employee && <><div className="table-tools"><strong>{employee.full_name}</strong><span>{employee.employee_code}</span><span>{activeRoute?.name || "Assigned route"}</span><span>{pendingCount} offline orders pending</span>{syncing&&<span>Syncing…</span>}</div>
     <form className="transaction-form" onSubmit={submit}>
