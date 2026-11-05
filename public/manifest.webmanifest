@@ -7,6 +7,42 @@
   "background_color": "#f4f7f7",
   "theme_color": "#102c36",
   "icons": [
-    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "description": "EBS PRO V.01 — Wholesale and distribution management",
+  "categories": [
+    "business",
+    "productivity"
+  ],
+  "shortcuts": [
+    {
+      "name": "Booker App",
+      "short_name": "Booker",
+      "description": "Open offline order booking",
+      "url": "/?app=booker",
+      "icons": [
+        {
+          "src": "/icon.svg",
+          "sizes": "any"
+        }
+      ]
+    },
+    {
+      "name": "Delivery Man App",
+      "short_name": "Delivery",
+      "description": "Open assigned delivery work",
+      "url": "/?app=delivery",
+      "icons": [
+        {
+          "src": "/icon.svg",
+          "sizes": "any"
+        }
+      ]
+    }
   ]
 }
