@@ -63,7 +63,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       const rules=ruleResult.data||[];
       let visibleProducts=(prod.data||[]).filter(product=>{
         const matching=rules.filter(rule=>(rule.product_id&&rule.product_id===product.id)||(rule.brand&&rule.brand.toLowerCase()===(product.brand||"").toLowerCase())||(rule.vendor_id&&(vendorMap.data||[]).some(v=>v.product_id===product.id&&v.supplier_id===rule.vendor_id)));
-        if(!matching.length)return true;
+        if(!matching.length)return !rules.some(rule=>rule.is_allowed===true);
         const specific=matching.filter(rule=>rule.product_id===product.id);
         const brandRules=matching.filter(rule=>rule.brand&&rule.brand.toLowerCase()===(product.brand||"").toLowerCase());
         const vendorRules=matching.filter(rule=>rule.vendor_id&&(vendorMap.data||[]).some(v=>v.product_id===product.id&&v.supplier_id===rule.vendor_id));
@@ -72,9 +72,9 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       });
       const stockRules=rules.some(rule=>rule.require_stock&&rule.is_allowed);
       if(stockRules&&visibleProducts.length){
-        const stockResult=await db.from("stock_movements").select("product_id,quantity_in,quantity_out").eq("tenant_id",tenantId);
+        const stockResult=await db.rpc("get_booker_stock_balances",{p_tenant_id:tenantId});
         if(stockResult.error)throw stockResult.error;
-        const balances=(stockResult.data||[]).reduce((acc,row)=>{acc[row.product_id]=(acc[row.product_id]||0)+Number(row.quantity_in||0)-Number(row.quantity_out||0);return acc;},{} as Record<string,number>);
+        const balances=(stockResult.data||[]).reduce((acc,row)=>{acc[row.product_id]=Number(row.quantity_on_hand||0);return acc;},{} as Record<string,number>);
         visibleProducts=visibleProducts.filter(product=>{
           const applicable=rules.filter(rule=>rule.require_stock&&rule.is_allowed&&((rule.product_id&&rule.product_id===product.id)||(rule.brand&&rule.brand.toLowerCase()===(product.brand||"").toLowerCase())||(rule.vendor_id&&(vendorMap.data||[]).some(v=>v.product_id===product.id&&v.supplier_id===rule.vendor_id))));
           return !applicable.length||Number(balances[product.id]||0)>0;
