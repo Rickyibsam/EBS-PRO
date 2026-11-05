@@ -4,7 +4,7 @@ import {getQueuedDeliveryVisits,queueDeliveryVisit,removeQueuedDeliveryVisit,cac
 type Row=Record<string,any>;
 export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenantId:string}){
  const [employee,setEmployee]=useState<Row|null>(null),[deliveries,setDeliveries]=useState<Row[]>([]),[orders,setOrders]=useState<Row[]>([]),[customers,setCustomers]=useState<Row[]>([]),[products,setProducts]=useState<Row[]>([]),[lines,setLines]=useState<Row[]>([]),[visits,setVisits]=useState<Row[]>([]);
- const [form,setForm]=useState({delivery_id:"",visit_status:"delivered",notes:""}),[lineQuantities,setLineQuantities]=useState<Record<string,{delivered:string;marketReturn:string}>>({}),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[notice,setNotice]=useState("");
+ const [form,setForm]=useState({delivery_id:"",visit_status:"delivered",notes:""}),[lineQuantities,setLineQuantities]=useState<Record<string,{delivered:string;marketReturn:string;returnBatch:string;returnExpiry:string}>>({}),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[notice,setNotice]=useState("");
  const [installPrompt,setInstallPrompt]=useState<any>(null);
  useEffect(()=>{const handler=(event:Event)=>{event.preventDefault();setInstallPrompt(event as any);};window.addEventListener("beforeinstallprompt",handler);return()=>window.removeEventListener("beforeinstallprompt",handler);},[]);
  async function load(){
