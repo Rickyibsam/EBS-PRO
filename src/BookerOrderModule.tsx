@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {enqueueBookerOrder,getPendingBookerOrders,removePendingBookerOrder,cacheBookerSnapshot,getBookerSnapshot,enqueueBookerVisit,getPendingBookerVisits,removePendingBookerVisit} from "./bookerOfflineQueue";
 
 type Row = Record<string, any>;
-type CartLine = { product_id: string; unit_id: string; quantity: string };
+type CartLine = { product_id: string; unit_id: string; quantity: string; is_free:boolean };
 let deferredInstallPrompt:any=null;
 if(typeof window!=="undefined")window.addEventListener("beforeinstallprompt",(event:Event)=>{event.preventDefault();deferredInstallPrompt=event;});
 
@@ -18,7 +18,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
   const [productUnits, setProductUnits] = useState<Row[]>([]);
   const [prices, setPrices] = useState<Row[]>([]);
   const [listId, setListId] = useState("");
-  const [cart, setCart] = useState<CartLine[]>([{ product_id: "", unit_id: "", quantity: "1" }]);
+  const [cart, setCart] = useState<CartLine[]>([{ product_id: "", unit_id: "", quantity: "1", is_free:false }]);\n  const [productSearch,setProductSearch]=useState("");\n  const [barcodeInput,setBarcodeInput]=useState("");
   const [deliveryDate, setDeliveryDate] = useState("");
   const [notes, setNotes] = useState("");
   const [orders, setOrders] = useState<Row[]>([]);
@@ -36,12 +36,12 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
 
   const money = (n: number) => "PKR " + Number(n || 0).toLocaleString("en-PK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const activeRoute = routes.find(x => x.id === routeId);
-  const activeCustomer = customers.find(x => x.id === customerId);
+  const activeCustomer = customers.find(x => x.id === customerId);\n  const filteredProducts=useMemo(()=>{const q=productSearch.trim().toLowerCase();return q?products.filter(p=>[p.name,p.sku,p.barcode,p.brand].some(v=>String(v||"").toLowerCase().includes(q))):products;},[products,productSearch]);
   const estimate = useMemo(() => cart.reduce((sum, line) => {
     const qty = Number(line.quantity);
     const candidates = prices.filter(p => p.product_id === line.product_id && p.unit_id === line.unit_id && Number(p.min_quantity) <= qty).sort((a,b) => Number(b.min_quantity)-Number(a.min_quantity));
     const product = products.find(p => p.id === line.product_id);
-    const subtotal = candidates[0] ? qty * Number(candidates[0].price) : 0;
+    const subtotal = !line.is_free && candidates[0] ? qty * Number(candidates[0].price) : 0;
     return sum + subtotal + subtotal * Number(product?.sales_tax_rate || 0) / 100;
   }, 0), [cart, prices]);
 
@@ -54,7 +54,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       setAuthUserId(auth.user.id);
       const [emp, prod, pu, u, recent] = await Promise.all([
         db.from("employees").select("id,employee_code,full_name,branch_id").eq("tenant_id", tenantId).eq("user_id", auth.user.id).eq("employment_status", "active").maybeSingle(),
-        db.from("products").select("id,sku,name,brand,sales_tax_rate").eq("tenant_id", tenantId).eq("is_active", true).order("name"),
+        db.from("products").select("id,sku,barcode,name,brand,sales_tax_rate").eq("tenant_id", tenantId).eq("is_active", true).order("name"),
         db.from("product_units").select("product_id,unit_id,conversion_to_base,is_sales_unit").eq("tenant_id", tenantId).eq("is_sales_unit", true),
         db.from("units_of_measure").select("id,name,symbol").eq("tenant_id", tenantId).order("name"),
         db.from("sales_orders").select("id,order_number,order_date,status,grand_total").eq("tenant_id", tenantId).eq("created_by", auth.user.id).eq("order_source", "order_booker").order("created_at", { ascending: false }).limit(30)
@@ -186,6 +186,15 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
   function updateLine(i: number, key: keyof CartLine, value: string) {
     setCart(old => old.map((line, index) => index === i ? { ...line, [key]: value, ...(key === "product_id" ? { unit_id: "" } : {}) } : line));
   }
+  function addScannedProduct(raw:string){
+    const code=raw.trim();if(!code)return;
+    const product=products.find(p=>String(p.barcode||"").trim()===code||String(p.sku||"").trim().toLowerCase()===code.toLowerCase());
+    if(!product){setNotice("No product matched barcode / SKU: "+code);setBarcodeInput("");return;}
+    const unit=productUnits.find(x=>x.product_id===product.id);
+    if(!unit){setNotice("No sales unit is configured for "+product.name+".");setBarcodeInput("");return;}
+    setCart(old=>{const index=old.findIndex(x=>x.product_id===product.id&&x.unit_id===unit.unit_id&&!x.is_free);if(index>=0)return old.map((x,i)=>i===index?{...x,quantity:String(Number(x.quantity)+1)}:x);const line={product_id:product.id,unit_id:unit.unit_id,quantity:"1",is_free:false};return old.length===1&&!old[0].product_id?[line]:[...old,line];});
+    setNotice("Added "+product.name+" from barcode / SKU scan.");setBarcodeInput("");
+  }
   function linePrice(line: CartLine) {
     const qty = Number(line.quantity);
     return prices.filter(p => p.product_id === line.product_id && p.unit_id === line.unit_id && Number(p.min_quantity) <= qty).sort((a,b) => Number(b.min_quantity)-Number(a.min_quantity))[0]?.price;
@@ -221,7 +230,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       if (!valid.length) throw new Error("Add at least one valid product line.");
       for (const line of valid) if (linePrice(line) == null) throw new Error("A valid price is missing for one or more product quantities. Ask sales administration to update the price list.");
       const {data:{session}}=await db.auth.getSession();const offlineUserId=authUserId||session?.user.id||"";if(!offlineUserId)throw new Error("Please sign in before saving an offline order.");
-      const queuedOrder={id:requestId,kind:"order" as const,tenantId,userId:offlineUserId,routeId,customerId,requestId,requiredDeliveryDate:deliveryDate||null,notes:notes.trim()||null,lines:valid.map(x=>({product_id:x.product_id,unit_id:x.unit_id,quantity:Number(x.quantity)})),createdAt:new Date().toISOString()};
+      const queuedOrder={id:requestId,kind:"order" as const,tenantId,userId:offlineUserId,routeId,customerId,requestId,requiredDeliveryDate:deliveryDate||null,notes:notes.trim()||null,lines:valid.map(x=>({product_id:x.product_id,unit_id:x.unit_id,quantity:Number(x.quantity),is_free_item:x.is_free})),createdAt:new Date().toISOString()};
       if(!navigator.onLine){
         await enqueueBookerOrder(queuedOrder);setPendingCount(n=>n+1);setNotice("Order saved securely on this device. It will sync automatically when internet returns.");
       }else{
@@ -234,7 +243,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
           await enqueueBookerOrder(queuedOrder);setPendingCount(n=>n+1);setNotice("Connection dropped. Order saved on this device and will sync automatically.");
         }
       }
-      setCart([{ product_id: "", unit_id: "", quantity: "1" }]); setNotes(""); setDeliveryDate(""); setRequestId(crypto.randomUUID());
+      setCart([{ product_id: "", unit_id: "", quantity: "1", is_free:false }]); setNotes(""); setDeliveryDate(""); setRequestId(crypto.randomUUID());
       if(navigator.onLine)await load();
     } catch (e) { setNotice(e instanceof Error ? e.message : "Order could not be submitted."); }
     setSaving(false);
@@ -242,7 +251,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
 
   if (loading) return <section className="module-page"><div className="table-empty">Loading Booker workspace…</div></section>;
   return <section className="module-page">
-    <div className="module-toolbar"><div><h2>Mobile Booker App</h2><p>Assigned route customers, live product pricing, offline order capture and automatic sync.</p></div>{installPrompt&&<button onClick={async()=>{await installPrompt.prompt();setInstallPrompt(null);}}>Install Booker App</button>}<button onClick={() => void syncQueuedOrders()}>↻ Sync now</button><button onClick={() => void load()}>Refresh</button></div>
+    <div className="module-toolbar"><div><h2>Mobile Booker App</h2><p>Assigned route customers, product search and barcode scanning, free-item booking, live customer pricing, offline order and GPS visit capture.</p></div>{installPrompt&&<button onClick={async()=>{await installPrompt.prompt();setInstallPrompt(null);}}>Install Booker App</button>}<button onClick={() => void syncQueuedOrders()}>↻ Sync now</button><button onClick={() => void load()}>Refresh</button></div>
     {notice && <div className="notice">{notice}</div>}
     {employee && <><div className="table-tools"><strong>{employee.full_name}</strong><span>{employee.employee_code}</span><span>{activeRoute?.name || "Assigned route"}</span><span>{pendingCount} offline orders · {pendingVisitCount} GPS visits pending</span>{syncing&&<span>Syncing…</span>}</div>
     <form className="transaction-form" onSubmit={submit}>
@@ -257,15 +266,15 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
         const options = productUnits.filter(x => x.product_id === line.product_id);
         const price = linePrice(line);
         return <div className="form-grid" key={i}>
-          <label>Product<select required value={line.product_id} onChange={e => updateLine(i,"product_id",e.target.value)}><option value="">Select product</option>{products.map(p => <option key={p.id} value={p.id}>{p.sku} · {p.name}</option>)}</select></label>
+          <label>Product<select required value={line.product_id} onChange={e => updateLine(i,"product_id",e.target.value)}><option value="">Select product</option>{filteredProducts.map(p => <option key={p.id} value={p.id}>{p.sku} · {p.name}</option>)}</select></label>
           <label>Sales unit<select required value={line.unit_id} onChange={e => updateLine(i,"unit_id",e.target.value)}><option value="">Select unit</option>{options.map(x => <option key={x.unit_id} value={x.unit_id}>{units.find(u => u.id === x.unit_id)?.symbol || units.find(u => u.id === x.unit_id)?.name || x.unit_id} (×{x.conversion_to_base})</option>)}</select></label>
           <label>Quantity<input required type="number" min="0.001" step="0.001" value={line.quantity} onChange={e => updateLine(i,"quantity",e.target.value)}/></label>
-          <label>Unit price<input readOnly value={price == null ? "Price unavailable" : money(Number(price))}/></label>
-          <label>Line total<input readOnly value={price == null ? "—" : money(Number(price)*Number(line.quantity))}/></label>
-          <button type="button" onClick={() => setCart(old => old.length === 1 ? [{product_id:"",unit_id:"",quantity:"1"}] : old.filter((_,n)=>n!==i))}>Remove line</button>
+          <label>Unit price<input readOnly value={line.is_free?"FREE ITEM":price == null ? "Price unavailable" : money(Number(price))}/></label>
+          <label>Line total<input readOnly value={line.is_free?money(0):price == null ? "—" : money(Number(price)*Number(line.quantity))}/></label><label><span>Free item (FOC)</span><input type="checkbox" checked={line.is_free} onChange={e=>setCart(old=>old.map((x,n)=>n===i?{...x,is_free:e.target.checked}:x))}/></label>
+          <button type="button" onClick={() => setCart(old => old.length === 1 ? [{product_id:"",unit_id:"",quantity:"1",is_free:false}] : old.filter((_,n)=>n!==i))}>Remove line</button>
         </div>;
       })}
-      <div className="table-tools"><button type="button" onClick={() => setCart(old => [...old,{product_id:"",unit_id:"",quantity:"1"}])}>+ Add product</button><strong>Estimated total (incl. product tax): {money(estimate)}</strong></div>
+      <div className="table-tools"><button type="button" onClick={() => setCart(old => [...old,{product_id:"",unit_id:"",quantity:"1",is_free:false}])}>+ Add product</button><strong>Estimated total (incl. product tax): {money(estimate)}</strong></div>
       <label>Order notes<textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional delivery instructions"/></label>
       <button disabled={saving || !prices.length}>{saving ? "Submitting order…" : "Submit order"}</button>
       <p className="module-footnote">Orders are submitted using the database's assigned-route, customer, active price-list and duplicate-request checks. Final approval and stock dispatch remain with authorized office/warehouse staff.</p>
