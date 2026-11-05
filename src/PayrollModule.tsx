@@ -7,7 +7,7 @@ export default function PayrollModule({db,tenantId,currentRole}:{db:SupabaseClie
  const [periodStart,setPeriodStart]=useState(new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString().slice(0,10));
  const [periodEnd,setPeriodEnd]=useState(new Date(new Date().getFullYear(),new Date().getMonth()+1,0).toISOString().slice(0,10));
  const [payDate,setPayDate]=useState(new Date().toISOString().slice(0,10));
- const canManage=["owner","admin","manager","accounts"].includes(currentRole);
+ const canManage=["owner","admin","manager","accounts"].includes(currentRole);const canEditSalary=["owner","admin","manager"].includes(currentRole);
  const money=(v:number)=>"PKR "+Number(v||0).toLocaleString("en-PK",{minimumFractionDigits:2,maximumFractionDigits:2});
  async function load(){
   setLoading(true);setNotice("");
@@ -28,7 +28,7 @@ export default function PayrollModule({db,tenantId,currentRole}:{db:SupabaseClie
  useEffect(()=>{void load();},[tenantId]);
  useEffect(()=>{void loadLines(selected);},[selected,employees.length]);
  async function updateSalary(id:string,value:string){
-  const amount=Number(value);if(!Number.isFinite(amount)||amount<0){setNotice("Salary must be a valid non-negative amount.");return;}
+  const amount=Number(value);if(!canEditSalary){setNotice("Only an owner, admin or manager can change employee salary master.");return;}if(!Number.isFinite(amount)||amount<0){setNotice("Salary must be a valid non-negative amount.");return;}
   const {error}=await db.from("employees").update({basic_salary:amount}).eq("tenant_id",tenantId).eq("id",id);
   if(error)setNotice(error.message);else{setEmployees(old=>old.map(x=>x.id===id?{...x,basic_salary:amount}:x));setNotice("Employee salary master updated.");}
  }
@@ -71,7 +71,7 @@ export default function PayrollModule({db,tenantId,currentRole}:{db:SupabaseClie
   <div className="module-toolbar"><div><h2>HR & Payroll</h2><p>Employee salary master, monthly payroll drafts, ledger posting and salary disbursement.</p></div><button onClick={()=>void load()}>↻ Refresh</button></div>
   {notice&&<div className="notice">{notice}</div>}
   <h3>Employee salary master</h3>
-  <div className="data-table-wrap"><table className="data-table"><thead><tr><th>Employee</th><th>Code</th><th>Designation</th><th>Employment</th><th>Basic salary (PKR / month)</th><th>Joining date</th></tr></thead><tbody>{employees.map(x=><tr key={x.id}><td>{x.full_name}</td><td>{x.employee_code}</td><td>{x.job_title||"—"}</td><td>{x.employment_status}</td><td><input type="number" min="0" step="0.01" disabled={!canManage} value={x.basic_salary??0} onChange={e=>setEmployees(old=>old.map(y=>y.id===x.id?{...y,basic_salary:e.target.value}:y))} onBlur={e=>void updateSalary(x.id,e.target.value)}/></td><td>{x.joining_date||"—"}</td></tr>)}{!employees.length&&<tr><td colSpan={6} className="table-empty">No employee records found.</td></tr>}</tbody></table></div>
+  <div className="data-table-wrap"><table className="data-table"><thead><tr><th>Employee</th><th>Code</th><th>Designation</th><th>Employment</th><th>Basic salary (PKR / month)</th><th>Joining date</th></tr></thead><tbody>{employees.map(x=><tr key={x.id}><td>{x.full_name}</td><td>{x.employee_code}</td><td>{x.job_title||"—"}</td><td>{x.employment_status}</td><td><input type="number" min="0" step="0.01" disabled={!canEditSalary} value={x.basic_salary??0} onChange={e=>setEmployees(old=>old.map(y=>y.id===x.id?{...y,basic_salary:e.target.value}:y))} onBlur={e=>void updateSalary(x.id,e.target.value)}/></td><td>{x.joining_date||"—"}</td></tr>)}{!employees.length&&<tr><td colSpan={6} className="table-empty">No employee records found.</td></tr>}</tbody></table></div>
   {canManage&&<form className="transaction-form" onSubmit={createRun}><h3>Generate monthly payroll draft</h3><div className="form-grid"><label>Period start<input type="date" required value={periodStart} onChange={e=>setPeriodStart(e.target.value)}/></label><label>Period end<input type="date" required value={periodEnd} onChange={e=>setPeriodEnd(e.target.value)}/></label><label>Pay date<input type="date" required value={payDate} onChange={e=>setPayDate(e.target.value)}/></label></div><button disabled={saving}>{saving?"Generating…":"Generate draft payroll"}</button></form>}
   <h3>Payroll runs</h3>
   <div className="table-tools"><select value={selected} onChange={e=>setSelected(e.target.value)}><option value="">Select payroll run</option>{runs.map(x=><option key={x.id} value={x.id}>{x.run_number} · {x.period_start} to {x.period_end} · {x.status}</option>)}</select><span>{runs.length} runs</span></div>
