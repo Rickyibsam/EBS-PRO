@@ -9,7 +9,8 @@ export default function HRModule({db,tenantId,currentRole}:{db:SupabaseClient;te
  const [employeeId,setEmployeeId]=useState(""),[attendanceDate,setAttendanceDate]=useState(localDate()),[attendanceStatus,setAttendanceStatus]=useState("present"),[checkIn,setCheckIn]=useState(""),[checkOut,setCheckOut]=useState(""),[attendanceNotes,setAttendanceNotes]=useState("");
  const [leaveType,setLeaveType]=useState("Annual"),[leaveStart,setLeaveStart]=useState(localDate()),[leaveEnd,setLeaveEnd]=useState(localDate()),[leaveReason,setLeaveReason]=useState("");
  const [departmentCode,setDepartmentCode]=useState(""),[departmentName,setDepartmentName]=useState(""),[designationCode,setDesignationCode]=useState(""),[designationName,setDesignationName]=useState(""),[designationDepartment,setDesignationDepartment]=useState("");
- const [advanceAmount,setAdvanceAmount]=useState(""),[advanceDate,setAdvanceDate]=useState(localDate()),[advanceNotes,setAdvanceNotes]=useState(""),[repayments,setRepayments]=useState<Record<string,string>>({}),[repaymentMethods,setRepaymentMethods]=useState<Record<string,string>>({});\n const [advanceMapping,setAdvanceMapping]=useState({receivable_account_id:"",cash_account_id:"",bank_account_id:""});
+ const [advanceAmount,setAdvanceAmount]=useState(""),[advanceDate,setAdvanceDate]=useState(localDate()),[advanceNotes,setAdvanceNotes]=useState(""),[repayments,setRepayments]=useState<Record<string,string>>({}),[repaymentMethods,setRepaymentMethods]=useState<Record<string,string>>({});
+ const [advanceMapping,setAdvanceMapping]=useState({receivable_account_id:"",cash_account_id:"",bank_account_id:""});
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[notice,setNotice]=useState(""),[tab,setTab]=useState("attendance");
  const [currentUserId,setCurrentUserId]=useState("");
  const ownEmployee=employees.find(x=>x.user_id===currentUserId);
