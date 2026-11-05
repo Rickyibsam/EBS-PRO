@@ -164,7 +164,7 @@ export default function AccountingModule({ db, tenantId }: { db: SupabaseClient;
         {accounts.map(a => <tr key={a.id}><td>{a.account_code}</td><td>{a.account_name}</td><td>{a.account_type}</td><td>{a.is_active ? "Active" : "Inactive"}</td></tr>)}
         {!accounts.length && <tr><td colSpan={4} className="table-empty">No chart accounts configured.</td></tr>}
       </tbody></table></div>}
-    </> : <>
+    </> : tab === "trial" ? <>
       <div className="module-toolbar"><div><h3>Trial balance & financial position</h3><p>Posted journal entries only; draft journals are excluded.</p></div><label>As of date<input type="date" value={trialDate} onChange={e => setTrialDate(e.target.value)} /></label></div>
       {loading ? <div className="table-empty">Calculating posted account balances…</div> : <>
         <div className="stats report-stats">
