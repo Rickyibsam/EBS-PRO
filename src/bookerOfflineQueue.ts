@@ -28,5 +28,5 @@ export async function cacheBookerSnapshot(tenantId:string,userId:string,patch:Re
  });db.close();
 }
 export async function getBookerSnapshot(tenantId:string,userId:string):Promise<BookerOfflineSnapshot|null>{
- const db=await openDb();const value=await new Promise<BookerOfflineSnapshot|null>((resolve,reject)=>{const tx=db.transaction(STORE,"readonly"),request=tx.objectStore(STORE).get("snapshot-"+tenantId);request.onsuccess=()=>resolve((request.result as BookerOfflineSnapshot)||null);request.onerror=()=>reject(request.error||new Error("Offline Booker snapshot could not be loaded."));});db.close();return value;
+ const db=await openDb();const value=await new Promise<BookerOfflineSnapshot|null>((resolve,reject)=>{const tx=db.transaction(STORE,"readonly"),request=tx.objectStore(STORE).get("snapshot-"+tenantId+"-"+userId);request.onsuccess=()=>resolve((request.result as BookerOfflineSnapshot)||null);request.onerror=()=>reject(request.error||new Error("Offline Booker snapshot could not be loaded."));});db.close();return value;
 }
