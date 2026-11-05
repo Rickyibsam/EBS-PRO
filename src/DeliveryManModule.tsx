@@ -1,4 +1,5 @@
-import {FormEvent,useEffect,useState} from "react";
+import {FormEvent,useEffect,useState,useRef} from "react";
+import type {PointerEvent as ReactPointerEvent} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 import {getQueuedDeliveryVisits,queueDeliveryVisit,removeQueuedDeliveryVisit,cacheDeliverySnapshot,getDeliverySnapshot} from "./deliveryOfflineQueue";
 type Row=Record<string,any>;
@@ -7,6 +8,8 @@ if(typeof window!=="undefined")window.addEventListener("beforeinstallprompt",(ev
 export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenantId:string}){
  const [authUserId,setAuthUserId]=useState(""),[employee,setEmployee]=useState<Row|null>(null),[deliveries,setDeliveries]=useState<Row[]>([]),[orders,setOrders]=useState<Row[]>([]),[customers,setCustomers]=useState<Row[]>([]),[products,setProducts]=useState<Row[]>([]),[lines,setLines]=useState<Row[]>([]),[visits,setVisits]=useState<Row[]>([]);
  const [form,setForm]=useState({delivery_id:"",visit_status:"delivered",notes:""}),[lineQuantities,setLineQuantities]=useState<Record<string,{delivered:string;marketReturn:string;returnBatch:string;returnExpiry:string}>>({}),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[notice,setNotice]=useState("");
+ const [signaturePoints,setSignaturePoints]=useState<Array<{x:number;y:number;move:boolean}>>([]);
+ const signatureCanvas=useRef<HTMLCanvasElement|null>(null),signatureDrawing=useRef(false);
  const [installPrompt,setInstallPrompt]=useState<any>(deferredInstallPrompt);
  useEffect(()=>{const handler=(event:Event)=>{event.preventDefault();setInstallPrompt(event as any);};window.addEventListener("beforeinstallprompt",handler);return()=>window.removeEventListener("beforeinstallprompt",handler);},[]);
  async function load(){
@@ -23,7 +26,7 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
     const [o,l,v]=await Promise.all([
      db.from("sales_orders").select("id,order_number,customer_id,order_date").eq("tenant_id",tenantId).in("id",ids),
      db.from("delivery_lines").select("id,delivery_id,product_id,quantity_base,picked_quantity_base,delivered_quantity_base").eq("tenant_id",tenantId).in("delivery_id",deliveryIds),
-     db.from("delivery_shop_visits").select("id,delivery_id,customer_id,visit_at,visit_status,notes,line_quantities").eq("tenant_id",tenantId).in("delivery_id",deliveryIds).order("visit_at",{ascending:false})
+     db.from("delivery_shop_visits").select("id,delivery_id,customer_id,visit_at,visit_status,notes,line_quantities,proof_of_delivery_signature").eq("tenant_id",tenantId).in("delivery_id",deliveryIds).order("visit_at",{ascending:false})
     ]);
     const err=o.error||l.error||v.error;if(err)throw err;setOrders(o.data??[]);setLines(l.data??[]);setVisits(v.data??[]);
     const customerIds=[...new Set((o.data??[]).map(x=>x.customer_id))],productIds=[...new Set((l.data??[]).map(x=>x.product_id))];
@@ -42,6 +45,21 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
   }
   setLoading(false);
  }
+ function signaturePoint(e:ReactPointerEvent<HTMLCanvasElement>){
+  const canvas=e.currentTarget,rect=canvas.getBoundingClientRect();
+  return {x:(e.clientX-rect.left)*(canvas.width/rect.width),y:(e.clientY-rect.top)*(canvas.height/rect.height)};
+ }
+ function beginSignature(e:ReactPointerEvent<HTMLCanvasElement>){
+  const canvas=e.currentTarget,point=signaturePoint(e),ctx=canvas.getContext("2d");if(!ctx)return;
+  canvas.setPointerCapture(e.pointerId);signatureDrawing.current=true;ctx.lineWidth=2.4;ctx.lineCap="round";ctx.lineJoin="round";ctx.strokeStyle="#163e43";ctx.beginPath();ctx.moveTo(point.x,point.y);setSignaturePoints(old=>old.length<4000?[...old,{...point,move:true}]:old);
+ }
+ function moveSignature(e:ReactPointerEvent<HTMLCanvasElement>){
+  if(!signatureDrawing.current||signaturePoints.length>=4000)return;
+  const canvas=e.currentTarget,point=signaturePoint(e),ctx=canvas.getContext("2d");if(!ctx)return;
+  ctx.lineTo(point.x,point.y);ctx.stroke();setSignaturePoints(old=>old.length<4000?[...old,{...point,move:false}]:old);
+ }
+ function endSignature(){signatureDrawing.current=false;}
+ function clearSignature(){const canvas=signatureCanvas.current;if(canvas){const ctx=canvas.getContext("2d");ctx?.clearRect(0,0,canvas.width,canvas.height);}setSignaturePoints([]);}
  async function syncPendingVisits(){
   if(!navigator.onLine)return;
   try{
@@ -49,6 +67,7 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
    for(const item of pending){
     const {error}=await db.rpc("record_van_delivery_visit",{p_delivery_id:item.delivery_id,p_visit_status:item.visit_status,p_line_quantities:item.line_quantities,p_notes:item.notes,p_idempotency_key:item.idempotency_key});
     if(error)throw error;
+    if(item.proof_of_delivery_signature?.length){const signatureResult=await db.rpc("save_delivery_pod_signature",{p_delivery_id:item.delivery_id,p_signature:item.proof_of_delivery_signature});if(signatureResult.error)throw signatureResult.error;}
     await removeQueuedDeliveryVisit(item.id);
    }
    if(pending.length)setNotice(pending.length+" offline delivery visit(s) synchronized.");
@@ -65,7 +84,7 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
    const selectedLines=lines.filter(x=>x.delivery_id===d.id);
    const quantityReport=selectedLines.map(x=>({delivery_line_id:x.id,product_id:x.product_id,picked_quantity_base:Number(x.picked_quantity_base||0),delivered_quantity_base:Number(lineQuantities[x.id]?.delivered??x.picked_quantity_base??0),market_return_quantity_base:Number(lineQuantities[x.id]?.marketReturn||0),return_batch_number:lineQuantities[x.id]?.returnBatch||null,return_expiry_date:lineQuantities[x.id]?.returnExpiry||null}));
    for(const q of quantityReport){if(!Number.isFinite(q.delivered_quantity_base)||q.delivered_quantity_base<0||q.delivered_quantity_base>q.picked_quantity_base)throw new Error("Delivered quantity must be between zero and picked quantity.");if(!Number.isFinite(q.market_return_quantity_base)||q.market_return_quantity_base<0||q.market_return_quantity_base>q.delivered_quantity_base)throw new Error("Market return quantity cannot exceed delivered quantity.");}
-   const payload={idempotency_key:crypto.randomUUID(),vehicle_number:d.vehicle_number||"",user_id:authUserId,tenant_id:tenantId,delivery_id:d.id,delivery_man_employee_id:employee.id,customer_id:o.customer_id,visit_status:form.visit_status,shops_visited:1,line_quantities:quantityReport,notes:form.notes.trim()||null,created_by:session.user.id,queued_at:new Date().toISOString()};
+   const payload={idempotency_key:crypto.randomUUID(),vehicle_number:d.vehicle_number||"",user_id:authUserId,tenant_id:tenantId,delivery_id:d.id,delivery_man_employee_id:employee.id,customer_id:o.customer_id,visit_status:form.visit_status,shops_visited:1,line_quantities:quantityReport,notes:form.notes.trim()||null,created_by:session.user.id,queued_at:new Date().toISOString(),proof_of_delivery_signature:signaturePoints};
    if(!navigator.onLine){
     await queueDeliveryVisit({...payload,id:crypto.randomUUID(),created_by:payload.created_by||null});
     setNotice("No internet: delivery visit safely queued on this device. It will sync when connection returns.");
@@ -76,8 +95,8 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
       await queueDeliveryVisit({...payload,id:crypto.randomUUID(),created_by:payload.created_by||null});
       setNotice("Connection interrupted: delivery visit queued for automatic synchronization.");
      }else throw error;
-    }else setNotice(result?.invoice_number?"Delivery completed. Invoice "+result.invoice_number+" posted · PKR "+Number(result.invoice_total||0).toLocaleString("en-PK")+". Van stock, returns and COGS journal are synchronized.":"Delivery outcome saved. Returned stock and vehicle ledger are synchronized; no invoice was required for this failed/returned delivery.");
-   }setForm({delivery_id:"",visit_status:"delivered",notes:""});setLineQuantities({});if(navigator.onLine)await load();
+    }else {let signaturePending=false;if(signaturePoints.length>1){const signatureResult=await db.rpc("save_delivery_pod_signature",{p_delivery_id:d.id,p_signature:signaturePoints});if(signatureResult.error){signaturePending=true;await queueDeliveryVisit({...payload,id:crypto.randomUUID(),created_by:payload.created_by||null});}}setNotice(signaturePending?"Delivery posted successfully; customer signature proof is queued for synchronization.":result?.invoice_number?"Delivery completed. Invoice "+result.invoice_number+" posted · PKR "+Number(result.invoice_total||0).toLocaleString("en-PK")+". Van stock, returns, COGS and customer signature are synchronized.":"Delivery outcome saved. Returned stock and vehicle ledger are synchronized.");}
+   }setForm({delivery_id:"",visit_status:"delivered",notes:""});setLineQuantities({});clearSignature();if(navigator.onLine)await load();
   }catch(e){setNotice(e instanceof Error?e.message:"Shop visit could not be saved.");}
   setSaving(false);
  }
@@ -96,9 +115,9 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
     <label>Assigned delivery / customer<select required value={form.delivery_id} onChange={e=>{const id=e.target.value;setForm(x=>({...x,delivery_id:id}));const d=deliveries.find(x=>x.id===id);setLineQuantities(Object.fromEntries(lines.filter(x=>x.delivery_id===id).map(x=>[x.id,{delivered:String(x.picked_quantity_base||0),marketReturn:"0",returnBatch:"",returnExpiry:""}])));}}><option value="">Select delivery</option>{deliveries.map(d=><option key={d.id} value={d.id}>{d.delivery_number} · {customerFor(d)?.name||orders.find(o=>o.id===d.sales_order_id)?.order_number||"Customer"} · {d.vehicle_number||"No vehicle"}</option>)}</select></label>
     <label>Visit result<select value={form.visit_status} onChange={e=>setForm(x=>({...x,visit_status:e.target.value}))}><option value="delivered">Delivered</option><option value="short_delivered">Short delivered</option><option value="not_available">Shop not available</option><option value="market_return">Market return</option><option value="refused">Customer refused</option></select></label>
     <label>Notes<input value={form.notes} onChange={e=>setForm(x=>({...x,notes:e.target.value}))} placeholder="Reason, returned items, customer remarks"/></label>
-   </div>{selectedDeliveryLines.map(line=>{const p=products.find(x=>x.id===line.product_id),q=lineQuantities[line.id]||{delivered:String(line.picked_quantity_base||0),marketReturn:"0",returnBatch:"",returnExpiry:""};return <div className="form-grid" key={line.id}><label>{p?.name||p?.sku||"Product"} · Picked {line.picked_quantity_base}<input type="number" min="0" max={line.picked_quantity_base} step="0.001" value={q.delivered} onChange={e=>setLineQuantities(x=>({...x,[line.id]:{...q,delivered:e.target.value}}))}/></label><label>Customer return quantity<input type="number" min="0" max={q.delivered||0} step="0.001" value={q.marketReturn} onChange={e=>setLineQuantities(x=>({...x,[line.id]:{...q,marketReturn:e.target.value}}))}/></label>{Number(q.marketReturn)>0&&<><label>Return batch number<input value={q.returnBatch} onChange={e=>setLineQuantities(x=>({...x,[line.id]:{...q,returnBatch:e.target.value}}))}/></label><label>Return expiry date<input type="date" value={q.returnExpiry} onChange={e=>setLineQuantities(x=>({...x,[line.id]:{...q,returnExpiry:e.target.value}}))}/></label></>}</div>})}<button disabled={saving||!form.delivery_id||deliveries.find(x=>x.id===form.delivery_id)?.status!=="dispatched"}>{saving?"Saving…":"Save delivery & stock movements"}</button></form>
-   <h3>Visit history</h3><div className="data-table-wrap"><table className="data-table"><thead><tr><th>Date</th><th>Delivery</th><th>Customer</th><th>Result</th><th>Notes</th></tr></thead><tbody>{visits.map(v=><tr key={v.id}><td>{new Date(v.visit_at).toLocaleString("en-PK")}</td><td>{deliveries.find(d=>d.id===v.delivery_id)?.delivery_number||"—"}</td><td>{customers.find(c=>c.id===v.customer_id)?.name||"—"}</td><td>{v.visit_status.replaceAll("_"," ")}{Array.isArray(v.line_quantities)&&v.line_quantities.length>0?<div>{v.line_quantities.map((q:Row,i:number)=><div key={i}>Delivered {q.delivered_quantity_base} · Market return {q.market_return_quantity_base}</div>)}</div>:null}</td><td>{v.notes||"—"}</td></tr>)}{!visits.length&&<tr><td colSpan={5} className="table-empty">No visits recorded yet.</td></tr>}</tbody></table></div>
+   </div><div className="pod-signature"><div><b>Proof of delivery · Customer signature</b><span>Optional digital signature, saved with the delivery visit.</span></div><canvas ref={signatureCanvas} width={520} height={140} onPointerDown={beginSignature} onPointerMove={moveSignature} onPointerUp={endSignature} onPointerCancel={endSignature} className="signature-canvas"/><button type="button" onClick={clearSignature}>Clear signature</button></div>{selectedDeliveryLines.map(line=>{const p=products.find(x=>x.id===line.product_id),q=lineQuantities[line.id]||{delivered:String(line.picked_quantity_base||0),marketReturn:"0",returnBatch:"",returnExpiry:""};return <div className="form-grid" key={line.id}><label>{p?.name||p?.sku||"Product"} · Picked {line.picked_quantity_base}<input type="number" min="0" max={line.picked_quantity_base} step="0.001" value={q.delivered} onChange={e=>setLineQuantities(x=>({...x,[line.id]:{...q,delivered:e.target.value}}))}/></label><label>Customer return quantity<input type="number" min="0" max={q.delivered||0} step="0.001" value={q.marketReturn} onChange={e=>setLineQuantities(x=>({...x,[line.id]:{...q,marketReturn:e.target.value}}))}/></label>{Number(q.marketReturn)>0&&<><label>Return batch number<input value={q.returnBatch} onChange={e=>setLineQuantities(x=>({...x,[line.id]:{...q,returnBatch:e.target.value}}))}/></label><label>Return expiry date<input type="date" value={q.returnExpiry} onChange={e=>setLineQuantities(x=>({...x,[line.id]:{...q,returnExpiry:e.target.value}}))}/></label></>}</div>})}<button disabled={saving||!form.delivery_id||deliveries.find(x=>x.id===form.delivery_id)?.status!=="dispatched"}>{saving?"Saving…":"Save delivery & stock movements"}</button></form>
+   <h3>Visit history</h3><div className="data-table-wrap"><table className="data-table"><thead><tr><th>Date</th><th>Delivery</th><th>Customer</th><th>Result</th><th>Proof</th><th>Notes</th></tr></thead><tbody>{visits.map(v=><tr key={v.id}><td>{new Date(v.visit_at).toLocaleString("en-PK")}</td><td>{deliveries.find(d=>d.id===v.delivery_id)?.delivery_number||"—"}</td><td>{customers.find(c=>c.id===v.customer_id)?.name||"—"}</td><td>{v.visit_status.replaceAll("_"," ")}{Array.isArray(v.line_quantities)&&v.line_quantities.length>0?<div>{v.line_quantities.map((q:Row,i:number)=><div key={i}>Delivered {q.delivered_quantity_base} · Market return {q.market_return_quantity_base}</div>)}</div>:null}</td><td>{v.proof_of_delivery_signature?.length?"Signature saved":"—"}</td><td>{v.notes||"—"}</td></tr>)}{!visits.length&&<tr><td colSpan={6} className="table-empty">No visits recorded yet.</td></tr>}</tbody></table></div>
   </>}
-  <p className="module-footnote">Assigned delivery data is cached locally for offline viewing on this device. Visit updates are queued and replayed with the tenant+delivery unique key when online. Delivered quantities and returns post to the van ledger transactionally; the system generates the posted sales invoice and revenue journal automatically when there is a sale.</p>
+  <p className="module-footnote">Assigned delivery data is cached locally for offline viewing on this device. Delivery visits, quantity reports and customer signature proofs are queued locally and replayed with idempotent server sync when online. Delivered quantities and returns post to the van ledger transactionally; the system generates the posted sales invoice and revenue journal automatically when there is a sale.</p>
  </section>;
 }
