@@ -51,7 +51,11 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
         cameraStream.current=stream;
         const video=videoRef.current;if(!video)throw new Error("Camera preview is not ready.");
         video.srcObject=stream;await video.play();
-        detector=new BarcodeDetectorCtor({formats:["ean_13","ean_8","upc_a","upc_e","code_128","code_39","itf","qr_code"]});
+        const desiredFormats=["ean_13","ean_8","upc_a","upc_e","code_128","code_39","itf","qr_code"];
+        const supportedFormats=typeof BarcodeDetectorCtor.getSupportedFormats==="function"?await BarcodeDetectorCtor.getSupportedFormats():desiredFormats;
+        const formats=desiredFormats.filter(format=>supportedFormats.includes(format));
+        if(!formats.length)throw new Error("This browser does not expose a supported product barcode format. Use a handheld scanner or enter the barcode manually.");
+        detector=new BarcodeDetectorCtor({formats});
         const scan=async()=>{
           if(!active)return;
           try{
