@@ -18,7 +18,9 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
   const [productUnits, setProductUnits] = useState<Row[]>([]);
   const [prices, setPrices] = useState<Row[]>([]);
   const [listId, setListId] = useState("");
-  const [cart, setCart] = useState<CartLine[]>([{ product_id: "", unit_id: "", quantity: "1", is_free:false }]);\n  const [productSearch,setProductSearch]=useState("");\n  const [barcodeInput,setBarcodeInput]=useState("");
+  const [cart, setCart] = useState<CartLine[]>([{ product_id: "", unit_id: "", quantity: "1", is_free:false }]);
+  const [productSearch,setProductSearch]=useState("");
+  const [barcodeInput,setBarcodeInput]=useState("");
   const [deliveryDate, setDeliveryDate] = useState("");
   const [notes, setNotes] = useState("");
   const [orders, setOrders] = useState<Row[]>([]);
@@ -36,7 +38,8 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
 
   const money = (n: number) => "PKR " + Number(n || 0).toLocaleString("en-PK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const activeRoute = routes.find(x => x.id === routeId);
-  const activeCustomer = customers.find(x => x.id === customerId);\n  const filteredProducts=useMemo(()=>{const q=productSearch.trim().toLowerCase();return q?products.filter(p=>[p.name,p.sku,p.barcode,p.brand].some(v=>String(v||"").toLowerCase().includes(q))):products;},[products,productSearch]);
+  const activeCustomer = customers.find(x => x.id === customerId);
+  const filteredProducts=useMemo(()=>{const q=productSearch.trim().toLowerCase();return q?products.filter(p=>[p.name,p.sku,p.barcode,p.brand].some(v=>String(v||"").toLowerCase().includes(q))):products;},[products,productSearch]);
   const estimate = useMemo(() => cart.reduce((sum, line) => {
     const qty = Number(line.quantity);
     const candidates = prices.filter(p => p.product_id === line.product_id && p.unit_id === line.unit_id && Number(p.min_quantity) <= qty).sort((a,b) => Number(b.min_quantity)-Number(a.min_quantity));
