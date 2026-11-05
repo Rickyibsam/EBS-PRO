@@ -11,7 +11,7 @@ The application has 10 module groups. The navigation and module screens are pres
 1. **Dashboard & Management**
    - Owner/admin dashboard and daily, weekly and monthly posted-sales indicators.
    - Purchase, stock, profit, open-order and delivery metrics.
-   - Low-stock alert and live operational notifications for low stock, pending sales approvals, past-due invoice dates and the delivery queue.
+   - Low-stock alert and persistent per-user read/unread notification inbox for low stock, pending sales approvals, past-due invoice dates and the delivery queue.
    - Recent audit activity.
 
 2. **Sales & Customer Management**
@@ -22,10 +22,9 @@ The application has 10 module groups. The navigation and module screens are pres
 3. **Order Booking App**
    - Booker login linked to an employee and assigned route.
    - Customer selection and route-scoped customer creation.
-   - Product/SKU search and barcode field that accepts a handheld USB/Bluetooth scanner as keyboard input.
+   - Product/SKU search, handheld USB/Bluetooth scanner input and supported phone-camera barcode scanning through the browser BarcodeDetector API.
    - Cart, free items, unit conversion and customer price list.
-   - GPS visit check-in and offline visit/order queue with synchronization.
-   - Camera-based barcode scanning is not currently implemented.
+   - GPS visit check-in and offline visit/order queue with idempotent synchronization.
 
 4. **Inventory & Warehouse**
    - Product/SKU, category, brand, unit and alternate-unit management.
@@ -56,13 +55,43 @@ The application has 10 module groups. The navigation and module screens are pres
 
 10. **Administration & Security**
     - Tenant/company onboarding, multiple companies, branches and warehouses.
-    - Staff invitations, employee profiles, tenant memberships, role/module access.
+    - Staff invitations, employee profiles, tenant memberships, role/module access and owner-managed per-user View/Create/Update/Delete overrides.
     - Audit trail, login history, password recovery, company settings and invoice design.
     - Draft voucher revision history and manual tenant backup/additive restore.
 
+## Newly completed gaps and workflow fixes
+
+- **Custom permissions:** the owner can enable per-user overrides for 10 module groups with View/Create/Update/Delete actions. If no override exists, the user's existing role rules remain the default. Owner/admin role access remains protected. Database RLS enforces explicit grants and denials on 77 tenant-scoped business tables.
+- **Barcode camera:** the Booker order form can use the phone camera on supported secure-context browsers that expose the BarcodeDetector API. Handheld keyboard-wedge scanners and manual SKU/barcode entry remain available as fallbacks.
+- **Persistent notifications:** operational alerts are saved per user and tenant with read/unread state, mark-read and mark-all-read actions. Repeated daily alerts update the existing notification instead of creating duplicates.
+- **Automated tests:** `npm test` runs 12 tests for permission resolution, barcode matching, Booker IndexedDB queues/snapshots and deliveryman IndexedDB queues/snapshots. GitHub Actions runs the tests before the TypeScript/Vite production build.
+- **Critical workflow defects found and fixed during transactional testing:**
+  - The document-number allocator used obsolete column names and omitted the required branch key; it now uses the current branch-aware sequence schema.
+  - Approved sales/purchase vouchers can now progress through controlled fulfilment/receipt status transitions without unlocking their business fields.
+  - Voucher line guards now use the correct goods-receipt creator column and allow only the received-quantity increment on approved purchase order lines.
+
+## Transactional verification completed
+
+The following database smoke workflows were run as authenticated owner/staff contexts inside explicit transactions and rolled back after assertions. No test business records were retained:
+
+- Sales: approved order → delivery allocation → dispatch → posted invoice → cash receipt → posted sales credit note and stock return.
+- Purchasing: draft PO → approval → GRN creation/posting → PO received status → supplier invoice posting → allocated supplier payment.
+- Payroll: temporary payroll run → posting → salary payment.
+- Booker: offline order RPC sync and replay idempotency; GPS visit RPC sync and replay idempotency.
+- Deliveryman: batch-aware warehouse-to-van load → van dispatch/reservation → offline delivery visit sync → invoice creation and replay idempotency.
+- Backup: tenant backup export and additive restore RPC smoke test.
+- Security: per-user module denial/grant enforcement, owner-managed permission row access, personal notification inbox access, and an organization visibility isolation check.
+- Client offline storage: all Booker and deliveryman IndexedDB unit tests passed.
+
+The latest GitHub Actions run completed successfully: **12/12 tests passed**, TypeScript checks passed and Vite production build passed. Render deployment for commit `56ec698961370da4718598023a5d8f401d856b87` is live.
+
+## Remaining verification limits
+
+This is stronger coverage than a build-only check, but it is not a claim of complete production certification. Browser-level E2E coverage with real login sessions and user interfaces, physical mobile camera testing, signup/email confirmation, purchase returns, commission clawback, fixed-asset/budget edge cases, and exhaustive backup restore reconciliation are still outstanding. The current tenant has only a small sample dataset, so all business edge cases cannot be proven from its existing records.
+
 ## Current hosted database
 
-The hosted Supabase database currently has **80 public base tables**; all 80 have RLS enabled and the read-only audit found zero public base tables without RLS. Public RPC execution is not available to the anonymous role. New public functions, tables and sequences created by the postgres role now require explicit grants.
+The hosted Supabase database currently has **82 public base tables**; all 82 have RLS enabled and the audit found zero public base tables without RLS. Public RPC execution is not available to the anonymous role. New public functions, tables and sequences created by the postgres role now require explicit grants. Owner-managed per-user module/action overrides are enforced across **77 tenant-scoped business tables**. The permission configuration and personal notification inbox use separate ownership/user-scoped RLS policies.
 
 The current hosted project has existing organization and sample/test records. Examples at the time of the latest audit include one organization, two tenant memberships, one employee, one sales order, one purchase order, one goods receipt and one journal entry. There were no posted sales invoices or deliveries at that time. This is a small test dataset, not evidence that all workflows have been exercised.
 
@@ -86,13 +115,4 @@ Apply future schema changes as versioned migrations, keep the matching SQL file 
 
 The latest production build/deploy succeeded. Read-only smoke checks confirmed the trial balance query returned equal debits and credits (PKR 1,200 each in the current test data), and stock-balance, inventory-valuation and low-stock RPCs returned successfully for the owner context.
 
-The following still need full workflow testing before calling the ERP production-ready:
-
-- Signup, email confirmation, staff invitation and every role's allowed/blocked actions.
-- Sales order → approval → delivery → invoice → receipt → return/credit note.
-- Purchase order → GRN → supplier invoice → supplier payment → purchase return.
-- Stock transfer, stock take, batch/expiry and van reservation edge cases.
-- Payroll, commission clawback, fixed-asset depreciation/disposal and budget locks.
-- Booker and deliveryman offline queue recovery on real mobile devices.
-- Backup export, additive restore and skipped-table reconciliation.
-- Cross-tenant access isolation using two independent tenants.
+The remaining verification limits are listed in **Remaining verification limits** above. Do not certify the system as fully production-ready until those are closed.
