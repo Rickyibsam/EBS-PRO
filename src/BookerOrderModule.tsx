@@ -13,6 +13,8 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
   const [routeId, setRouteId] = useState("");
   const [customers, setCustomers] = useState<Row[]>([]);
   const [customerId, setCustomerId] = useState("");
+  const [showNewCustomer,setShowNewCustomer]=useState(false);
+  const [newCustomer,setNewCustomer]=useState({name:"",phone:"",address:"",city:""});
   const [products, setProducts] = useState<Row[]>([]);
   const [units, setUnits] = useState<Row[]>([]);
   const [productUnits, setProductUnits] = useState<Row[]>([]);
@@ -113,6 +115,20 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
 
   useEffect(() => { void load(); }, [tenantId]);
 
+  async function createRouteCustomer(e:FormEvent){
+    e.preventDefault();
+    if(!navigator.onLine){setNotice("New customer registration requires an internet connection.");return;}
+    if(!activeRoute){setNotice("Select your assigned route first.");return;}
+    setSaving(true);setNotice("");
+    try{
+      const {data,error}=await db.rpc("create_booker_customer",{p_tenant_id:tenantId,p_route_id:routeId,p_name:newCustomer.name.trim(),p_phone:newCustomer.phone.trim()||null,p_address:newCustomer.address.trim()||null,p_city:newCustomer.city.trim()||null});
+      if(error)throw error;
+      await load();setCustomerId(data.customer_id);setShowNewCustomer(false);setNewCustomer({name:"",phone:"",address:"",city:""});
+      setNotice(data.existing_customer?"Existing customer linked to your route.":"New route customer registered successfully.");
+    }catch(err){setNotice(err instanceof Error?err.message:"Customer could not be registered.");}
+    finally{setSaving(false);}
+  }
+
   async function syncQueuedOrders(){
     if(!navigator.onLine||syncLock.current)return;
     syncLock.current=true;setSyncing(true);
@@ -199,6 +215,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
     setNotice("Added "+product.name+" from barcode / SKU scan.");setBarcodeInput("");
   }
   function linePrice(line: CartLine) {
+    if(line.is_free)return 0;
     const qty = Number(line.quantity);
     return prices.filter(p => p.product_id === line.product_id && p.unit_id === line.unit_id && Number(p.min_quantity) <= qty).sort((a,b) => Number(b.min_quantity)-Number(a.min_quantity))[0]?.price;
   }
@@ -261,10 +278,12 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       <h3>New customer order</h3>
       <div className="form-grid">
         <label>Assigned route<select required disabled={!navigator.onLine} value={routeId} onChange={e => setRouteId(e.target.value)}><option value="">Select route</option>{routes.map(r => <option key={r.id} value={r.id}>{r.route_code} · {r.name}</option>)}</select></label>
-        <label>Route customer<select required disabled={!navigator.onLine} value={customerId} onChange={e => setCustomerId(e.target.value)}><option value="">Select assigned customer</option>{customers.map(c => <option key={c.id} value={c.id}>{c.party_code} · {c.name}</option>)}</select></label><label>Field visit<button type="button" disabled={saving||!customerId} onClick={()=>void recordVisit()}>GPS check-in</button></label>
+        <label>Route customer<select required disabled={!navigator.onLine} value={customerId} onChange={e => setCustomerId(e.target.value)}><option value="">Select assigned customer</option>{customers.map(c => <option key={c.id} value={c.id}>{c.party_code} · {c.name}</option>)}</select></label><button type="button" disabled={!navigator.onLine||!routeId||saving} onClick={()=>setShowNewCustomer(x=>!x)}>＋ New customer</button><label>Field visit<button type="button" disabled={saving||!customerId} onClick={()=>void recordVisit()}>GPS check-in</button></label>
         <label>Required delivery date<input type="date" min={new Date().toISOString().slice(0,10)} value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)}/></label>
       </div>
+      {showNewCustomer&&<div className="transaction-form"><h3>Register route customer</h3><form className="form-grid" onSubmit={createRouteCustomer}><label>Customer name<input required value={newCustomer.name} onChange={e=>setNewCustomer({...newCustomer,name:e.target.value})}/></label><label>Phone<input value={newCustomer.phone} onChange={e=>setNewCustomer({...newCustomer,phone:e.target.value})}/></label><label>Address<input value={newCustomer.address} onChange={e=>setNewCustomer({...newCustomer,address:e.target.value})}/></label><label>City / Area<input value={newCustomer.city} onChange={e=>setNewCustomer({...newCustomer,city:e.target.value})}/></label><button disabled={saving}>Save customer to route</button></form></div>}
       <h3>Order items</h3>
+      <div className="form-grid"><label>Search product<input type="search" value={productSearch} onChange={e=>setProductSearch(e.target.value)} placeholder="Search product, SKU or brand"/></label><label>Scan barcode / SKU<input value={barcodeInput} onChange={e=>setBarcodeInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();addScannedProduct(barcodeInput);}}} placeholder="Scan barcode then press Enter"/></label></div>
       {cart.map((line,i) => {
         const options = productUnits.filter(x => x.product_id === line.product_id);
         const price = linePrice(line);
