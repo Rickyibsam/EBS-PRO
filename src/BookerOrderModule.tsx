@@ -63,12 +63,12 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       const rules=ruleResult.data||[];
       let visibleProducts=(prod.data||[]).filter(product=>{
         const matching=rules.filter(rule=>(rule.product_id&&rule.product_id===product.id)||(rule.brand&&rule.brand.toLowerCase()===(product.brand||"").toLowerCase())||(rule.vendor_id&&(vendorMap.data||[]).some(v=>v.product_id===product.id&&v.supplier_id===rule.vendor_id)));
-        if(!matching.length)return !rules.some(rule=>rule.is_allowed===false);
+        if(!matching.length)return true;
         const specific=matching.filter(rule=>rule.product_id===product.id);
         const brandRules=matching.filter(rule=>rule.brand&&rule.brand.toLowerCase()===(product.brand||"").toLowerCase());
         const vendorRules=matching.filter(rule=>rule.vendor_id&&(vendorMap.data||[]).some(v=>v.product_id===product.id&&v.supplier_id===rule.vendor_id));
         const applicable=specific.length?specific:brandRules.length?brandRules:vendorRules;
-        return applicable.some(rule=>rule.is_allowed===true);
+        return applicable.some(rule=>rule.is_allowed===true)&&!applicable.some(rule=>rule.is_allowed===false);
       });
       const stockRules=rules.some(rule=>rule.require_stock&&rule.is_allowed);
       if(stockRules&&visibleProducts.length){
