@@ -17,7 +17,8 @@ const launchers=[
 ];
 export default function DashboardModule({db,tenantId,company,allowedModules,onNavigate}:{db:SupabaseClient;tenantId:string;company:string;allowedModules:string[];onNavigate:(module:string)=>void}){
  const [metrics,setMetrics]=useState<Metric[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState("");
- const [updatedAt,setUpdatedAt]=useState("");\n const [expandedLauncher,setExpandedLauncher]=useState("1. Dashboard & Management");
+ const [updatedAt,setUpdatedAt]=useState("");
+ const [expandedLauncher,setExpandedLauncher]=useState("1. Dashboard & Management");
  useEffect(()=>{let live=true;async function load(){setLoading(true);setError("");try{
   const now=new Date(),today=localDate(now),since=new Date(now.getTime()-24*60*60*1000).toISOString();
   const [sales,orders,purchases,purchaseInvoices,products,customers,vendors,receipts,deliveries,lowStock,activity,inventoryValuation,coa,journalLines]=await Promise.all([
