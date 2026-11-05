@@ -3,7 +3,7 @@ import type {SupabaseClient} from "@supabase/supabase-js";
 type Row=Record<string,any>;
 export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenantId:string}){
  const [employee,setEmployee]=useState<Row|null>(null),[deliveries,setDeliveries]=useState<Row[]>([]),[orders,setOrders]=useState<Row[]>([]),[customers,setCustomers]=useState<Row[]>([]),[products,setProducts]=useState<Row[]>([]),[lines,setLines]=useState<Row[]>([]),[visits,setVisits]=useState<Row[]>([]);
- const [form,setForm]=useState({delivery_id:"",visit_status:"delivered",notes:""}),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[notice,setNotice]=useState("");
+ const [form,setForm]=useState({delivery_id:"",visit_status:"delivered",notes:""}),[lineQuantities,setLineQuantities]=useState<Record<string,{delivered:string;marketReturn:string}>>({}),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[notice,setNotice]=useState("");
  async function load(){
   setLoading(true);setNotice("");
   try{
@@ -18,7 +18,7 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
     const [o,l,v]=await Promise.all([
      db.from("sales_orders").select("id,order_number,customer_id,order_date").eq("tenant_id",tenantId).in("id",ids),
      db.from("delivery_lines").select("id,delivery_id,product_id,quantity_base,picked_quantity_base,delivered_quantity_base").eq("tenant_id",tenantId).in("delivery_id",deliveryIds),
-     db.from("delivery_shop_visits").select("id,delivery_id,customer_id,visit_at,visit_status,notes").eq("tenant_id",tenantId).in("delivery_id",deliveryIds).order("visit_at",{ascending:false})
+     db.from("delivery_shop_visits").select("id,delivery_id,customer_id,visit_at,visit_status,notes,line_quantities").eq("tenant_id",tenantId).in("delivery_id",deliveryIds).order("visit_at",{ascending:false})
     ]);
     const err=o.error||l.error||v.error;if(err)throw err;setOrders(o.data??[]);setLines(l.data??[]);setVisits(v.data??[]);
     const customerIds=[...new Set((o.data??[]).map(x=>x.customer_id))],productIds=[...new Set((l.data??[]).map(x=>x.product_id))];
@@ -38,12 +38,16 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
    const d=deliveries.find(x=>x.id===form.delivery_id),o=orders.find(x=>x.id===d?.sales_order_id);
    if(!d||!o)throw new Error("Select one of your assigned deliveries.");
    const {data:user}=await db.auth.getUser();
-   const {error}=await db.from("delivery_shop_visits").insert({tenant_id:tenantId,delivery_id:d.id,delivery_man_employee_id:employee.id,customer_id:o.customer_id,visit_status:form.visit_status,shops_visited:1,notes:form.notes.trim()||null,created_by:user.user?.id??null});
-   if(error)throw error;setNotice("Shop visit saved. Delivered quantities and invoice are finalized by the warehouse/manager confirmation.");setForm({delivery_id:"",visit_status:"delivered",notes:""});await load();
+   const selectedLines=lines.filter(x=>x.delivery_id===d.id);
+   const quantityReport=selectedLines.map(x=>({delivery_line_id:x.id,product_id:x.product_id,picked_quantity_base:Number(x.picked_quantity_base||0),delivered_quantity_base:Number(lineQuantities[x.id]?.delivered||0),market_return_quantity_base:Number(lineQuantities[x.id]?.marketReturn||0)}));
+   for(const q of quantityReport){if(!Number.isFinite(q.delivered_quantity_base)||q.delivered_quantity_base<0||q.delivered_quantity_base>q.picked_quantity_base)throw new Error("Delivered quantity must be between zero and picked quantity.");if(!Number.isFinite(q.market_return_quantity_base)||q.market_return_quantity_base<0||q.market_return_quantity_base>q.delivered_quantity_base)throw new Error("Market return quantity cannot exceed delivered quantity.");}
+   const {error}=await db.from("delivery_shop_visits").insert({tenant_id:tenantId,delivery_id:d.id,delivery_man_employee_id:employee.id,customer_id:o.customer_id,visit_status:form.visit_status,shops_visited:1,line_quantities:quantityReport,notes:form.notes.trim()||null,created_by:user.user?.id??null});
+   if(error)throw error;setNotice("Shop visit saved. Delivered quantities and invoice are finalized by the warehouse/manager confirmation.");setForm({delivery_id:"",visit_status:"delivered",notes:""});setLineQuantities({});await load();
   }catch(e){setNotice(e instanceof Error?e.message:"Shop visit could not be saved.");}
   setSaving(false);
  }
  const customerFor=(delivery:Row)=>customers.find(x=>x.id===orders.find(o=>o.id===delivery.sales_order_id)?.customer_id);
+ const selectedDeliveryLines=lines.filter(x=>x.delivery_id===form.delivery_id);
  return <section className="module-page">
   <div className="module-toolbar"><div><h2>Delivery Man App</h2><p>Assigned deliveries, customer stops, product quantities and visit outcomes.</p></div><button onClick={()=>void load()}>↻ Refresh</button></div>
   {notice&&<div className="notice">{notice}</div>}
@@ -58,7 +62,7 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
     <label>Visit result<select value={form.visit_status} onChange={e=>setForm(x=>({...x,visit_status:e.target.value}))}><option value="delivered">Delivered</option><option value="short_delivered">Short delivered</option><option value="not_available">Shop not available</option><option value="market_return">Market return</option><option value="refused">Customer refused</option></select></label>
     <label>Notes<input value={form.notes} onChange={e=>setForm(x=>({...x,notes:e.target.value}))} placeholder="Reason, returned items, customer remarks"/></label>
    </div><button disabled={saving||!form.delivery_id}>{saving?"Saving…":"Save shop visit"}</button></form>
-   <h3>Visit history</h3><div className="data-table-wrap"><table className="data-table"><thead><tr><th>Date</th><th>Delivery</th><th>Customer</th><th>Result</th><th>Notes</th></tr></thead><tbody>{visits.map(v=><tr key={v.id}><td>{new Date(v.visit_at).toLocaleString("en-PK")}</td><td>{deliveries.find(d=>d.id===v.delivery_id)?.delivery_number||"—"}</td><td>{customers.find(c=>c.id===v.customer_id)?.name||"—"}</td><td>{v.visit_status.replaceAll("_"," ")}</td><td>{v.notes||"—"}</td></tr>)}{!visits.length&&<tr><td colSpan={5} className="table-empty">No visits recorded yet.</td></tr>}</tbody></table></div>
+   <h3>Visit history</h3><div className="data-table-wrap"><table className="data-table"><thead><tr><th>Date</th><th>Delivery</th><th>Customer</th><th>Result</th><th>Notes</th></tr></thead><tbody>{visits.map(v=><tr key={v.id}><td>{new Date(v.visit_at).toLocaleString("en-PK")}</td><td>{deliveries.find(d=>d.id===v.delivery_id)?.delivery_number||"—"}</td><td>{customers.find(c=>c.id===v.customer_id)?.name||"—"}</td><td>{v.visit_status.replaceAll("_"," ")}{Array.isArray(v.line_quantities)&&v.line_quantities.length>0?<div>{v.line_quantities.map((q:Row,i:number)=><div key={i}>Delivered {q.delivered_quantity_base} · Market return {q.market_return_quantity_base}</div>)}</div>:null}</td><td>{v.notes||"—"}</td></tr>)}{!visits.length&&<tr><td colSpan={5} className="table-empty">No visits recorded yet.</td></tr>}</tbody></table></div>
   </>}
   <p className="module-footnote">This field app records shop visits and delivery outcomes. The warehouse/manager still confirms final delivered quantities, short-stock return and invoice posting in Distribution.</p>
  </section>;
