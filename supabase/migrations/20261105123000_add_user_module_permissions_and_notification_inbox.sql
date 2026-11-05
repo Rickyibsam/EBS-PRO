@@ -7,7 +7,7 @@ create table if not exists public.tenant_user_module_permissions (
   tenant_id uuid not null references public.organizations(id) on delete cascade,
   user_id uuid not null,
   module_key text not null check (module_key in (
-    'sales_customer','order_booking','inventory','purchase_supplier',
+    'dashboard_management','sales_customer','order_booking','inventory','purchase_supplier',
     'accounts_finance','distribution_delivery','hr_payroll',
     'reports_analytics','administration_security'
   )),
