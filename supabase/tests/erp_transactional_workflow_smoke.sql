@@ -32,7 +32,9 @@ declare
   v_grn uuid := gen_random_uuid();
   v_grn_line uuid := gen_random_uuid();
   v_purchase_invoice uuid;
+  v_debit_note uuid;
   v_invoice_result jsonb;
+  v_debit_result jsonb;
   v_inventory_account uuid := gen_random_uuid();
   v_grni_account uuid := gen_random_uuid();
   v_tax_account uuid := gen_random_uuid();
@@ -162,6 +164,27 @@ begin
   if not exists(select 1 from public.journal_entries where tenant_id=v_tenant_a
     and source_type='purchase_invoice' and source_id=v_purchase_invoice and status='posted') then
     raise exception 'FAIL: supplier invoice posting did not create a GL journal';
+  end if;
+
+  -- Purchase return must reduce stock and post the supplier/AP journal.
+  v_debit_result:=public.create_purchase_debit_note(
+    v_grn,
+    jsonb_build_array(jsonb_build_object('goods_receipt_line_id',v_grn_line,'quantity',1)),
+    'Smoke test supplier return',
+    current_date
+  );
+  v_debit_note:=(v_debit_result->>'debit_note_id')::uuid;
+  perform public.post_purchase_debit_note(v_debit_note);
+  if not exists(select 1 from public.purchase_debit_notes where id=v_debit_note and status='posted') then
+    raise exception 'FAIL: purchase debit note did not post';
+  end if;
+  if not exists(select 1 from public.stock_movements where tenant_id=v_tenant_a
+    and reference_type='purchase_debit_note' and reference_id=v_debit_note and quantity_out=1) then
+    raise exception 'FAIL: purchase return did not reduce stock';
+  end if;
+  if not exists(select 1 from public.journal_entries where tenant_id=v_tenant_a
+    and source_type='purchase_return' and source_id=v_debit_note and status='posted') then
+    raise exception 'FAIL: purchase return did not create a GL journal';
   end if;
 
   -- Balanced journal must post and preserve double-entry equality.
