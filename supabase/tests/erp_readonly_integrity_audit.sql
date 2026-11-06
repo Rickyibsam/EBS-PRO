@@ -65,9 +65,9 @@ insert into _ebs_integrity_findings
 select 'paid_payroll_without_journal','high',count(*)::bigint,
        'Paid payroll lines without a matching posted payment journal'
 from payroll_lines l
-where l.status='paid'
+where l.payment_status='paid'
 and not exists(select 1 from journal_entries j where j.tenant_id=l.tenant_id
-               and j.reference_id=l.id and j.status='posted');
+               and j.source_type='payroll_payment' and j.source_id=l.id and j.status='posted');
 
 -- Compare tenant ownership on every FK edge where both tables carry tenant_id.
 -- This detects existing cross-tenant links even when the FK itself is single-column.
