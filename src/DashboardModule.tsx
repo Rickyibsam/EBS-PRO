@@ -21,6 +21,7 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
  const [metrics,setMetrics]=useState<Metric[]>([]),[recentActivity,setRecentActivity]=useState<any[]>([]),[notifications,setNotifications]=useState<Notice[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState("");
  const [updatedAt,setUpdatedAt]=useState("");
  const [monthlyTrend,setMonthlyTrend]=useState<MonthlyTrend[]>([]);
+ const [integrationCheck,setIntegrationCheck]=useState<any|null>(null);
  const [trendMonths,setTrendMonths]=useState<6|12>(6);
  const [expandedLauncher,setExpandedLauncher]=useState("1. Dashboard & Management");
  useEffect(()=>{let live=true;async function load(){setLoading(true);setError("");try{
@@ -48,6 +49,7 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
    db.from("payments").select("amount,payment_type,payment_date").eq("tenant_id",tenantId).gte("payment_date",trendStart).lte("payment_date",today)
   ]);
   const err=[sales,salesPeriod,orders,purchases,purchaseInvoices,products,customers,vendors,receipts,deliveries].find(x=>x.error);if(err)throw err.error;
+  if(allowedModules.includes("Reports")){try{const check=await db.rpc("get_erp_integration_reconciliation",{p_tenant_id:tenantId});if(!check.error)setIntegrationCheck(check.data);}catch{/* Reconciliation visibility is optional for roles without finance access. */}}
   const daySales=(sales.data??[]).reduce((s,x)=>s+Number(x.grand_total||0),0);
   const weekSales=(salesPeriod.data??[]).filter(x=>x.invoice_date>=weekStart).reduce((s,x)=>s+Number(x.grand_total||0),0);
   const monthSales=(salesPeriod.data??[]).reduce((s,x)=>s+Number(x.grand_total||0),0);
@@ -99,7 +101,7 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
   }
  }catch(e){if(live)setError(e instanceof Error?e.message:"Dashboard could not load.");}finally{if(live)setLoading(false);}}
  void load();return()=>{live=false;};
- },[db,tenantId,trendMonths]);
+ },[db,tenantId,trendMonths,allowedModules]);
  async function markNotificationRead(id:string){
   const {data:auth}=await db.auth.getUser();if(!auth.user)return;
   const readAt=new Date().toISOString();
@@ -135,6 +137,15 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
    </div>
    <div className="dashboard-finance-strip">{["Sales today","Purchases today","Receipts today","Stock value"].map(label=>{const metric=metrics.find(item=>item.label===label);return <div key={label}><small>{label}</small><strong>{metric?.value||"—"}</strong><span>{metric?.detail||"Live company data"}</span></div>;})}</div>
   </section>
+  {integrationCheck&&allowedModules.includes("Reports")&&<section className="recent-activity"><div className="dashboard-section-head"><div><span className="section-kicker">CROSS-MODULE CONTROLS</span><h2>ERP integration reconciliation</h2><p>Read-only checks across purchasing, payroll, fixed assets, delivery, Booker and budgets · {new Date(integrationCheck.checked_at).toLocaleString("en-PK")}</p></div><span className={integrationCheck.has_integrity_warnings?"permission-lock":"pulse-live"}>{integrationCheck.has_integrity_warnings?"Review required":"No flagged mismatches"}</span></div><div className="recent-activity-list">{[
+["Purchase returns",Number(integrationCheck.purchase_returns?.posted_without_journal||0)+Number(integrationCheck.purchase_returns?.value_mismatch||0)+Number(integrationCheck.purchase_returns?.stock_movement_mismatch||0),"Missing journals, value or stock movement mismatches"],
+["Payroll",Number(integrationCheck.payroll?.posted_runs_without_journal||0)+Number(integrationCheck.payroll?.paid_lines_without_payment_journal||0),"Posted runs or paid salaries missing journal links"],
+["Fixed assets",Number(integrationCheck.fixed_assets?.posted_depreciation_without_journal||0),"Posted depreciation entries missing journal links"],
+["Delivery",Number(integrationCheck.delivery?.delivered_without_posted_invoice||0),"Delivered records missing posted sales invoices"],
+["Booker",Number(integrationCheck.booker?.orders_without_idempotency_key||0),"Orders missing offline replay keys"],
+["Budgets",Number(integrationCheck.budgets?.approved_without_lines||0),"Approved budgets without account lines"],
+["Commission clawback",Number(integrationCheck.commission?.partial_clawback_remaining||0),"PKR remaining for future payroll recovery"]
+].map(([label,value,detail]:any)=><div key={label}><span className="activity-dot">{Number(value)>0?"!":"✓"}</span><b>{label}</b><span>{detail}</span><time>{label==="Commission clawback"?money(Number(value)):String(value)+" flagged"}</time></div>)}</div><p className="dashboard-disclaimer">These checks identify missing links and variances; they do not change or repair existing business records.</p></section>}
   {notifications.length>0&&<section className="recent-activity"><div className="dashboard-section-head"><div><span className="section-kicker">ACTION CENTRE</span><h2>Notification inbox</h2><p>{unreadNotifications} unread · {notifications.length} saved notification(s)</p></div>{unreadNotifications>0&&<button className="dashboard-refresh" onClick={()=>void markAllNotificationsRead()}>Mark all read</button>}</div><div className="recent-activity-list">{notifications.map(item=><div key={item.id} className={item.read_at?"notification-read":"notification-unread"}><span className="activity-dot">{item.level==="warning"?"!":"•"}</span><b>{item.title}</b><span>{item.detail}</span><time><button className="dashboard-refresh" onClick={()=>onNavigate(item.module)}>Open →</button>{!item.read_at&&<button className="dashboard-refresh" onClick={()=>void markNotificationRead(item.id)}>Mark read</button>}</time></div>)}</div></section>}
   {recentActivity.length>0&&<section className="recent-activity"><div className="dashboard-section-head"><div><span className="section-kicker">AUDIT STREAM</span><h2>Recent activity</h2><p>Latest recorded workspace events</p></div>{allowedModules.includes("Audit Trail")&&<button className="dashboard-refresh" onClick={()=>onNavigate("Audit Trail")}>Open audit trail →</button>}</div><div className="recent-activity-list">{recentActivity.map(item=><div key={item.id}><span className="activity-dot">•</span><b>{String(item.action||"Activity").replaceAll("_"," ")}</b><span>{item.entity_type||"Business record"}</span><time>{new Date(item.created_at).toLocaleString("en-PK",{dateStyle:"short",timeStyle:"short"})}</time></div>)}</div></section>}
   <div className="dashboard-lower"><article className="pulse-card"><div className="pulse-heading"><span className="pulse-spark">✦</span><div><small>SMART BUSINESS PULSE</small><h3>Operations insight</h3></div><span className="pulse-live">LIVE</span></div><p>{loading?"Preparing your operations summary…":pulse}</p><div className="pulse-actions"><button onClick={()=>onNavigate(low>0?"Inventory":pending>0?"Distribution":"Sales")}>{low>0?"Review stock alerts":pending>0?"Review deliveries":"Open sales workspace"} <span>→</span></button><button onClick={()=>onNavigate("Reports")}>View reports <span>→</span></button></div></article>

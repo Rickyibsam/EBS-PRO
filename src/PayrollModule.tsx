@@ -57,8 +57,19 @@ export default function PayrollModule({db,tenantId,currentRole}:{db:SupabaseClie
  }
  async function postRun(){
   if(!selected)return;setSaving(true);setNotice("");
-  try{const {data,error}=await db.rpc("post_payroll_run",{p_payroll_run_id:selected});if(error)throw error;if(data?.success!==true)throw new Error("Payroll posting was not confirmed.");setNotice("Payroll run posted to the general ledger.");await load();await loadLines(selected);}
-  catch(err){setNotice(err instanceof Error?err.message:"Payroll posting failed.");}finally{setSaving(false);}
+  try{
+   // Apply eligible customer-return commission clawbacks before the payroll journal is posted.
+   // The database function is idempotent per target/payroll run and locks the draft run.
+   const {data:adjustment,error:adjustmentError}=await db.rpc("apply_commission_return_adjustments",{p_payroll_run_id:selected});
+   if(adjustmentError)throw adjustmentError;
+   if(adjustment?.success!==true)throw new Error("Commission return adjustments were not confirmed.");
+   const {data,error}=await db.rpc("post_payroll_run",{p_payroll_run_id:selected});
+   if(error)throw error;
+   if(data?.success!==true)throw new Error("Payroll posting was not confirmed.");
+   setNotice("Payroll posted to the general ledger. Commission return deductions applied: "+money(Number(adjustment.applied_amount||0))+".");
+   await load();await loadLines(selected);
+  }catch(err){setNotice(err instanceof Error?err.message:"Payroll posting failed. Draft payroll remains available for review.");}
+  finally{setSaving(false);}
  }
  async function payLine(line:Row){
   const method=window.prompt("Payment method: cash, bank, cheque or online","bank");if(!method)return;
