@@ -21,9 +21,10 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
  const [metrics,setMetrics]=useState<Metric[]>([]),[recentActivity,setRecentActivity]=useState<any[]>([]),[notifications,setNotifications]=useState<Notice[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState("");
  const [updatedAt,setUpdatedAt]=useState("");
  const [monthlyTrend,setMonthlyTrend]=useState<MonthlyTrend[]>([]);
+ const [trendMonths,setTrendMonths]=useState<6|12>(6);
  const [expandedLauncher,setExpandedLauncher]=useState("1. Dashboard & Management");
  useEffect(()=>{let live=true;async function load(){setLoading(true);setError("");try{
-  const now=new Date(),today=localDate(now),since=new Date(now.getTime()-24*60*60*1000).toISOString(),monthStart=localDate(new Date(now.getFullYear(),now.getMonth(),1)),trendStart=localDate(new Date(now.getFullYear(),now.getMonth()-5,1)),weekStartDate=new Date(now);weekStartDate.setDate(now.getDate()-((now.getDay()+6)%7));const weekStart=localDate(weekStartDate);
+  const now=new Date(),today=localDate(now),since=new Date(now.getTime()-24*60*60*1000).toISOString(),monthStart=localDate(new Date(now.getFullYear(),now.getMonth(),1)),trendStart=localDate(new Date(now.getFullYear(),now.getMonth()-(trendMonths-1),1)),weekStartDate=new Date(now);weekStartDate.setDate(now.getDate()-((now.getDay()+6)%7));const weekStart=localDate(weekStartDate);
   const [sales,salesPeriod,orders,purchases,purchaseInvoices,products,customers,vendors,receipts,deliveries,lowStock,activity,inventoryValuation,coa,journalLines,pendingOrders,overdueInvoices,trendSales,trendPurchases,trendPayments]=await Promise.all([
    db.from("sales_invoices").select("id,grand_total,status,invoice_date",{count:"exact"}).eq("tenant_id",tenantId).eq("invoice_date",today).eq("status","posted"),
    db.from("sales_invoices").select("grand_total,invoice_date").eq("tenant_id",tenantId).eq("status","posted").gte("invoice_date",monthStart).lte("invoice_date",today),
@@ -52,7 +53,7 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
   const monthSales=(salesPeriod.data??[]).reduce((s,x)=>s+Number(x.grand_total||0),0);
   const dayReceipts=(receipts.data??[]).filter(x=>x.payment_type==="receipt").reduce((s,x)=>s+Number(x.amount||0),0);
   const dayPurchases=(purchaseInvoices.data??[]).reduce((s,x)=>s+Number(x.grand_total||0),0);
-  const trendRows:MonthlyTrend[]=Array.from({length:6},(_,index)=>{const monthDate=new Date(now.getFullYear(),now.getMonth()-5+index,1),key=localDate(monthDate).slice(0,7);const sumFor=(rows:any[],dateKey:string,valueKey:string)=>rows.filter((row:any)=>String(row[dateKey]||"").slice(0,7)===key).reduce((sum:number,row:any)=>sum+Number(row[valueKey]||0),0);const cashRows=trendPayments.data??[];return{label:monthDate.toLocaleDateString("en-PK",{month:"short"}),sales:sumFor(trendSales.data??[],"invoice_date","grand_total"),purchases:sumFor(trendPurchases.data??[],"invoice_date","grand_total"),receipts:sumFor(cashRows.filter(row=>row.payment_type==="receipt"),"payment_date","amount"),payments:sumFor(cashRows.filter(row=>row.payment_type==="payment"),"payment_date","amount")};});
+  const trendRows:MonthlyTrend[]=Array.from({length:trendMonths},(_,index)=>{const monthDate=new Date(now.getFullYear(),now.getMonth()-5+index,1),key=localDate(monthDate).slice(0,7);const sumFor=(rows:any[],dateKey:string,valueKey:string)=>rows.filter((row:any)=>String(row[dateKey]||"").slice(0,7)===key).reduce((sum:number,row:any)=>sum+Number(row[valueKey]||0),0);const cashRows=trendPayments.data??[];return{label:monthDate.toLocaleDateString("en-PK",{month:"short"}),sales:sumFor(trendSales.data??[],"invoice_date","grand_total"),purchases:sumFor(trendPurchases.data??[],"invoice_date","grand_total"),receipts:sumFor(cashRows.filter(row=>row.payment_type==="receipt"),"payment_date","amount"),payments:sumFor(cashRows.filter(row=>row.payment_type==="payment"),"payment_date","amount")};});
   const accountTypes=new Map((coa.data??[]).map(x=>[x.id,x.account_type]));
   const netProfit=(journalLines.data??[]).reduce((sum,x)=>{const type=accountTypes.get(x.account_id);return sum+(type==="income"?Number(x.credit||0)-Number(x.debit||0):type==="expense"?Number(x.debit||0)-Number(x.credit||0):0);},0);
   const stockValue=inventoryValuation.error?null:Number(inventoryValuation.data?.total_value||0),profitValue=coa.error||journalLines.error?null:netProfit;
@@ -98,7 +99,7 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
   }
  }catch(e){if(live)setError(e instanceof Error?e.message:"Dashboard could not load.");}finally{if(live)setLoading(false);}}
  void load();return()=>{live=false;};
- },[db,tenantId]);
+ },[db,tenantId,trendMonths]);
  async function markNotificationRead(id:string){
   const {data:auth}=await db.auth.getUser();if(!auth.user)return;
   const readAt=new Date().toISOString();
@@ -123,7 +124,7 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
   {error&&<div className="notice">{error}</div>}
   {loading?<div className="dashboard-loading"><span className="loading-pulse"/> Reading live business data…</div>:<div className="ai-metric-grid">{metrics.map(m=><article className="ai-metric" key={m.label}><div className={"metric-icon "+m.tone}>{m.icon}</div><div className="metric-label">{m.label}</div><strong>{m.value}</strong><small>{m.detail}</small><span className="metric-glow"/></article>)}</div>}
   <section className="dashboard-analytics">
-   <div className="dashboard-section-head"><div><span className="section-kicker">FINANCE & DISTRIBUTION</span><h2>Performance analysis</h2><p>Six-month view from posted invoices and recorded payments</p></div><span className="dashboard-period-label">LAST 6 MONTHS</span></div>
+   <div className="dashboard-section-head"><div><span className="section-kicker">FINANCE & DISTRIBUTION</span><h2>Performance analysis</h2><p>{trendMonths}-month view from posted invoices and recorded payments</p></div><div className="dashboard-period-switch" role="group" aria-label="Chart date range"><button type="button" className={trendMonths===6?"active":""} aria-pressed={trendMonths===6} onClick={()=>setTrendMonths(6)}>6M</button><button type="button" className={trendMonths===12?"active":""} aria-pressed={trendMonths===12} onClick={()=>setTrendMonths(12)}>12M</button></div></div>
    <div className="dashboard-chart-grid">
     <article className="dashboard-chart-card"><div className="dashboard-chart-title"><div><small>REVENUE VS PROCUREMENT</small><h3>Sales and purchases</h3></div><div className="dashboard-legend"><span><i className="legend-sales"/>Sales</span><span><i className="legend-purchases"/>Purchases</span></div></div>
      {monthlyTrend.some(m=>m.sales||m.purchases)?<div className="dashboard-bars" role="img" aria-label="Monthly posted sales and purchase invoice totals">{monthlyTrend.map(m=>{const max=Math.max(1,...monthlyTrend.flatMap(x=>[x.sales,x.purchases]));return <div className="dashboard-bar-month" key={m.label}><div className="dashboard-bar-pair"><div className="dashboard-bar-track"><span className="dashboard-bar sales-bar" style={{height:Math.max(3,m.sales/max*100)+"%"}} title={"Sales "+money(m.sales)}/></div><div className="dashboard-bar-track"><span className="dashboard-bar purchase-bar" style={{height:Math.max(3,m.purchases/max*100)+"%"}} title={"Purchases "+money(m.purchases)}/></div></div><small>{m.label}</small></div>;})}</div>:<div className="dashboard-chart-empty">No posted sales or purchase invoices in this period.</div>}
