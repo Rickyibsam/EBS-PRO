@@ -26,6 +26,12 @@ test("Booker workflow calculates server totals and replays idempotently after ro
   assert.ok(smoke.includes("client_request_id=v_order_request"));
 });
 
+test("database voucher RPC rejects direct updates denied by custom permissions", () => {
+  assert.ok(smoke.includes("tenant_user_module_permissions"));
+  assert.ok(smoke.includes("public.update_draft_voucher_lines("));
+  assert.ok(smoke.includes("direct voucher RPC bypassed custom update denial"));
+});
+
 test("purchase workflow posts GRN stock, supplier invoice, and purchase return", () => {
   assert.ok(smoke.includes("public.post_goods_receipt(v_grn)"));
   assert.ok(smoke.includes("public.create_purchase_invoice("));
