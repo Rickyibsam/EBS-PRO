@@ -69,6 +69,8 @@ declare
   v_budget uuid := gen_random_uuid();
   v_budget_company_supported boolean;
   v_budget_branch_supported boolean;
+  v_backup jsonb;
+  v_restore jsonb;
 begin
   select user_id into v_user
   from public.tenant_memberships
@@ -358,6 +360,21 @@ begin
   end if;
   if v_budget_branch_supported is distinct from true then
     raise exception 'FAIL: branch budget did not recognize source-inferred branch attribution';
+  end if;
+
+  -- Export/restore round-trip: same-tenant additive restore must be complete and idempotent.
+  v_backup:=public.export_tenant_backup(v_tenant_a);
+  if v_backup->>'format'<>'EBS-PRO-TENANT-BACKUP-V1'
+     or v_backup->>'tenant_id'<>v_tenant_a::text
+     or jsonb_typeof(v_backup->'tables')<>'object' then
+    raise exception 'FAIL: tenant backup export format or ownership is invalid';
+  end if;
+  v_restore:=public.restore_tenant_backup(v_tenant_a,v_backup);
+  if coalesce((v_restore->>'success')::boolean,false) is not true
+     or coalesce((v_restore->>'complete')::boolean,false) is not true
+     or coalesce((v_restore->>'imported_rows')::integer,-1)<>0
+     or v_restore->>'mode'<>'additive_only_no_overwrite_no_delete' then
+    raise exception 'FAIL: same-tenant backup restore was not complete and idempotent: %',v_restore;
   end if;
 
   -- Balanced journal must post and preserve double-entry equality.
