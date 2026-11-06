@@ -158,7 +158,7 @@ begin
   where id=v_purchase_order and tenant_id=v_tenant_a;
   insert into public.goods_receipts(id,tenant_id,purchase_order_id,warehouse_id,grn_number,received_date,status,received_by)
   values(v_grn,v_tenant_a,v_purchase_order,
-    (select id from public.warehouses where tenant_id=v_tenant_a and code='TX-WH'),
+    v_warehouse,
     'TX-GRN-001',current_date,'draft',v_user);
   insert into public.goods_receipt_lines(id,tenant_id,goods_receipt_id,product_id,unit_id,quantity,conversion_to_base,accepted_quantity,rejected_quantity,unit_cost,purchase_order_line_id)
   values(v_grn_line,v_tenant_a,v_grn,v_product,v_unit,5,1,5,0,20,v_purchase_order_line);
