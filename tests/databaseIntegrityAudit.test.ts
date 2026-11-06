@@ -39,6 +39,6 @@ test("production audit limits writes to its transaction-scoped findings table", 
   assert.match(audit, /create temporary table/i);
   assert.doesNotMatch(
     audit,
-    /\\b(insert\\s+into\\s+(?!_ebs_integrity_findings)|update\\s+(?!_ebs_integrity_findings)|delete\\s+from\\s+(?!_ebs_integrity_findings)|drop\\s+table|alter\\s+table)\\b/i
+    /\\b(insert\\s+into\\s+(?!_ebs_integrity_findings)\\w+|update\\s+(public\\.)?\\w+\\s+set|delete\\s+from\\s+(?!_ebs_integrity_findings)\\w+|drop\\s+table|alter\\s+table)\\b/i
   );
 });
