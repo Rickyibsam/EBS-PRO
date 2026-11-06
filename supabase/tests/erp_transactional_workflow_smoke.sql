@@ -39,6 +39,15 @@ declare
   v_grni_account uuid := gen_random_uuid();
   v_tax_account uuid := gen_random_uuid();
   v_ap_account uuid := gen_random_uuid();
+  v_cogs_account uuid := gen_random_uuid();
+  v_ar_account uuid := gen_random_uuid();
+  v_sales_tax_account uuid := gen_random_uuid();
+  v_delivery_result jsonb;
+  v_delivery_id uuid;
+  v_delivery_line uuid;
+  v_dispatch_result jsonb;
+  v_complete_result jsonb;
+  v_sales_invoice_id uuid;
   v_rejected boolean := false;
 begin
   select user_id into v_user
@@ -131,7 +140,10 @@ begin
     (v_inventory_account,v_tenant_a,'1200','Inventory','asset'),
     (v_grni_account,v_tenant_a,'2100','Goods Received Not Invoiced','liability'),
     (v_tax_account,v_tenant_a,'1300','Input Tax','asset'),
-    (v_ap_account,v_tenant_a,'2000','Accounts Payable','liability');
+    (v_ap_account,v_tenant_a,'2000','Accounts Payable','liability'),
+    (v_cogs_account,v_tenant_a,'5000','Cost of Goods Sold','expense'),
+    (v_ar_account,v_tenant_a,'1100','Accounts Receivable','asset'),
+    (v_sales_tax_account,v_tenant_a,'2200','Sales Tax Payable','liability');
 
   -- Purchase -> GRN -> stock ledger -> supplier invoice -> GL workflow.
   insert into public.parties(id,tenant_id,party_code,party_type,name)
@@ -185,6 +197,35 @@ begin
   if not exists(select 1 from public.journal_entries where tenant_id=v_tenant_a
     and source_type='purchase_return' and source_id=v_debit_note and status='posted') then
     raise exception 'FAIL: purchase return did not create a GL journal';
+  end if;
+
+  -- Sales order -> delivery allocation -> stock dispatch -> invoice/AR/revenue.
+  update public.sales_orders set status='approved',approved_by=v_user
+  where id=v_order_first and tenant_id=v_tenant_a;
+  v_delivery_result:=public.create_delivery_for_approved_order(v_order_first,v_employee);
+  v_delivery_id:=(v_delivery_result->>'delivery_id')::uuid;
+  select id into v_delivery_line from public.delivery_lines
+  where tenant_id=v_tenant_a and delivery_id=v_delivery_id;
+  v_dispatch_result:=public.dispatch_delivery(
+    v_delivery_id,
+    jsonb_build_array(jsonb_build_object('line_id',v_delivery_line,'picked_quantity_base',2))
+  );
+  if not exists(select 1 from public.stock_movements where tenant_id=v_tenant_a
+    and reference_type='delivery' and reference_id=v_delivery_id and movement_type='sale_dispatch' and quantity_out=2) then
+    raise exception 'FAIL: delivery dispatch did not issue stock';
+  end if;
+  v_complete_result:=public.complete_delivery(
+    v_delivery_id,
+    jsonb_build_array(jsonb_build_object('line_id',v_delivery_line,'delivered_quantity_base',2))
+  );
+  v_sales_invoice_id:=(v_complete_result->>'invoice_id')::uuid;
+  if not exists(select 1 from public.sales_invoices where id=v_sales_invoice_id
+    and tenant_id=v_tenant_a and status='posted' and grand_total=117) then
+    raise exception 'FAIL: delivery completion did not create the expected posted invoice';
+  end if;
+  if not exists(select 1 from public.journal_entries where tenant_id=v_tenant_a
+    and source_type='sales_invoice' and source_id=v_sales_invoice_id and status='posted') then
+    raise exception 'FAIL: sales invoice did not create an AR/revenue journal';
   end if;
 
   -- Balanced journal must post and preserve double-entry equality.
