@@ -37,6 +37,7 @@ export default function PurchaseInvoiceModule({db,tenantId,currentRole}:{db:Supa
   finally{setSaving(false);}
  }
  async function post(id:string){
+  if(!canPost)return;
   setSaving(true);setNotice("");
   try{const {data,error}=await db.rpc("post_purchase_invoice",{p_purchase_invoice_id:id});if(error)throw error;if(data?.success!==true)throw new Error("Vendor invoice posting was not confirmed.");setNotice("Vendor invoice posted. GRNI cleared and accounts payable recognized.");await load();}
   catch(err){setNotice(err instanceof Error?err.message:"Vendor invoice posting failed.");}finally{setSaving(false);}

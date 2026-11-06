@@ -54,6 +54,7 @@ export default function PayrollModule({db,tenantId,currentRole}:{db:SupabaseClie
   finally{setSaving(false);}
  }
  async function updateLine(line:Row,field:"allowances"|"overtime"|"sales_incentive"|"deductions",value:string){
+  if(!canUpdate||activeRun?.status!=="draft")return;
   const amount=Number(value);if(!Number.isFinite(amount)||amount<0){setNotice("Payroll adjustment must be non-negative.");return;}
   const patch={ [field]:amount, net_salary:Number(line.basic_salary)+(field==="allowances"?amount:Number(line.allowances))+(field==="overtime"?amount:Number(line.overtime))+(field==="sales_incentive"?amount:Number(line.sales_incentive||0))-(field==="deductions"?amount:Number(line.deductions))};
   if(patch.net_salary<0){setNotice("Deductions cannot exceed gross salary.");return;}
@@ -61,7 +62,7 @@ export default function PayrollModule({db,tenantId,currentRole}:{db:SupabaseClie
   if(error)setNotice(error.message);else{setLines(old=>old.map(x=>x.id===line.id?{...x,...patch}:x));setNotice("Payroll line updated.");}
  }
  async function postRun(){
-  if(!selected)return;setSaving(true);setNotice("");
+  if(!canUpdate||!selected)return;setSaving(true);setNotice("");
   try{
    // Apply eligible customer-return commission clawbacks before the payroll journal is posted.
    // The database function is idempotent per target/payroll run and locks the draft run.
@@ -77,6 +78,7 @@ export default function PayrollModule({db,tenantId,currentRole}:{db:SupabaseClie
   finally{setSaving(false);}
  }
  async function payLine(line:Row){
+  if(!canUpdate||activeRun?.status!=="posted"||line.payment_status!=="unpaid")return;
   const method=window.prompt("Payment method: cash, bank, cheque or online","bank");if(!method)return;
   const reference=window.prompt("Payment reference (optional)","")||null;setSaving(true);setNotice("");
   try{const {data,error}=await db.rpc("pay_payroll_line",{p_payroll_line_id:line.id,p_method:method.trim().toLowerCase(),p_reference:reference});if(error)throw error;if(data?.success!==true)throw new Error("Salary payment was not confirmed.");setNotice("Salary payment posted to cash/bank and payroll payable.");await loadLines(selected);}

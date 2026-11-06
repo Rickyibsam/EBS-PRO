@@ -93,6 +93,7 @@ export default function ReturnsModule({ db, tenantId, currentRole }: { db: Supab
   }
 
   async function postNote(id:string){
+    if(!canPost)return;
     setSaving(true);setNotice("");
     try{const {data,error}=await db.rpc("post_sales_credit_note",{p_credit_note_id:id});if(error)throw error;if(data?.success!==true)throw new Error("Credit note posting was not confirmed.");setNotice("Credit note posted. Customer balance and returned stock/accounting have been updated.");await load();}
     catch(e){setNotice(e instanceof Error?e.message:"Credit note posting failed.");}
