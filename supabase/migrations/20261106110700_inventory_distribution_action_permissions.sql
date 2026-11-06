@@ -43,5 +43,5 @@ begin
  if position('when ''stock_transfer'' then' in v_definition)=0 then raise exception 'Expected branch inference stock transfer block not found.'; end if;
  execute replace(v_definition,
   'when ''stock_transfer'' then',
-  'when ''stock_take'' then select w.branch_id into v_branch from public.stock_takes t join public.warehouses w on w.id=t.warehouse_id and w.tenant_id=t.tenant_id where t.id=new.source_id and t.tenant_id=new.tenant_id;\n  when ''stock_transfer'' then');
+  'when ''stock_take'' then select w.branch_id into v_branch from public.stock_takes t join public.warehouses w on w.id=t.warehouse_id and w.tenant_id=t.tenant_id where t.id=new.source_id and t.tenant_id=new.tenant_id;' || chr(10) || '  when ''stock_transfer'' then');
 end $$;
