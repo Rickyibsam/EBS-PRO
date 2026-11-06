@@ -71,6 +71,7 @@ declare
   v_budget_branch_supported boolean;
   v_backup jsonb;
   v_restore jsonb;
+  v_permission_rejected boolean := false;
 begin
   select user_id into v_user
   from public.tenant_memberships
@@ -140,6 +141,21 @@ begin
     raise exception 'FAIL: Booker order totals were not calculated by the server';
   end if;
   select warehouse_id into v_warehouse from public.sales_orders where id=v_order_first;
+
+  -- Direct voucher RPC must enforce custom per-user update denial, not rely on UI.
+  insert into public.tenant_user_module_permissions(
+    tenant_id,user_id,module_key,can_view,can_create,can_update,can_delete
+  ) values(v_tenant_a,v_booker_user,'sales_customer',true,true,false,false);
+  v_permission_rejected:=false;
+  begin
+    perform public.update_draft_voucher_lines(v_tenant_a,'sales_orders',v_order_first,'[]'::jsonb);
+  exception when insufficient_privilege then
+    v_permission_rejected:=true;
+  end;
+  if not v_permission_rejected then
+    raise exception 'FAIL: direct voucher RPC bypassed custom update denial';
+  end if;
+
   update public.sales_routes set is_active=false
   where tenant_id=v_tenant_a and id=v_route;
   v_order_retry:=public.create_order_booker_order(
