@@ -42,6 +42,13 @@ test("sales workflow dispatches stock and creates a posted invoice", () => {
   assert.ok(smoke.includes("sales invoice did not create an AR/revenue journal"));
 });
 
+test("payroll workflow posts accrual, pays once, and rejects invalid calculations", () => {
+  assert.ok(smoke.includes("public.post_payroll_run(v_payroll_run)"));
+  assert.ok(smoke.includes("public.pay_payroll_line(v_payroll_line"));
+  assert.ok(smoke.includes("already_paid"));
+  assert.ok(smoke.includes("invalid payroll arithmetic was not safely rejected"));
+});
+
 test("accounting workflow posts balanced journals and rejects unbalanced journals", () => {
   assert.ok(smoke.includes("public.post_journal_entry(v_journal_ok)"));
   assert.ok(smoke.includes("public.post_journal_entry(v_journal_bad)"));
