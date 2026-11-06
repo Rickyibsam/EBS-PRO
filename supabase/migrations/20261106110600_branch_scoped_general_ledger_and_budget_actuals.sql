@@ -74,7 +74,7 @@ $function$;
 revoke all on function private.assign_journal_entry_branch() from public,anon,authenticated;
 drop trigger if exists journal_entries_branch_inference on public.journal_entries;
 create trigger journal_entries_branch_inference
-before insert or update of branch_id,source_type,source_id,tenant_id
+before insert or update
 on public.journal_entries
 for each row execute function private.assign_journal_entry_branch();
 
