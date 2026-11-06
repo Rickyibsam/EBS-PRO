@@ -2,6 +2,7 @@ import {useEffect,useMemo,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 type Metric={label:string;value:string;detail:string;icon:string;tone:string};
 type Notice={id:string;title:string;detail:string;module:string;level:"warning"|"info";read_at?:string|null};
+type MonthlyTrend={label:string;sales:number;purchases:number;receipts:number;payments:number};
 const money=(v:number)=>"PKR "+Number(v||0).toLocaleString("en-PK",{maximumFractionDigits:0});
 const localDate=(d:Date)=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");
 const launchers=[
@@ -19,9 +20,10 @@ const launchers=[
 export default function DashboardModule({db,tenantId,company,allowedModules,onNavigate}:{db:SupabaseClient;tenantId:string;company:string;allowedModules:string[];onNavigate:(module:string)=>void}){
  const [metrics,setMetrics]=useState<Metric[]>([]),[recentActivity,setRecentActivity]=useState<any[]>([]),[notifications,setNotifications]=useState<Notice[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState("");
  const [updatedAt,setUpdatedAt]=useState("");
+ const [monthlyTrend,setMonthlyTrend]=useState<MonthlyTrend[]>([]);
  const [expandedLauncher,setExpandedLauncher]=useState("1. Dashboard & Management");
  useEffect(()=>{let live=true;async function load(){setLoading(true);setError("");try{
-  const now=new Date(),today=localDate(now),since=new Date(now.getTime()-24*60*60*1000).toISOString(),monthStart=localDate(new Date(now.getFullYear(),now.getMonth(),1)),weekStartDate=new Date(now);weekStartDate.setDate(now.getDate()-((now.getDay()+6)%7));const weekStart=localDate(weekStartDate);
+  const now=new Date(),today=localDate(now),since=new Date(now.getTime()-24*60*60*1000).toISOString(),monthStart=localDate(new Date(now.getFullYear(),now.getMonth(),1)),trendStart=localDate(new Date(now.getFullYear(),now.getMonth()-5,1)),weekStartDate=new Date(now);weekStartDate.setDate(now.getDate()-((now.getDay()+6)%7));const weekStart=localDate(weekStartDate);
   const [sales,salesPeriod,orders,purchases,purchaseInvoices,products,customers,vendors,receipts,deliveries,lowStock,activity,inventoryValuation,coa,journalLines,pendingOrders,overdueInvoices]=await Promise.all([
    db.from("sales_invoices").select("id,grand_total,status,invoice_date",{count:"exact"}).eq("tenant_id",tenantId).eq("invoice_date",today).eq("status","posted"),
    db.from("sales_invoices").select("grand_total,invoice_date").eq("tenant_id",tenantId).eq("status","posted").gte("invoice_date",monthStart).lte("invoice_date",today),
@@ -39,7 +41,10 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
    db.from("chart_of_accounts").select("id,account_type").eq("tenant_id",tenantId),
    db.from("journal_lines").select("account_id,debit,credit,journal_entries!inner(entry_date,status)").eq("tenant_id",tenantId).eq("journal_entries.status","posted").eq("journal_entries.entry_date",today),
    db.from("sales_orders").select("id,order_number,status").eq("tenant_id",tenantId).in("status",["draft","submitted"]).limit(100),
-   db.from("sales_invoices").select("id,invoice_number,due_date,grand_total").eq("tenant_id",tenantId).eq("status","posted").lt("due_date",today).limit(1000)
+   db.from("sales_invoices").select("id,invoice_number,due_date,grand_total").eq("tenant_id",tenantId).eq("status","posted").lt("due_date",today).limit(1000),
+   db.from("sales_invoices").select("grand_total,invoice_date").eq("tenant_id",tenantId).eq("status","posted").gte("invoice_date",trendStart).lte("invoice_date",today),
+   db.from("purchase_invoices").select("grand_total,invoice_date").eq("tenant_id",tenantId).eq("status","posted").gte("invoice_date",trendStart).lte("invoice_date",today),
+   db.from("payments").select("amount,payment_type,payment_date").eq("tenant_id",tenantId).gte("payment_date",trendStart).lte("payment_date",today)
   ]);
   const err=[sales,salesPeriod,orders,purchases,purchaseInvoices,products,customers,vendors,receipts,deliveries].find(x=>x.error);if(err)throw err.error;
   const daySales=(sales.data??[]).reduce((s,x)=>s+Number(x.grand_total||0),0);
@@ -47,6 +52,7 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
   const monthSales=(salesPeriod.data??[]).reduce((s,x)=>s+Number(x.grand_total||0),0);
   const dayReceipts=(receipts.data??[]).filter(x=>x.payment_type==="receipt").reduce((s,x)=>s+Number(x.amount||0),0);
   const dayPurchases=(purchaseInvoices.data??[]).reduce((s,x)=>s+Number(x.grand_total||0),0);
+  const trendRows:MonthlyTrend[]=Array.from({length:6},(_,index)=>{const monthDate=new Date(now.getFullYear(),now.getMonth()-5+index,1),key=localDate(monthDate).slice(0,7);const sumFor=(rows:any[],dateKey:string,valueKey:string)=>rows.filter(row=>String(row[dateKey]||"").slice(0,7)===key).reduce((sum,row)=>sum+Number(row[valueKey]||0),0);const cashRows=trendPayments.data??[];return{label:monthDate.toLocaleDateString("en-PK",{month:"short"}),sales:sumFor(trendSales.data??[],"invoice_date","grand_total"),purchases:sumFor(trendPurchases.data??[],"invoice_date","grand_total"),receipts:sumFor(cashRows.filter(row=>row.payment_type==="receipt"),"payment_date","amount"),payments:sumFor(cashRows.filter(row=>row.payment_type==="payment"),"payment_date","amount")};});
   const accountTypes=new Map((coa.data??[]).map(x=>[x.id,x.account_type]));
   const netProfit=(journalLines.data??[]).reduce((sum,x)=>{const type=accountTypes.get(x.account_id);return sum+(type==="income"?Number(x.credit||0)-Number(x.debit||0):type==="expense"?Number(x.debit||0)-Number(x.credit||0):0);},0);
   const stockValue=inventoryValuation.error?null:Number(inventoryValuation.data?.total_value||0),profitValue=coa.error||journalLines.error?null:netProfit;
@@ -88,7 +94,7 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
     if(inboxError)throw inboxError;
     setNotifications((inbox||[]).map(item=>({id:item.id,title:item.title,detail:item.body,module:item.module_key,level:item.severity==="warning"?"warning":"info",read_at:item.read_at})));
    }
-   setMetrics(next);setRecentActivity(activity.data??[]);setUpdatedAt(now.toLocaleTimeString("en-PK",{hour:"2-digit",minute:"2-digit"}));
+   setMetrics(next);setMonthlyTrend(trendRows);setRecentActivity(activity.data??[]);setUpdatedAt(now.toLocaleTimeString("en-PK",{hour:"2-digit",minute:"2-digit"}));
   }
  }catch(e){if(live)setError(e instanceof Error?e.message:"Dashboard could not load.");}finally{if(live)setLoading(false);}}
  void load();return()=>{live=false;};
@@ -116,6 +122,18 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
   <div className="dashboard-section-head"><div><span className="section-kicker">LIVE PERFORMANCE</span><h2>Business snapshot</h2><p>Posted invoices, open workflows and current stock signals</p></div><button className="dashboard-refresh" onClick={()=>window.location.reload()}>↻ Refresh view</button></div>
   {error&&<div className="notice">{error}</div>}
   {loading?<div className="dashboard-loading"><span className="loading-pulse"/> Reading live business data…</div>:<div className="ai-metric-grid">{metrics.map(m=><article className="ai-metric" key={m.label}><div className={"metric-icon "+m.tone}>{m.icon}</div><div className="metric-label">{m.label}</div><strong>{m.value}</strong><small>{m.detail}</small><span className="metric-glow"/></article>)}</div>}
+  <section className="dashboard-analytics">
+   <div className="dashboard-section-head"><div><span className="section-kicker">FINANCE & DISTRIBUTION</span><h2>Performance analysis</h2><p>Six-month view from posted invoices and recorded payments</p></div><span className="dashboard-period-label">LAST 6 MONTHS</span></div>
+   <div className="dashboard-chart-grid">
+    <article className="dashboard-chart-card"><div className="dashboard-chart-title"><div><small>REVENUE VS PROCUREMENT</small><h3>Sales and purchases</h3></div><div className="dashboard-legend"><span><i className="legend-sales"/>Sales</span><span><i className="legend-purchases"/>Purchases</span></div></div>
+     {monthlyTrend.some(m=>m.sales||m.purchases)?<div className="dashboard-bars" role="img" aria-label="Monthly posted sales and purchase invoice totals">{monthlyTrend.map(m=>{const max=Math.max(1,...monthlyTrend.flatMap(x=>[x.sales,x.purchases]));return <div className="dashboard-bar-month" key={m.label}><div className="dashboard-bar-pair"><div className="dashboard-bar-track"><span className="dashboard-bar sales-bar" style={{height:Math.max(3,m.sales/max*100)+"%"}} title={"Sales "+money(m.sales)}/></div><div className="dashboard-bar-track"><span className="dashboard-bar purchase-bar" style={{height:Math.max(3,m.purchases/max*100)+"%"}} title={"Purchases "+money(m.purchases)}/></div></div><small>{m.label}</small></div>;})}</div>:<div className="dashboard-chart-empty">No posted sales or purchase invoices in this period.</div>}
+    </article>
+    <article className="dashboard-chart-card"><div className="dashboard-chart-title"><div><small>CASH MOVEMENT</small><h3>Receipts and payments</h3></div><div className="dashboard-legend"><span><i className="legend-receipts"/>Receipts</span><span><i className="legend-payments"/>Payments</span></div></div>
+     {monthlyTrend.some(m=>m.receipts||m.payments)?<div className="dashboard-bars" role="img" aria-label="Monthly recorded receipts and payment totals">{monthlyTrend.map(m=>{const max=Math.max(1,...monthlyTrend.flatMap(x=>[x.receipts,x.payments]));return <div className="dashboard-bar-month" key={m.label}><div className="dashboard-bar-pair"><div className="dashboard-bar-track"><span className="dashboard-bar receipt-bar" style={{height:Math.max(3,m.receipts/max*100)+"%"}} title={"Receipts "+money(m.receipts)}/></div><div className="dashboard-bar-track"><span className="dashboard-bar payment-bar" style={{height:Math.max(3,m.payments/max*100)+"%"}} title={"Payments "+money(m.payments)}/></div></div><small>{m.label}</small></div>;})}</div>:<div className="dashboard-chart-empty">No receipts or payments recorded in this period.</div>}
+    </article>
+   </div>
+   <div className="dashboard-finance-strip">{["Sales today","Purchases today","Receipts today","Stock value"].map(label=>{const metric=metrics.find(item=>item.label===label);return <div key={label}><small>{label}</small><strong>{metric?.value||"—"}</strong><span>{metric?.detail||"Live company data"}</span></div>;})}</div>
+  </section>
   {notifications.length>0&&<section className="recent-activity"><div className="dashboard-section-head"><div><span className="section-kicker">ACTION CENTRE</span><h2>Notification inbox</h2><p>{unreadNotifications} unread · {notifications.length} saved notification(s)</p></div>{unreadNotifications>0&&<button className="dashboard-refresh" onClick={()=>void markAllNotificationsRead()}>Mark all read</button>}</div><div className="recent-activity-list">{notifications.map(item=><div key={item.id} className={item.read_at?"notification-read":"notification-unread"}><span className="activity-dot">{item.level==="warning"?"!":"•"}</span><b>{item.title}</b><span>{item.detail}</span><time><button className="dashboard-refresh" onClick={()=>onNavigate(item.module)}>Open →</button>{!item.read_at&&<button className="dashboard-refresh" onClick={()=>void markNotificationRead(item.id)}>Mark read</button>}</time></div>)}</div></section>}
   {recentActivity.length>0&&<section className="recent-activity"><div className="dashboard-section-head"><div><span className="section-kicker">AUDIT STREAM</span><h2>Recent activity</h2><p>Latest recorded workspace events</p></div>{allowedModules.includes("Audit Trail")&&<button className="dashboard-refresh" onClick={()=>onNavigate("Audit Trail")}>Open audit trail →</button>}</div><div className="recent-activity-list">{recentActivity.map(item=><div key={item.id}><span className="activity-dot">•</span><b>{String(item.action||"Activity").replaceAll("_"," ")}</b><span>{item.entity_type||"Business record"}</span><time>{new Date(item.created_at).toLocaleString("en-PK",{dateStyle:"short",timeStyle:"short"})}</time></div>)}</div></section>}
   <div className="dashboard-lower"><article className="pulse-card"><div className="pulse-heading"><span className="pulse-spark">✦</span><div><small>SMART BUSINESS PULSE</small><h3>Operations insight</h3></div><span className="pulse-live">LIVE</span></div><p>{loading?"Preparing your operations summary…":pulse}</p><div className="pulse-actions"><button onClick={()=>onNavigate(low>0?"Inventory":pending>0?"Distribution":"Sales")}>{low>0?"Review stock alerts":pending>0?"Review deliveries":"Open sales workspace"} <span>→</span></button><button onClick={()=>onNavigate("Reports")}>View reports <span>→</span></button></div></article>
