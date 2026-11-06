@@ -1,0 +1,1 @@
+-- Database-side budget and fixed asset safeguards.
