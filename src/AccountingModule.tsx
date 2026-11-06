@@ -1,10 +1,14 @@
 import { FormEvent, useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {useModuleAction} from "./lib/modulePermissionContext";
 
 type Row = Record<string, any>;
 type TrialRow = { account_id: string; account_code: string; account_name: string; account_type: string; total_debit: number; total_credit: number; balance: number };
 
-export default function AccountingModule({ db, tenantId }: { db: SupabaseClient; tenantId: string }) {
+export default function AccountingModule({ db, tenantId,currentRole }: { db: SupabaseClient; tenantId: string;currentRole:string }) {
+  const roleCanManage=["owner","admin","manager","accounts"].includes(currentRole);
+  const canCreate=useModuleAction("accounts_finance","create",roleCanManage);
+  const canUpdate=useModuleAction("accounts_finance","update",roleCanManage);
   const [tab, setTab] = useState("journals");
   const [accounts, setAccounts] = useState<Row[]>([]);
   const [journals, setJournals] = useState<Row[]>([]);
@@ -94,6 +98,7 @@ export default function AccountingModule({ db, tenantId }: { db: SupabaseClient;
   }
 
   async function saveReconciliation(){
+    if(!canCreate)return;
     const amount=Number(statementBalance);if(!cashAccountId||!statementDate||!Number.isFinite(amount)){setNotice("Select an account and enter a valid statement balance.");return;}
     const book=cashRows.filter(x=>x.account_id===cashAccountId).reduce((n,x)=>n+Number(x.debit||0)-Number(x.credit||0),0);
     const {error}=await db.from("bank_reconciliations").insert({tenant_id:tenantId,account_id:cashAccountId,statement_date:statementDate,statement_balance:amount,book_balance:book,difference:amount-book,notes:reconNotes.trim()||null});
@@ -101,6 +106,7 @@ export default function AccountingModule({ db, tenantId }: { db: SupabaseClient;
   }
 
   async function postJournal(id: string) {
+    if(!canUpdate)return;
     setSaving(true); setNotice("");
     try {
       const { error } = await db.rpc("post_journal_entry", { p_journal_entry_id: id });
@@ -112,7 +118,7 @@ export default function AccountingModule({ db, tenantId }: { db: SupabaseClient;
   }
 
   async function saveAccount(e: FormEvent) {
-    e.preventDefault(); setSaving(true); setNotice("");
+    e.preventDefault(); if(!canCreate)return; setSaving(true); setNotice("");
     try {
       if (!accountForm.account_code.trim() || !accountForm.account_name.trim()) throw new Error("Enter account code and account name.");
       const { error } = await db.from("chart_of_accounts").insert({
@@ -129,7 +135,7 @@ export default function AccountingModule({ db, tenantId }: { db: SupabaseClient;
   }
 
   async function save(e: FormEvent) {
-    e.preventDefault(); setSaving(true); setNotice("");
+    e.preventDefault(); if(!canCreate)return; setSaving(true); setNotice("");
     try {
       const value = Number(amount);
       if (!debitAccount || !creditAccount || debitAccount === creditAccount || !Number.isFinite(value) || value <= 0 || !narration.trim()) {
@@ -169,7 +175,7 @@ export default function AccountingModule({ db, tenantId }: { db: SupabaseClient;
     </div>
 
     {tab === "journals" ? <>
-      <form className="transaction-form" onSubmit={save}>
+      {canCreate&&<form className="transaction-form" onSubmit={save}>
         <h3>New balanced journal draft</h3>
         <div className="form-grid">
           <label>Entry date<input type="date" value={date} onChange={e => setDate(e.target.value)} /></label>
@@ -188,7 +194,7 @@ export default function AccountingModule({ db, tenantId }: { db: SupabaseClient;
       </tbody></table></div>}
     </> : tab === "accounts" ? <>
       <h3>Chart of accounts</h3>
-      <form className="transaction-form" onSubmit={saveAccount}><div className="form-grid">
+      {canCreate&&<form className="transaction-form" onSubmit={saveAccount}><div className="form-grid">
         <label>Account code<input required value={accountForm.account_code} onChange={e => setAccountForm({ ...accountForm, account_code: e.target.value })} /></label>
         <label>Account name<input required value={accountForm.account_name} onChange={e => setAccountForm({ ...accountForm, account_name: e.target.value })} /></label>
         <label>Account type<select value={accountForm.account_type} onChange={e => setAccountForm({ ...accountForm, account_type: e.target.value })}><option value="asset">Asset</option><option value="liability">Liability</option><option value="equity">Equity</option><option value="income">Income</option><option value="expense">Expense</option></select></label>
