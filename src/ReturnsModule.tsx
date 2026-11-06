@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {useModuleAction} from "./lib/modulePermissionContext";
 
 type Row = Record<string, any>;
 type ReturnLine = Row & { product_name: string; unit_name: string; returned_quantity: number; return_quantity: string; return_to_stock: boolean };
@@ -20,7 +21,8 @@ export default function ReturnsModule({ db, tenantId, currentRole }: { db: Supab
   const [notice, setNotice] = useState("");
   const [printNote,setPrintNote] = useState<Row|null>(null);
   const [printLines,setPrintLines] = useState<Row[]>([]);
-  const canPost = ["owner","admin","manager","accounts"].includes(currentRole);
+  const canCreate=useModuleAction("sales_customer","create",["owner","admin","manager","sales"].includes(currentRole));
+  const canPost=useModuleAction("sales_customer","update",["owner","admin","manager","accounts"].includes(currentRole));
   const money = (v: number) => "PKR " + Number(v || 0).toLocaleString("en-PK",{minimumFractionDigits:2,maximumFractionDigits:2});
 
   async function load() {
@@ -65,7 +67,7 @@ export default function ReturnsModule({ db, tenantId, currentRole }: { db: Supab
   }
 
   async function createDraft(e:FormEvent){
-    e.preventDefault();setSaving(true);setNotice("");
+    e.preventDefault();if(!canCreate)return;setSaving(true);setNotice("");
     try{
       const lines=invoiceLines.filter(x=>Number(x.return_quantity)>0);
       if(!invoiceId||!reason.trim()||!lines.length)throw new Error("Select an invoice, enter a reason and enter at least one returned quantity.");
@@ -104,7 +106,7 @@ export default function ReturnsModule({ db, tenantId, currentRole }: { db: Supab
   return <section className="module-page">
     <div className="module-toolbar"><div><h2>Sales Returns & Credit Notes</h2><p>Record customer returns against posted invoices, issue credit notes and restore accepted goods to stock.</p></div><button onClick={()=>void load()}>↻ Refresh</button></div>
     {notice&&<div className="notice">{notice}</div>}
-    <form className="transaction-form" onSubmit={createDraft}>
+    {canCreate&&<form className="transaction-form" onSubmit={createDraft}>
       <h3>Create customer return / credit note</h3>
       <div className="form-grid">
         <label>Customer<select required value={selectedCustomerId} onChange={e=>{setSelectedCustomerId(e.target.value);setSelectedOrderId("");setInvoiceId("");setInvoiceLines([]);}}><option value="">Select customer</option>{customers.map(x=><option key={x.id} value={x.id}>{x.name} · {x.party_code}</option>)}</select></label>
@@ -119,7 +121,7 @@ export default function ReturnsModule({ db, tenantId, currentRole }: { db: Supab
       </tbody></table><div className="table-tools"><strong>Estimated credit note: {money(estimate)}</strong></div></div>}
       <button disabled={saving||!invoiceLines.length}>{saving?"Saving…":"Save credit note draft"}</button>
       <p className="module-footnote">Posting is restricted to owner, admin, manager and accounts roles. Accepted returns add stock at the original dispatch cost; price-only credits do not change stock.</p>
-    </form>
+    </form>}
     <div className="module-toolbar"><h3>Credit note register</h3><button onClick={exportNotes}>Export Excel (CSV)</button><button onClick={()=>window.print()}>Print / PDF</button></div>
     {loading?<div className="table-empty">Loading credit notes…</div>:<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Credit note</th><th>Date</th><th>Invoice</th><th>Customer</th><th>Reason</th><th>Amount</th><th>Status / action</th></tr></thead><tbody>
       {notes.map(n=><tr key={n.id}><td>{n.credit_note_number}</td><td>{n.credit_note_date}</td><td>{invoices.find(i=>i.id===n.sales_invoice_id)?.invoice_number||n.sales_invoice_id}</td><td>{customers.find(c=>c.id===n.customer_id)?.name||n.customer_id}</td><td>{n.reason}</td><td>{money(n.grand_total)}</td><td><button onClick={()=>void preparePrint(n)}>Print</button> {n.status==="draft"&&canPost?<button disabled={saving} onClick={()=>void postNote(n.id)}>Post credit note</button>:n.status==="draft"?"Awaiting accounts posting":n.status}</td></tr>)}
