@@ -216,7 +216,7 @@ export default function App() {
         : active === "Vendor Statement Reconciliation"
           ? <VendorReconciliationModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Cheque Register"
-          ? <ChequeRegisterModule db={db} tenantId={organization.id} />
+          ? <ChequeRegisterModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Customer Credit Control"
           ? <CustomerCreditControlModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Tax Register"
