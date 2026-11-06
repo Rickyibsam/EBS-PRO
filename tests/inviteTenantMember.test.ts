@@ -41,7 +41,7 @@ test("failed profile persistence removes partial employee and membership records
   assert.match(source, /if \(profileError\)[\s\S]*?employees[\s\S]*?tenant_memberships[\s\S]*?if \(invited\) await admin\.auth\.admin\.deleteUser\(user\.id\)/);
 });
 
-test("staff invitations never expose the service-role key to the browser", () => {
+test("service-role credentials are read from server-side environment variables", () => {
   assert.match(source, /Deno\.env\.get\("SUPABASE_SERVICE_ROLE_KEY"\)/);
   assert.match(source, /verify_jwt|authHeader/);
 });
