@@ -1,6 +1,7 @@
 import {useEffect,useMemo,useState} from "react";
 type Row=Record<string,any>;
 import type {SupabaseClient} from "@supabase/supabase-js";
+import {useModuleAction} from "./lib/modulePermissionContext";
 const TYPES=[
  {table:"sales_orders",label:"Sales orders",number:"order_number",date:"order_date",notes:"notes",approval:true,lines:"sales_order_lines",parentKey:"sales_order_id",lineKind:"taxedSales"},
  {table:"purchase_orders",label:"Purchase orders",number:"po_number",date:"order_date",notes:"notes",approval:true,lines:"purchase_order_lines",parentKey:"purchase_order_id",lineKind:"taxedPurchase"},
@@ -22,8 +23,12 @@ const LINE_FIELDS:any={
 export default function VoucherHistoryModule({db,tenantId,currentRole}:{db:SupabaseClient;tenantId:string;currentRole:string}){
  const [rows,setRows]=useState<any[]>([]),[loading,setLoading]=useState(true),[notice,setNotice]=useState(""),[filter,setFilter]=useState("all");
  const [table,setTable]=useState<string>("sales_orders"),[drafts,setDrafts]=useState<any[]>([]),[selectedId,setSelectedId]=useState(""),[draftDate,setDraftDate]=useState(""),[draftNotes,setDraftNotes]=useState(""),[lineRows,setLineRows]=useState<any[]>([]),[saving,setSaving]=useState(false);
- const canEdit=["owner","admin","manager","accounts"].includes(currentRole);
- const canApprove=["owner","admin","manager"].includes(currentRole);
+ const salesUpdate=useModuleAction("sales_customer","update",["owner","admin","manager","sales"].includes(currentRole));
+ const purchaseUpdate=useModuleAction("purchase_supplier","update",["owner","admin","manager","purchase","warehouse"].includes(currentRole));
+ const accountsUpdate=useModuleAction("accounts_finance","update",["owner","admin","manager","accounts"].includes(currentRole));
+ const permissionForTable=(name:string)=>name.startsWith("sales_")?salesUpdate:name.startsWith("purchase_")||name.startsWith("goods_")?purchaseUpdate:accountsUpdate;
+ const canEdit=permissionForTable(table);
+ const canApprove=canEdit&&config.approval;
  const config=useMemo(()=>TYPES.find(x=>x.table===table)||TYPES[0],[table]);
  async function load(){setLoading(true);const {data,error}=await db.from("voucher_revisions").select("id,entity_table,entity_id,action,before_data,after_data,changed_by,changed_at").eq("tenant_id",tenantId).order("changed_at",{ascending:false}).limit(1000);if(error)setNotice(error.message);else setRows(data||[]);setLoading(false);}
  async function loadDrafts(nextTable=table){
@@ -87,7 +92,7 @@ export default function VoucherHistoryModule({db,tenantId,currentRole}:{db:Supab
  }
  async function restoreRevision(revision:Row){
   const isLine=String(revision.entity_table).endsWith("_lines");
-  if(!canEdit||!(revision.action==="updated"||(isLine&&revision.action==="deleted")))return;
+  if(!permissionForTable(revision.entity_table)||!(revision.action==="updated"||(isLine&&revision.action==="deleted")))return;
   if(!window.confirm(isLine?"Restore this earlier voucher line? Current draft lines will be recorded in revision history.":"Restore this earlier voucher header? The current draft values will be saved as a new revision."))return;
   setSaving(true);setNotice("");
   try{
@@ -123,7 +128,7 @@ export default function VoucherHistoryModule({db,tenantId,currentRole}:{db:Supab
   {!drafts.length&&<p className="module-footnote">No draft vouchers available for this type.</p>}
   </div>
   <div className="table-tools"><select value={filter} onChange={e=>setFilter(e.target.value)}><option value="all">All voucher types</option>{[...new Set(rows.map(x=>x.entity_table))].map(x=><option key={x}>{x}</option>)}</select><span>{shown.length} revisions</span></div>
-  {loading?<div className="table-empty">Loading revision history…</div>:<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Changed at</th><th>Voucher type</th><th>Record ID</th><th>Action</th><th>Before snapshot</th><th>After snapshot</th><th>Changed by</th><th>Restore</th></tr></thead><tbody>{shown.map(x=><tr key={x.id}><td>{new Date(x.changed_at).toLocaleString("en-PK")}</td><td>{x.entity_table}</td><td><code>{x.entity_id}</code></td><td>{x.action}</td><td><details><summary>View JSON</summary><pre>{JSON.stringify(x.before_data,null,2)}</pre></details></td><td>{x.after_data?<details><summary>View JSON</summary><pre>{JSON.stringify(x.after_data,null,2)}</pre></details>:"—"}</td><td>{x.changed_by||"System"}</td><td>{canEdit&&(x.action==="updated"||(String(x.entity_table).endsWith("_lines")&&x.action==="deleted"))?<button disabled={saving} onClick={()=>void restoreRevision(x)}>Restore before</button>:"—"}</td></tr>)}{!shown.length&&<tr><td colSpan={8} className="table-empty">No draft voucher revisions recorded.</td></tr>}</tbody></table></div>}
+  {loading?<div className="table-empty">Loading revision history…</div>:<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Changed at</th><th>Voucher type</th><th>Record ID</th><th>Action</th><th>Before snapshot</th><th>After snapshot</th><th>Changed by</th><th>Restore</th></tr></thead><tbody>{shown.map(x=><tr key={x.id}><td>{new Date(x.changed_at).toLocaleString("en-PK")}</td><td>{x.entity_table}</td><td><code>{x.entity_id}</code></td><td>{x.action}</td><td><details><summary>View JSON</summary><pre>{JSON.stringify(x.before_data,null,2)}</pre></details></td><td>{x.after_data?<details><summary>View JSON</summary><pre>{JSON.stringify(x.after_data,null,2)}</pre></details>:"—"}</td><td>{x.changed_by||"System"}</td><td>{permissionForTable(x.entity_table)&&(x.action==="updated"||(String(x.entity_table).endsWith("_lines")&&x.action==="deleted"))?<button disabled={saving} onClick={()=>void restoreRevision(x)}>Restore before</button>:"—"}</td></tr>)}{!shown.length&&<tr><td colSpan={8} className="table-empty">No draft voucher revisions recorded.</td></tr>}</tbody></table></div>}
   <p className="module-footnote">Posted voucher headers and lines are protected at database level. Draft headers and supported line items can be edited here with atomic total recalculation and automatic revision snapshots. Earlier header snapshots can be restored while the voucher remains draft; line snapshots remain available for review. Approval is enabled for sales and purchase orders; other documents use their dedicated posting workflows.</p>
  </section>;
 }
