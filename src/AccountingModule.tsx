@@ -191,7 +191,7 @@ export default function AccountingModule({ db, tenantId,currentRole }: { db: Sup
         </div>
         <p className="module-footnote">One debit and one equal credit are generated automatically. Drafts do not affect posted balances until authorized posting.</p>
         <button disabled={saving || !accounts.length}>{saving ? "Saving…" : "Save journal draft"}</button>
-      </form>
+      </form>}
       <h3>Journal register</h3>
       {loading ? <div className="table-empty">Loading journals…</div> : <div className="data-table-wrap"><table className="data-table"><thead><tr><th>Journal</th><th>Date</th><th>Narration</th><th>Status</th><th>Action</th></tr></thead><tbody>
         {journals.map(j => <tr key={j.id}><td>{j.journal_number}</td><td>{j.entry_date}</td><td>{j.narration}</td><td>{j.status}</td><td>{j.status === "draft" ? <button disabled={saving} onClick={() => void postJournal(j.id)}>Post journal</button> : "Posted"}</td></tr>)}
@@ -203,7 +203,7 @@ export default function AccountingModule({ db, tenantId,currentRole }: { db: Sup
         <label>Account code<input required value={accountForm.account_code} onChange={e => setAccountForm({ ...accountForm, account_code: e.target.value })} /></label>
         <label>Account name<input required value={accountForm.account_name} onChange={e => setAccountForm({ ...accountForm, account_name: e.target.value })} /></label>
         <label>Account type<select value={accountForm.account_type} onChange={e => setAccountForm({ ...accountForm, account_type: e.target.value })}><option value="asset">Asset</option><option value="liability">Liability</option><option value="equity">Equity</option><option value="income">Income</option><option value="expense">Expense</option></select></label>
-      </div><button disabled={saving}>{saving ? "Saving…" : "Add account"}</button></form>
+      </div><button disabled={saving}>{saving ? "Saving…" : "Add account"}</button></form>}
       {loading ? <div className="table-empty">Loading accounts…</div> : <div className="data-table-wrap"><table className="data-table"><thead><tr><th>Code</th><th>Account name</th><th>Type</th><th>Status</th></tr></thead><tbody>
         {accounts.map(a => <tr key={a.id}><td>{a.account_code}</td><td>{a.account_name}</td><td>{a.account_type}</td><td>{a.is_active ? "Active" : "Inactive"}</td></tr>)}
         {!accounts.length && <tr><td colSpan={4} className="table-empty">No chart accounts configured.</td></tr>}
