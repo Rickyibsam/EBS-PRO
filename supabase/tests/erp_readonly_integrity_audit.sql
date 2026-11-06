@@ -69,6 +69,21 @@ where l.payment_status='paid'
 and not exists(select 1 from journal_entries j where j.tenant_id=l.tenant_id
                and j.source_type='payroll_payment' and j.source_id=l.id and j.status='posted');
 
+insert into _ebs_integrity_findings
+select 'tenant_fk_missing_child_indexes','high',count(*)::bigint,
+       'Tenant-scoped foreign keys without a covering child-side index'
+from pg_constraint c
+join pg_class ct on ct.oid=c.conrelid join pg_namespace cn on cn.oid=ct.relnamespace
+join pg_class pt on pt.oid=c.confrelid join pg_namespace pn on pn.oid=pt.relnamespace
+join pg_attribute ca on ca.attrelid=c.conrelid and ca.attname='tenant_id' and not ca.attisdropped
+join pg_attribute pa on pa.attrelid=c.confrelid and pa.attname='tenant_id' and not pa.attisdropped
+where c.contype='f' and cn.nspname='public' and pn.nspname='public'
+  and ca.attnum=any(c.conkey) and pa.attnum=any(c.confkey)
+  and not exists(select 1 from pg_index i where i.indrelid=c.conrelid and i.indisvalid
+    and i.indpred is null and i.indexprs is null and i.indnkeyatts>=cardinality(c.conkey)
+    and (select array_agg(i.indkey[s]::smallint order by s)
+         from generate_series(0,cardinality(c.conkey)-1) s)=c.conkey);
+
 -- Compare tenant ownership on every FK edge where both tables carry tenant_id.
 -- This detects existing cross-tenant links even when the FK itself is single-column.
 do $tenant_audit$
