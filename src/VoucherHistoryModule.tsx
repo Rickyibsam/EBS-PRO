@@ -27,9 +27,9 @@ export default function VoucherHistoryModule({db,tenantId,currentRole}:{db:Supab
  const purchaseUpdate=useModuleAction("purchase_supplier","update",["owner","admin","manager","purchase","warehouse"].includes(currentRole));
  const accountsUpdate=useModuleAction("accounts_finance","update",["owner","admin","manager","accounts"].includes(currentRole));
  const permissionForTable=(name:string)=>name.startsWith("sales_")?salesUpdate:name.startsWith("purchase_")||name.startsWith("goods_")?purchaseUpdate:accountsUpdate;
+ const config=useMemo(()=>TYPES.find(x=>x.table===table)||TYPES[0],[table]);
  const canEdit=permissionForTable(table);
  const canApprove=canEdit&&config.approval;
- const config=useMemo(()=>TYPES.find(x=>x.table===table)||TYPES[0],[table]);
  async function load(){setLoading(true);const {data,error}=await db.from("voucher_revisions").select("id,entity_table,entity_id,action,before_data,after_data,changed_by,changed_at").eq("tenant_id",tenantId).order("changed_at",{ascending:false}).limit(1000);if(error)setNotice(error.message);else setRows(data||[]);setLoading(false);}
  async function loadDrafts(nextTable=table){
   setSelectedId("");setDraftDate("");setDraftNotes("");setLineRows([]);
