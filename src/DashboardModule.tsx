@@ -100,7 +100,7 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
   }
  }catch(e){if(live)setError(e instanceof Error?e.message:"Dashboard could not load.");}finally{if(live)setLoading(false);}}
  void load();return()=>{live=false;};
- },[db,tenantId,trendMonths]);
+ },[db,tenantId,trendMonths,allowedModules]);
  async function markNotificationRead(id:string){
   const {data:auth}=await db.auth.getUser();if(!auth.user)return;
   const readAt=new Date().toISOString();
