@@ -22,7 +22,7 @@ begin
  if not exists(select 1 from public.chart_of_accounts where id=p_accumulated_account_id and tenant_id=v_asset.tenant_id and account_type='asset' and is_active) then raise exception 'Select an active asset/contra-asset account for accumulated depreciation.';end if;
  select coalesce(sum(depreciation_amount),0) into v_prior from public.asset_depreciation_entries where tenant_id=v_asset.tenant_id and asset_id=v_asset.id and posted;
  v_month_days:=extract(day from (date_trunc('month',p_period_start)+interval '1 month - 1 day'))::integer;
- v_overlap_days:=greatest(0,(least(p_period_end,(v_asset.acquisition_date+make_interval(months=>v_asset.useful_life_months-1))-greatest(p_period_start,v_asset.acquisition_date)+1));
+ v_overlap_days:=greatest(0,(least(p_period_end,v_asset.acquisition_date+make_interval(months=>v_asset.useful_life_months-1))-greatest(p_period_start,v_asset.acquisition_date)+1));
  v_monthly:=(v_asset.acquisition_cost-v_asset.salvage_value)/v_asset.useful_life_months;
  v_amount:=round(least(greatest(0,v_asset.acquisition_cost-v_asset.salvage_value-v_prior),v_monthly*v_overlap_days/v_month_days),2);
  if v_amount<=0 then raise exception 'No depreciation is due for the selected period.';end if;
