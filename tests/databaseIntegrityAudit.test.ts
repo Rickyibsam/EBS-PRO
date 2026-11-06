@@ -24,6 +24,7 @@ test("read-only production audit reconciles posted accounting and payroll", () =
 test("tenant isolation audit compares tenant IDs across every scoped foreign-key relationship", () => {
   assert.match(audit, /cross_tenant_reference_rows/);
   assert.match(audit, /tenant_fk_without_composite_pair/);
+  assert.match(audit, /tenant_fk_missing_child_indexes/);
   assert.match(audit, /c\.tenant_id is distinct from p\.tenant_id/);
   assert.match(audit, /unnest\(r\.conkey,r\.confkey\)/);
 });
