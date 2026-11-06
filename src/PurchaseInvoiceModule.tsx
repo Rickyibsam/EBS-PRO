@@ -1,11 +1,13 @@
 import {FormEvent,useEffect,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
+import {useModuleAction} from "./lib/modulePermissionContext";
 type Row=Record<string,any>;
 export default function PurchaseInvoiceModule({db,tenantId,currentRole}:{db:SupabaseClient;tenantId:string;currentRole:string}){
  const [grns,setGrns]=useState<Row[]>([]),[orders,setOrders]=useState<Row[]>([]),[parties,setParties]=useState<Row[]>([]),[invoices,setInvoices]=useState<Row[]>([]);
  const [selectedGrn,setSelectedGrn]=useState(""),[invoiceNo,setInvoiceNo]=useState(""),[invoiceDate,setInvoiceDate]=useState(new Date().toISOString().slice(0,10)),[dueDate,setDueDate]=useState(""),[tax,setTax]=useState("0"),[notes,setNotes]=useState("");
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[notice,setNotice]=useState("");
- const canCreate=["owner","admin","manager","purchase"].includes(currentRole),canPost=["owner","admin","manager","accounts"].includes(currentRole);
+ const canCreate=useModuleAction("purchase_supplier","create",["owner","admin","manager","purchase"].includes(currentRole));
+ const canPost=useModuleAction("purchase_supplier","update",["owner","admin","manager","accounts"].includes(currentRole));
  const money=(v:number)=>"PKR "+Number(v||0).toLocaleString("en-PK",{minimumFractionDigits:2,maximumFractionDigits:2});
  async function load(){
   setLoading(true);setNotice("");
