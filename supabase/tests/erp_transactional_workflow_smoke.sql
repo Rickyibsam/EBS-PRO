@@ -206,6 +206,18 @@ begin
   v_delivery_id:=(v_delivery_result->>'delivery_id')::uuid;
   select id into v_delivery_line from public.delivery_lines
   where tenant_id=v_tenant_a and delivery_id=v_delivery_id;
+  if (select id from public.sales_orders where id=v_order_first) is distinct from
+     (select warehouse_id from public.deliveries where id=v_delivery_id) then
+    raise exception 'FAIL: sales order and delivery warehouse do not match';
+  end if;
+  if coalesce((select sum(quantity_in-quantity_out) from public.stock_movements
+    where tenant_id=v_tenant_a and warehouse_id=(select warehouse_id from public.deliveries where id=v_delivery_id)
+      and product_id=v_product),0)<2 then
+    raise exception 'FAIL: stock fixture is short before dispatch: %',
+      coalesce((select sum(quantity_in-quantity_out) from public.stock_movements
+       where tenant_id=v_tenant_a and warehouse_id=(select warehouse_id from public.deliveries where id=v_delivery_id)
+         and product_id=v_product),0);
+  end if;
   v_dispatch_result:=public.dispatch_delivery(
     v_delivery_id,
     jsonb_build_array(jsonb_build_object('line_id',v_delivery_line,'picked_quantity_base',2))
