@@ -1,5 +1,6 @@
 import {useEffect,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
+import {useModuleAction} from "./lib/modulePermissionContext";
 type Row=Record<string,any>;
 const today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");};
 const money=(n:number)=>"PKR "+Number(n||0).toLocaleString("en-PK",{maximumFractionDigits:2});
@@ -7,7 +8,10 @@ export default function StockTakeModule({db,tenantId,currentRole}:{db:SupabaseCl
  const [warehouses,setWarehouses]=useState<Row[]>([]),[takes,setTakes]=useState<Row[]>([]),[snapshot,setSnapshot]=useState<Row[]>([]),[lines,setLines]=useState<Row[]>([]),[products,setProducts]=useState<Row[]>([]);
  const [warehouseId,setWarehouseId]=useState(""),[countDate,setCountDate]=useState(today()),[notes,setNotes]=useState(""),[selectedTake,setSelectedTake]=useState<Row|null>(null);
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[notice,setNotice]=useState("");
- const canEdit=["owner","admin","manager","warehouse"].includes(currentRole);
+ const roleCanEdit=["owner","admin","manager","warehouse"].includes(currentRole);
+ const canCreate=useModuleAction("inventory","create",roleCanEdit);
+ const canUpdate=useModuleAction("inventory","update",roleCanEdit);
+ const canEdit=canCreate||canUpdate;
  async function load(){
   setLoading(true);setNotice("");
   const [w,t]=await Promise.all([db.from("warehouses").select("id,code,name,is_active").eq("tenant_id",tenantId).eq("is_active",true).order("name"),db.from("stock_takes").select("id,warehouse_id,stock_take_number,count_date,status,notes,created_at").eq("tenant_id",tenantId).order("created_at",{ascending:false}).limit(50)]);
@@ -24,7 +28,7 @@ export default function StockTakeModule({db,tenantId,currentRole}:{db:SupabaseCl
  }
  function updateSnapshot(index:number,value:string){setSnapshot(rows=>rows.map((x,i)=>i===index?{...x,counted_quantity:value}:x));}
  async function createDraft(){
-  if(!canEdit||!snapshot.length)return;
+  if(!canCreate||!snapshot.length)return;
   setSaving(true);setNotice("");
   try{
    const payload=snapshot.map(x=>({product_id:x.product_id,batch_number:x.batch_number,expiry_date:x.expiry_date,expected_quantity:Number(x.expected_quantity),counted_quantity:Number(x.counted_quantity)}));
@@ -48,7 +52,7 @@ export default function StockTakeModule({db,tenantId,currentRole}:{db:SupabaseCl
  }
  function updateLine(id:string,value:string){setLines(rows=>rows.map(x=>x.id===id?{...x,counted_quantity:value,variance_quantity:Number(value)-Number(x.expected_quantity)}:x));}
  async function saveCounts(){
-  if(!selectedTake||selectedTake.status!=="draft"||!canEdit)return;
+  if(!selectedTake||selectedTake.status!=="draft"||!canUpdate)return;
   setSaving(true);setNotice("");
   try{
    const payload=lines.map(x=>({id:x.id,counted_quantity:Number(x.counted_quantity)}));
@@ -71,7 +75,7 @@ export default function StockTakeModule({db,tenantId,currentRole}:{db:SupabaseCl
  return <section className="module-page">
   <div className="module-toolbar"><div><h2>Physical Stock Taking</h2><p>Compare counted warehouse quantities against the live batch ledger, then post only the verified variance.</p></div><button onClick={()=>void load()}>↻ Refresh</button></div>
   {notice&&<div className="notice">{notice}</div>}
-  <div className="transaction-form"><h3>Start a physical count</h3><div className="form-grid"><label>Warehouse<select value={warehouseId} onChange={e=>{setWarehouseId(e.target.value);setSnapshot([]);}}><option value="">Select warehouse</option>{warehouses.map(w=><option key={w.id} value={w.id}>{w.code} · {w.name}</option>)}</select></label><label>Count date<input type="date" value={countDate} readOnly/></label><label>Notes<input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Optional count reference"/></label></div><div className="table-tools"><button disabled={!canEdit||saving||!warehouseId} onClick={()=>void loadSnapshot()}>Load live stock snapshot</button>{snapshot.length>0&&<button disabled={!canEdit||saving} onClick={()=>void createDraft()}>{saving?"Saving…":"Create draft stock take"}</button>}</div>
+  <div className="transaction-form"><h3>Start a physical count</h3><div className="form-grid"><label>Warehouse<select value={warehouseId} onChange={e=>{setWarehouseId(e.target.value);setSnapshot([]);}}><option value="">Select warehouse</option>{warehouses.map(w=><option key={w.id} value={w.id}>{w.code} · {w.name}</option>)}</select></label><label>Count date<input type="date" value={countDate} readOnly/></label><label>Notes<input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Optional count reference"/></label></div><div className="table-tools"><button disabled={!canEdit||saving||!warehouseId} onClick={()=>void loadSnapshot()}>Load live stock snapshot</button>{snapshot.length>0&&<button disabled={!canCreate||saving} onClick={()=>void createDraft()}>{saving?"Saving…":"Create draft stock take"}</button>}</div>
    {snapshot.length>0&&<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Product</th><th>Batch</th><th>Expiry</th><th>Ledger qty</th><th>Physical count</th><th>Variance</th></tr></thead><tbody>{snapshot.map((x,i)=>{const variance=Number(x.counted_quantity)-Number(x.expected_quantity);return <tr key={x.product_id+"|"+x.batch_number+"|"+x.expiry_date}><td>{x.sku} · {x.product_name}</td><td>{x.batch_number||"—"}</td><td>{x.expiry_date||"—"}</td><td>{Number(x.expected_quantity).toLocaleString("en-PK")}</td><td><input type="number" min="0" step="0.001" value={x.counted_quantity} onChange={e=>updateSnapshot(i,e.target.value)}/></td><td>{variance>0?"+":""}{variance.toLocaleString("en-PK")}</td></tr>})}</tbody></table></div>}
   </div>
   <div className="data-table-wrap"><h3>Recent stock takes</h3><table className="data-table"><thead><tr><th>Reference</th><th>Warehouse</th><th>Date</th><th>Status</th><th>Action</th></tr></thead><tbody>{takes.map(t=><tr key={t.id}><td>{t.stock_take_number}</td><td>{warehouses.find(w=>w.id===t.warehouse_id)?.name||t.warehouse_id}</td><td>{t.count_date}</td><td>{t.status}</td><td><button onClick={()=>void openTake(t)}>Open</button></td></tr>)}{!takes.length&&<tr><td colSpan={5} className="table-empty">No stock takes recorded yet.</td></tr>}</tbody></table></div>

@@ -1,4 +1,5 @@
 import { resolveAllowedNavigation } from "./lib/erpAccess";
+import {ModulePermissionProvider,type ModuleActionPermission} from "./lib/modulePermissionContext";
 import { FormEvent, lazy, Suspense, useEffect, useState } from "react";
 import { createClient, Session } from "@supabase/supabase-js";
 const WorkspaceModule = lazy(() => import("./WorkspaceModule"));
@@ -75,6 +76,7 @@ export default function App() {
   const [tenantChoices,setTenantChoices] = useState<Array<Organization & {role:string}>>([]);
   const [currentRole,setCurrentRole] = useState("viewer");
   const [modulePermissions,setModulePermissions] = useState<Record<string,boolean>>({});
+  const [moduleActionPermissions,setModuleActionPermissions] = useState<Record<string,ModuleActionPermission>>({});
   const [mode,setMode] = useState<"login"|"signup">("login");
   const [recoveryMode,setRecoveryMode] = useState(false);
   const [authEvent,setAuthEvent] = useState("");
@@ -93,11 +95,12 @@ export default function App() {
   useEffect(()=>{
     let live=true;
     async function loadOverrides(){
-      if(!db||!session||!organization||["owner","admin"].includes(currentRole)){if(live)setModulePermissions({});return;}
-      const {data,error}=await db.from("tenant_user_module_permissions").select("module_key,can_view").eq("tenant_id",organization.id).eq("user_id",session.user.id);
+      if(!db||!session||!organization||["owner","admin"].includes(currentRole)){if(live){setModulePermissions({});setModuleActionPermissions({});}return;}
+      const {data,error}=await db.from("tenant_user_module_permissions").select("module_key,can_view,can_create,can_update,can_delete").eq("tenant_id",organization.id).eq("user_id",session.user.id);
       if(!live)return;
-      if(error){setNotice("Could not load individual module permissions: "+error.message);setModulePermissions({});return;}
+      if(error){setNotice("Could not load individual module permissions: "+error.message);setModulePermissions({});setModuleActionPermissions({});return;}
       setModulePermissions(Object.fromEntries((data||[]).map(row=>[row.module_key,Boolean(row.can_view)])));
+      setModuleActionPermissions(Object.fromEntries((data||[]).map(row=>[row.module_key,{can_view:Boolean(row.can_view),can_create:Boolean(row.can_create),can_update:Boolean(row.can_update),can_delete:Boolean(row.can_delete)}])));
     }
     void loadOverrides();
     return()=>{live=false;};
@@ -191,13 +194,13 @@ export default function App() {
     : active === "Sales" || active === "Purchases"
       ? <TransactionsModule db={db} tenantId={organization.id} module={active} currentRole={currentRole} />
       : active === "Accounts"
-        ? <AccountingModule db={db} tenantId={organization.id} />
+        ? <AccountingModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Sales Returns"
           ? <ReturnsModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Price Lists"
-          ? <PricingModule db={db} tenantId={organization.id} />
+          ? <PricingModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Invoices"
-          ? <InvoiceModule db={db} tenantId={organization.id} />
+          ? <InvoiceModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Stock Transfers"
           ? <TransfersModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Purchase Returns"
@@ -209,11 +212,11 @@ export default function App() {
         : active === "Payroll"
           ? <PayrollModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Bank Reconciliation"
-          ? <BankReconciliationModule db={db} tenantId={organization.id} />
+          ? <BankReconciliationModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Vendor Statement Reconciliation"
-          ? <VendorReconciliationModule db={db} tenantId={organization.id} />
+          ? <VendorReconciliationModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Cheque Register"
-          ? <ChequeRegisterModule db={db} tenantId={organization.id} />
+          ? <ChequeRegisterModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Customer Credit Control"
           ? <CustomerCreditControlModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Tax Register"
@@ -254,5 +257,5 @@ export default function App() {
               ? <WorkspaceModule db={db} tenantId={organization.id} module={active} currentRole={currentRole} />
               : <DashboardModule db={db} tenantId={organization.id} company={organization.name} allowedModules={allowedNav} onNavigate={setActive} />;
 
-  return <div className="shell"><aside className="sidebar"><div className="brandline"><div className="logo">E</div><b>EBS <em>PRO</em><small>V.01</small></b></div><div className="org"><strong>{organization.name}</strong><small>{organization.city||"Pakistan"} · {organization.currency}</small>{tenantChoices.length>1&&<select aria-label="Switch company workspace" value={organization.id} onChange={e=>{const choice=tenantChoices.find(x=>x.id===e.target.value);if(choice){setOrganization(choice);setCurrentRole(choice.role);setActive("Overview");}}}>{tenantChoices.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select>}</div><small className="caption">WORKSPACE MODULES</small><nav className="module-nav">{navGroups.map(group=>{const items=group.items.filter(item=>allowedNav.includes(item));if(!items.length)return null;const opened=expandedGroup===group.name;return <div className="nav-group" key={group.name}><button className={"nav-group-head"+(items.includes(active)?" has-active":"")} aria-expanded={opened} onClick={()=>setExpandedGroup(opened?"":group.name)}><span className="nav-group-icon">{group.icon}</span><b>{group.name}</b><span className="nav-chevron">{opened?"⌄":"›"}</span></button>{opened&&<div className="nav-group-items">{items.map(item=><button className={active===item?"selected":""} key={item} onClick={()=>setActive(item)}>{item}</button>)}</div>}</div>})}</nav><div className="account"><b>{session.user.email}</b><button onClick={()=>void db.auth.signOut()}>Sign out ↗</button></div></aside><main className="main"><header><span>EBS PRO / <b>{active}</b></span><span className="live">● {currentRole.replaceAll("_"," ").toUpperCase()} ACCESS</span></header><section className="content"><Suspense fallback={<div className="table-empty">Loading module…</div>}>{moduleContent}</Suspense></section></main></div>;
+  return <div className="shell"><aside className="sidebar"><div className="brandline"><div className="logo">E</div><b>EBS <em>PRO</em><small>V.01</small></b></div><div className="org"><strong>{organization.name}</strong><small>{organization.city||"Pakistan"} · {organization.currency}</small>{tenantChoices.length>1&&<select aria-label="Switch company workspace" value={organization.id} onChange={e=>{const choice=tenantChoices.find(x=>x.id===e.target.value);if(choice){setOrganization(choice);setCurrentRole(choice.role);setActive("Overview");}}}>{tenantChoices.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select>}</div><small className="caption">WORKSPACE MODULES</small><nav className="module-nav">{navGroups.map(group=>{const items=group.items.filter(item=>allowedNav.includes(item));if(!items.length)return null;const opened=expandedGroup===group.name;return <div className="nav-group" key={group.name}><button className={"nav-group-head"+(items.includes(active)?" has-active":"")} aria-expanded={opened} onClick={()=>setExpandedGroup(opened?"":group.name)}><span className="nav-group-icon">{group.icon}</span><b>{group.name}</b><span className="nav-chevron">{opened?"⌄":"›"}</span></button>{opened&&<div className="nav-group-items">{items.map(item=><button className={active===item?"selected":""} key={item} onClick={()=>setActive(item)}>{item}</button>)}</div>}</div>})}</nav><div className="account"><b>{session.user.email}</b><button onClick={()=>void db.auth.signOut()}>Sign out ↗</button></div></aside><main className="main"><header><span>EBS PRO / <b>{active}</b></span><span className="live">● {currentRole.replaceAll("_"," ").toUpperCase()} ACCESS</span></header><section className="content"><ModulePermissionProvider permissions={moduleActionPermissions}><Suspense fallback={<div className="table-empty">Loading module…</div>}>{moduleContent}</Suspense></ModulePermissionProvider></section></main></div>;
 }

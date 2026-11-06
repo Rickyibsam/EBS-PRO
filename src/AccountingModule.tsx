@@ -1,12 +1,18 @@
 import { FormEvent, useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {useModuleAction} from "./lib/modulePermissionContext";
 
 type Row = Record<string, any>;
 type TrialRow = { account_id: string; account_code: string; account_name: string; account_type: string; total_debit: number; total_credit: number; balance: number };
 
-export default function AccountingModule({ db, tenantId }: { db: SupabaseClient; tenantId: string }) {
+export default function AccountingModule({ db, tenantId,currentRole }: { db: SupabaseClient; tenantId: string;currentRole:string }) {
+  const roleCanManage=["owner","admin","manager","accounts"].includes(currentRole);
+  const canCreate=useModuleAction("accounts_finance","create",roleCanManage);
+  const canUpdate=useModuleAction("accounts_finance","update",roleCanManage);
   const [tab, setTab] = useState("journals");
   const [accounts, setAccounts] = useState<Row[]>([]);
+  const [branches,setBranches]=useState<Row[]>([]);
+  const [branchId,setBranchId]=useState("");
   const [journals, setJournals] = useState<Row[]>([]);
   const [trialRows, setTrialRows] = useState<TrialRow[]>([]);
   const [ledgerParties,setLedgerParties]=useState<Row[]>([]);
@@ -40,15 +46,17 @@ export default function AccountingModule({ db, tenantId }: { db: SupabaseClient;
   async function load() {
     setLoading(true);
     setNotice("");
-    const [a, j, t] = await Promise.all([
+    const [a, j, t, br] = await Promise.all([
       db.from("chart_of_accounts").select("id,account_code,account_name,account_type,is_active").eq("tenant_id", tenantId).eq("is_active", true).order("account_code"),
-      db.from("journal_entries").select("id,journal_number,entry_date,narration,status,created_at").eq("tenant_id", tenantId).order("entry_date", { ascending: false }).limit(300),
-      db.rpc("get_trial_balance", { p_tenant_id: tenantId, p_as_of: trialDate })
+      db.from("journal_entries").select("id,journal_number,entry_date,narration,status,created_at,branch_id").eq("tenant_id", tenantId).order("entry_date", { ascending: false }).limit(300),
+      db.rpc("get_trial_balance", { p_tenant_id: tenantId, p_as_of: trialDate }),
+      db.from("branches").select("id,name,branch_code").eq("tenant_id",tenantId).order("name")
     ]);
-    const err = a.error || j.error || t.error;
+    const err = a.error || j.error || t.error || br.error;
     if (err) setNotice(err.message);
     else {
       setAccounts(a.data || []);
+      setBranches(br.data||[]);
       setJournals(j.data || []);
       setTrialRows((t.data || []) as TrialRow[]);
     }
@@ -94,6 +102,7 @@ export default function AccountingModule({ db, tenantId }: { db: SupabaseClient;
   }
 
   async function saveReconciliation(){
+    if(!canCreate)return;
     const amount=Number(statementBalance);if(!cashAccountId||!statementDate||!Number.isFinite(amount)){setNotice("Select an account and enter a valid statement balance.");return;}
     const book=cashRows.filter(x=>x.account_id===cashAccountId).reduce((n,x)=>n+Number(x.debit||0)-Number(x.credit||0),0);
     const {error}=await db.from("bank_reconciliations").insert({tenant_id:tenantId,account_id:cashAccountId,statement_date:statementDate,statement_balance:amount,book_balance:book,difference:amount-book,notes:reconNotes.trim()||null});
@@ -101,6 +110,7 @@ export default function AccountingModule({ db, tenantId }: { db: SupabaseClient;
   }
 
   async function postJournal(id: string) {
+    if(!canUpdate)return;
     setSaving(true); setNotice("");
     try {
       const { error } = await db.rpc("post_journal_entry", { p_journal_entry_id: id });
@@ -112,7 +122,7 @@ export default function AccountingModule({ db, tenantId }: { db: SupabaseClient;
   }
 
   async function saveAccount(e: FormEvent) {
-    e.preventDefault(); setSaving(true); setNotice("");
+    e.preventDefault(); if(!canCreate)return; setSaving(true); setNotice("");
     try {
       if (!accountForm.account_code.trim() || !accountForm.account_name.trim()) throw new Error("Enter account code and account name.");
       const { error } = await db.from("chart_of_accounts").insert({
@@ -129,7 +139,7 @@ export default function AccountingModule({ db, tenantId }: { db: SupabaseClient;
   }
 
   async function save(e: FormEvent) {
-    e.preventDefault(); setSaving(true); setNotice("");
+    e.preventDefault(); if(!canCreate)return; setSaving(true); setNotice("");
     try {
       const value = Number(amount);
       if (!debitAccount || !creditAccount || debitAccount === creditAccount || !Number.isFinite(value) || value <= 0 || !narration.trim()) {
@@ -138,7 +148,7 @@ export default function AccountingModule({ db, tenantId }: { db: SupabaseClient;
       const { data: user } = await db.auth.getUser();
       const number = "EBS-JV-" + Date.now().toString().slice(-9);
       const { data: head, error } = await db.from("journal_entries").insert({
-        tenant_id: tenantId, journal_number: number, entry_date: date, source_type: "manual",
+        tenant_id: tenantId, journal_number: number, entry_date: date, source_type: "manual", branch_id: branchId||null,
         narration: narration.trim(), status: "draft", created_by: user.user?.id ?? null
       }).select("id").single();
       if (error) throw error;
@@ -169,10 +179,11 @@ export default function AccountingModule({ db, tenantId }: { db: SupabaseClient;
     </div>
 
     {tab === "journals" ? <>
-      <form className="transaction-form" onSubmit={save}>
+      {canCreate&&<form className="transaction-form" onSubmit={save}>
         <h3>New balanced journal draft</h3>
         <div className="form-grid">
           <label>Entry date<input type="date" value={date} onChange={e => setDate(e.target.value)} /></label>
+          <label>Branch<select value={branchId} onChange={e=>setBranchId(e.target.value)}><option value="">Company-wide / unassigned</option>{branches.map(b=><option key={b.id} value={b.id}>{b.branch_code} · {b.name}</option>)}</select></label>
           <label>Debit account<select required value={debitAccount} onChange={e => setDebitAccount(e.target.value)}><option value="">Select account</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.account_code} · {a.account_name}</option>)}</select></label>
           <label>Credit account<select required value={creditAccount} onChange={e => setCreditAccount(e.target.value)}><option value="">Select account</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.account_code} · {a.account_name}</option>)}</select></label>
           <label>Amount (PKR)<input required type="number" min="0.01" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} /></label>
@@ -180,19 +191,19 @@ export default function AccountingModule({ db, tenantId }: { db: SupabaseClient;
         </div>
         <p className="module-footnote">One debit and one equal credit are generated automatically. Drafts do not affect posted balances until authorized posting.</p>
         <button disabled={saving || !accounts.length}>{saving ? "Saving…" : "Save journal draft"}</button>
-      </form>
+      </form>}
       <h3>Journal register</h3>
       {loading ? <div className="table-empty">Loading journals…</div> : <div className="data-table-wrap"><table className="data-table"><thead><tr><th>Journal</th><th>Date</th><th>Narration</th><th>Status</th><th>Action</th></tr></thead><tbody>
-        {journals.map(j => <tr key={j.id}><td>{j.journal_number}</td><td>{j.entry_date}</td><td>{j.narration}</td><td>{j.status}</td><td>{j.status === "draft" ? <button disabled={saving} onClick={() => void postJournal(j.id)}>Post journal</button> : "Posted"}</td></tr>)}
+        {journals.map(j => <tr key={j.id}><td>{j.journal_number}</td><td>{j.entry_date}</td><td>{j.narration}</td><td>{j.status}</td><td>{j.status === "draft"&&canUpdate ? <button disabled={saving} onClick={() => void postJournal(j.id)}>Post journal</button> : j.status === "draft" ? "Draft" : "Posted"}</td></tr>)}
         {!journals.length && <tr><td colSpan={5} className="table-empty">No journal entries yet.</td></tr>}
       </tbody></table></div>}
     </> : tab === "accounts" ? <>
       <h3>Chart of accounts</h3>
-      <form className="transaction-form" onSubmit={saveAccount}><div className="form-grid">
+      {canCreate&&<form className="transaction-form" onSubmit={saveAccount}><div className="form-grid">
         <label>Account code<input required value={accountForm.account_code} onChange={e => setAccountForm({ ...accountForm, account_code: e.target.value })} /></label>
         <label>Account name<input required value={accountForm.account_name} onChange={e => setAccountForm({ ...accountForm, account_name: e.target.value })} /></label>
         <label>Account type<select value={accountForm.account_type} onChange={e => setAccountForm({ ...accountForm, account_type: e.target.value })}><option value="asset">Asset</option><option value="liability">Liability</option><option value="equity">Equity</option><option value="income">Income</option><option value="expense">Expense</option></select></label>
-      </div><button disabled={saving}>{saving ? "Saving…" : "Add account"}</button></form>
+      </div><button disabled={saving}>{saving ? "Saving…" : "Add account"}</button></form>}
       {loading ? <div className="table-empty">Loading accounts…</div> : <div className="data-table-wrap"><table className="data-table"><thead><tr><th>Code</th><th>Account name</th><th>Type</th><th>Status</th></tr></thead><tbody>
         {accounts.map(a => <tr key={a.id}><td>{a.account_code}</td><td>{a.account_name}</td><td>{a.account_type}</td><td>{a.is_active ? "Active" : "Inactive"}</td></tr>)}
         {!accounts.length && <tr><td colSpan={4} className="table-empty">No chart accounts configured.</td></tr>}
