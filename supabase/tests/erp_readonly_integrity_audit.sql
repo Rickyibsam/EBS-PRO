@@ -59,7 +59,7 @@ select 'posted_payroll_without_journal','high',count(*)::bigint,
        'Posted payroll runs without a matching journal entry'
 from payroll_runs r
 where r.status='posted'
-and not exists(select 1 from journal_entries j where j.tenant_id=r.tenant_id and j.reference_id=r.id);
+and not exists(select 1 from journal_entries j where j.tenant_id=r.tenant_id and j.source_type='payroll' and j.source_id=r.id and j.status='posted');
 
 insert into _ebs_integrity_findings
 select 'paid_payroll_without_journal','high',count(*)::bigint,
