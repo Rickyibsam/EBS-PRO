@@ -194,13 +194,13 @@ export default function App() {
     : active === "Sales" || active === "Purchases"
       ? <TransactionsModule db={db} tenantId={organization.id} module={active} currentRole={currentRole} />
       : active === "Accounts"
-        ? <AccountingModule db={db} tenantId={organization.id} />
+        ? <AccountingModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Sales Returns"
           ? <ReturnsModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Price Lists"
-          ? <PricingModule db={db} tenantId={organization.id} />
+          ? <PricingModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Invoices"
-          ? <InvoiceModule db={db} tenantId={organization.id} />
+          ? <InvoiceModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Stock Transfers"
           ? <TransfersModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Purchase Returns"
@@ -212,9 +212,9 @@ export default function App() {
         : active === "Payroll"
           ? <PayrollModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Bank Reconciliation"
-          ? <BankReconciliationModule db={db} tenantId={organization.id} />
+          ? <BankReconciliationModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Vendor Statement Reconciliation"
-          ? <VendorReconciliationModule db={db} tenantId={organization.id} />
+          ? <VendorReconciliationModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Cheque Register"
           ? <ChequeRegisterModule db={db} tenantId={organization.id} />
         : active === "Customer Credit Control"
