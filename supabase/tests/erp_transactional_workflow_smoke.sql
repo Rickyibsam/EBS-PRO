@@ -23,6 +23,7 @@ declare
   v_unit uuid := gen_random_uuid();
   v_product uuid := gen_random_uuid();
   v_price_list uuid := gen_random_uuid();
+  v_warehouse uuid;
   v_order_request uuid := gen_random_uuid();
   v_order_first uuid;
   v_order_retry uuid;
@@ -96,9 +97,7 @@ begin
   values(v_tenant_a,'TX-CUST','customer','Smoke Test Customer') returning id into v_customer;
   insert into public.route_customers(tenant_id,route_id,customer_id)
   values(v_tenant_a,v_route,v_customer);
-  insert into public.warehouses(tenant_id,branch_id,name,code,is_default)
-  values(v_tenant_a,v_branch_a,'Smoke Test Warehouse','TX-WH',true);
-  insert into public.units_of_measure(id,tenant_id,name,symbol,unit_type,decimal_places)
+   insert into public.units_of_measure(id,tenant_id,name,symbol,unit_type,decimal_places)
   values(v_unit,v_tenant_a,'Smoke Test Unit','EA','quantity',0);
   insert into public.products(tenant_id,sku,name,base_unit_id,sales_tax_rate,sale_price)
   values(v_tenant_a,'TX-SKU','Smoke Test Product',v_unit,17,50) returning id into v_product;
@@ -119,6 +118,7 @@ begin
     and subtotal=100 and tax_total=17 and grand_total=117) then
     raise exception 'FAIL: Booker order totals were not calculated by the server';
   end if;
+  select warehouse_id into v_warehouse from public.sales_orders where id=v_order_first;
   update public.sales_routes set is_active=false
   where tenant_id=v_tenant_a and id=v_route;
   v_order_retry:=public.create_order_booker_order(
@@ -150,7 +150,7 @@ begin
   values(v_supplier,v_tenant_a,'TX-SUP','supplier','Smoke Test Supplier');
   insert into public.purchase_orders(id,tenant_id,branch_id,warehouse_id,supplier_id,po_number,status,created_by)
   values(v_purchase_order,v_tenant_a,v_branch_a,
-    (select id from public.warehouses where tenant_id=v_tenant_a and code='TX-WH'),
+    v_warehouse,
     v_supplier,'TX-PO-001','draft',v_user);
   insert into public.purchase_order_lines(id,tenant_id,purchase_order_id,product_id,unit_id,quantity,conversion_to_base,unit_cost,tax_rate,line_total)
   values(v_purchase_order_line,v_tenant_a,v_purchase_order,v_product,v_unit,10,1,20,10,200);
