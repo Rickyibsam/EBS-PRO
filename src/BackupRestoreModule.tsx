@@ -18,7 +18,8 @@ export default function BackupRestoreModule({db,tenantId,currentRole}:{db:Supaba
   const file=e.target.files?.[0];if(!file)return;setNotice("");setResult(null);
   try{
    const parsed=JSON.parse(await file.text());
-   if(parsed?.format!=="EBS-PRO-TENANT-BACKUP-V1"||parsed?.tenant_id!==tenantId||typeof parsed?.tables!=="object")throw new Error("This backup is invalid or belongs to a different company.");
+   if(parsed?.format!=="EBS-PRO-TENANT-BACKUP-V1"||parsed?.tenant_id!==tenantId||!parsed?.tables||typeof parsed.tables!=="object"||Array.isArray(parsed.tables))throw new Error("This backup is invalid or belongs to a different company.");
+   if(Object.values(parsed.tables).some(rows=>!Array.isArray(rows)))throw new Error("Backup table data is malformed. No restore was started.");
    setBackup(parsed);setFileName(file.name);setNotice("Backup file validated for this company. Restore will only add missing rows; existing records will not be overwritten or deleted.");
   }catch(err){setBackup(null);setFileName("");setNotice(err instanceof Error?err.message:"Backup file could not be read.");}
  }
@@ -28,7 +29,11 @@ export default function BackupRestoreModule({db,tenantId,currentRole}:{db:Supaba
   setBusy(true);setNotice("");setResult(null);
   try{
    const {data,error}=await db.rpc("restore_tenant_backup",{p_tenant_id:tenantId,p_backup:backup});if(error)throw error;
-   setResult(data);setNotice("Restore finished. "+Number(data?.imported_rows||0)+" missing records were added; "+(data?.skipped_tables?.length||0)+" table(s) need attention.");
+   setResult(data);
+   const added=Number(data?.imported_rows||0),attention=data?.skipped_tables?.length||0;
+   setNotice(data?.complete===true||data?.success===true&&attention===0
+    ?"Restore completed. "+added+" missing record(s) were added; existing records were preserved."
+    :"Restore is incomplete. "+added+" missing record(s) were added; "+attention+" table(s) need attention. Review the detailed errors before retrying.");
   }catch(e){setNotice(e instanceof Error?e.message:"Backup restore failed.");}
   finally{setBusy(false);}
  }
@@ -39,7 +44,7 @@ export default function BackupRestoreModule({db,tenantId,currentRole}:{db:Supaba
    <div className="transaction-form"><h3>1. Create a backup</h3><p>Downloads a JSON snapshot of the company’s tenant-scoped business tables. Passwords, API secrets and tenant membership/role assignments are excluded.</p><button className="primary-action" disabled={!allowed||busy} onClick={()=>void downloadBackup()}>Download backup JSON</button></div>
    <div className="transaction-form"><h3>2. Restore a backup</h3><p>Choose a backup exported from this same company. Restore is additive only: it never deletes or overwrites existing records.</p><label>Backup file<input type="file" accept="application/json,.json" onChange={e=>void chooseBackup(e)}/></label>{fileName&&<p><b>Selected:</b> {fileName}</p>}<button className="primary-action" disabled={!allowed||busy||!backup} onClick={()=>void restoreBackup()}>{busy?"Restoring…":"Restore missing records"}</button></div>
   </div>
-  {result&&<div className="transaction-form"><h3>Restore report</h3><div className="kpi-grid"><div><b>{Number(result.imported_rows||0).toLocaleString("en-PK")}</b><span>Records added</span></div><div><b>{result.passes||0}</b><span>Dependency passes</span></div><div><b>{result.skipped_tables?.length||0}</b><span>Tables needing attention</span></div></div>{result.skipped_tables?.length>0&&<><h4>Tables not restored</h4><ul>{result.skipped_tables.map((x:string)=><li key={x}><b>{x}</b>: {result.errors?.[x]||"Unresolved dependency or validation issue"}</li>)}</ul></>}</div>}
+  {result&&<div className="transaction-form"><h3>Restore report · {result.complete===true||result.success===true&&!(result.skipped_tables?.length)? "Complete":"Needs attention"}</h3><div className="kpi-grid"><div><b>{Number(result.imported_rows||0).toLocaleString("en-PK")}</b><span>Records added</span></div><div><b>{result.passes||0}</b><span>Dependency passes</span></div><div><b>{result.skipped_tables?.length||0}</b><span>Tables needing attention</span></div></div>{result.dependency_pass_limit_reached&&<p>The dependency pass limit was reached. Retry only after reviewing unresolved table dependencies.</p>}{result.skipped_tables?.length>0&&<><h4>Tables not restored</h4><ul>{result.skipped_tables.map((x:string)=><li key={x}><b>{x}</b>: {result.errors?.[x]||"Unresolved dependency or validation issue"}</li>)}</ul></>}</div>}
   <div className="module-footnote"><b>Important:</b> This is a manual JSON backup, not automatic point-in-time recovery. Restore only inserts missing records and may report tables that could not be restored because related records or validation requirements are missing. Keep multiple dated backup copies outside the hosting account.</div>
  </section>;
 }
