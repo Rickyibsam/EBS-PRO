@@ -139,6 +139,17 @@ where n.nspname='public' and p.proname in ('update_draft_voucher_lines','restore
 and position('module_permission_guard_internal' in pg_get_functiondef(p.oid))>0;
 
 insert into _ebs_integrity_findings
+select 'updated_at_trigger_missing_column','high',count(*)::bigint,
+       'Tables with set_updated_at trigger but no updated_at column'
+from pg_trigger t
+join pg_class c on c.oid=t.tgrelid
+join pg_namespace n on n.oid=c.relnamespace
+join pg_proc p on p.oid=t.tgfoid
+where n.nspname='public' and not t.tgisinternal and p.proname='set_updated_at'
+  and not exists(select 1 from information_schema.columns x
+    where x.table_schema='public' and x.table_name=c.relname and x.column_name='updated_at');
+
+insert into _ebs_integrity_findings
 select 'security_definer_without_search_path','high',count(*)::bigint,
        'SECURITY DEFINER public functions without an explicit search_path'
 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
