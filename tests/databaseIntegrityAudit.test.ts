@@ -10,7 +10,7 @@ const audit = await readFile(
 test("read-only production audit covers RLS and validated constraints", () => {
   assert.match(audit, /tables_without_rls/);
   assert.match(audit, /unvalidated_constraints/);
-  assert.match(audit, /contype in \('f','c'\)/);
+  assert.match(audit, /contype in \\('f','c'\\)/);
 });
 
 test("read-only production audit reconciles posted accounting and payroll", () => {
@@ -21,12 +21,12 @@ test("read-only production audit reconciles posted accounting and payroll", () =
   assert.match(audit, /paid_payroll_without_journal/);
 });
 
-test("tenant isolation audit compares tenant IDs across every scoped foreign-key relationship", () => {
+test("tenant isolation audit checks cross-tenant references, composite FKs and indexes", () => {
   assert.match(audit, /cross_tenant_reference_rows/);
   assert.match(audit, /tenant_fk_without_composite_pair/);
   assert.match(audit, /tenant_fk_missing_child_indexes/);
-  assert.match(audit, /c\.tenant_id is distinct from p\.tenant_id/);
-  assert.match(audit, /unnest\(r\.conkey,r\.confkey\)/);
+  assert.match(audit, /c\\.tenant_id is distinct from p\\.tenant_id/);
+  assert.match(audit, /unnest\\(r\\.conkey,r\\.confkey\\)/);
 });
 
 test("security audit checks SECURITY DEFINER search_path and voucher RPC guards", () => {
@@ -35,7 +35,10 @@ test("security audit checks SECURITY DEFINER search_path and voucher RPC guards"
   assert.match(audit, /module_permission_guard_internal/);
 });
 
-test("production audit uses only temporary state and contains no business data mutations", () => {
+test("production audit limits writes to its transaction-scoped findings table", () => {
   assert.match(audit, /create temporary table/i);
-  assert.doesNotMatch(audit, /\b(insert into|update\s+(public\.)?\w+|delete from|drop table|alter table)\b/i);
+  assert.doesNotMatch(
+    audit,
+    /\\b(insert\\s+into\\s+(?!_ebs_integrity_findings)|update\\s+(?!_ebs_integrity_findings)|delete\\s+from\\s+(?!_ebs_integrity_findings)|drop\\s+table|alter\\s+table)\\b/i
+  );
 });
