@@ -137,9 +137,11 @@ begin
   insert into public.purchase_orders(id,tenant_id,branch_id,warehouse_id,supplier_id,po_number,status,created_by)
   values(v_purchase_order,v_tenant_a,v_branch_a,
     (select id from public.warehouses where tenant_id=v_tenant_a and code='TX-WH'),
-    v_supplier,'TX-PO-001','approved',v_user);
+    v_supplier,'TX-PO-001','draft',v_user);
   insert into public.purchase_order_lines(id,tenant_id,purchase_order_id,product_id,unit_id,quantity,conversion_to_base,unit_cost,tax_rate,line_total)
   values(v_purchase_order_line,v_tenant_a,v_purchase_order,v_product,v_unit,10,1,20,10,200);
+  update public.purchase_orders set status='approved',approved_by=v_user
+  where id=v_purchase_order and tenant_id=v_tenant_a;
   insert into public.goods_receipts(id,tenant_id,purchase_order_id,warehouse_id,grn_number,received_date,status,received_by)
   values(v_grn,v_tenant_a,v_purchase_order,
     (select id from public.warehouses where tenant_id=v_tenant_a and code='TX-WH'),
