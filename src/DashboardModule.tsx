@@ -48,7 +48,8 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
    db.from("purchase_invoices").select("grand_total,invoice_date").eq("tenant_id",tenantId).eq("status","posted").gte("invoice_date",trendStart).lte("invoice_date",today),
    db.from("payments").select("amount,payment_type,payment_date").eq("tenant_id",tenantId).gte("payment_date",trendStart).lte("payment_date",today)
   ]);
-  const err=[sales,salesPeriod,orders,purchases,purchaseInvoices,products,customers,vendors,receipts,deliveries].find(x=>x.error);if(err)throw err.error;\n  if(allowedModules.includes("Reports")){try{const check=await db.rpc("get_erp_integration_reconciliation",{p_tenant_id:tenantId});if(!check.error)setIntegrationCheck(check.data);}catch{/* Reconciliation visibility is optional for roles without finance access. */}}
+  const err=[sales,salesPeriod,orders,purchases,purchaseInvoices,products,customers,vendors,receipts,deliveries].find(x=>x.error);if(err)throw err.error;
+  if(allowedModules.includes("Reports")){try{const check=await db.rpc("get_erp_integration_reconciliation",{p_tenant_id:tenantId});if(!check.error)setIntegrationCheck(check.data);}catch{/* Reconciliation visibility is optional for roles without finance access. */}}
   const daySales=(sales.data??[]).reduce((s,x)=>s+Number(x.grand_total||0),0);
   const weekSales=(salesPeriod.data??[]).filter(x=>x.invoice_date>=weekStart).reduce((s,x)=>s+Number(x.grand_total||0),0);
   const monthSales=(salesPeriod.data??[]).reduce((s,x)=>s+Number(x.grand_total||0),0);
