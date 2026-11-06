@@ -192,6 +192,13 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
 
   useEffect(()=>{void db.auth.getSession().then(async({data})=>{const userId=data.session?.user.id||"";const [orders,visits]=await Promise.all([getPendingBookerOrders(tenantId,userId),getPendingBookerVisits(tenantId,userId)]);setPendingCount(orders.length);setPendingVisitCount(visits.length);}).catch(()=>{});const onOnline=()=>void syncQueuedOrders();window.addEventListener('online',onOnline);if(navigator.onLine)void syncQueuedOrders();return()=>window.removeEventListener('online',onOnline);},[tenantId]);
 
+  // Retry queued orders/visits while online; failed requests remain in IndexedDB.
+  useEffect(()=>{
+    if(!navigator.onLine||syncing||pendingCount+pendingVisitCount===0)return;
+    const retry=window.setTimeout(()=>void syncQueuedOrders(),30000);
+    return()=>window.clearTimeout(retry);
+  },[pendingCount,pendingVisitCount,syncing,tenantId]);
+
   useEffect(() => {
     let cancelled = false;
     async function loadCustomers() {
