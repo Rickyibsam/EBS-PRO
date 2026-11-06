@@ -36,7 +36,7 @@ begin
   if v_run.status <> 'draft' then
     raise exception 'Incentives can only be imported into a draft payroll run.';
   end if;
-  if jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then
+  if p_items is null or jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then
     raise exception 'At least one earned employee incentive is required.';
   end if;
 
@@ -74,6 +74,15 @@ begin
        or v_target.period_start <> v_run.period_start
        or v_target.period_end <> v_run.period_end then
       raise exception 'An incentive target does not match this company, employee payroll period or employee scope.';
+    end if;
+
+    if exists (
+      select 1 from public.sales_incentive_accruals
+      where tenant_id = v_run.tenant_id
+        and sales_target_id = v_target.id
+        and status = 'settled'
+    ) then
+      raise exception 'A settled incentive target cannot be imported into payroll again.';
     end if;
 
     select * into v_line
