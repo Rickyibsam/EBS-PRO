@@ -41,7 +41,7 @@ export default function TargetsModule({db,tenantId,currentRole}:{db:SupabaseClie
   finally{setSaving(false);}
  }
  async function settleAccrual(id:string){
-  if(!["owner","admin","manager","accounts"].includes(currentRole))return;
+  if(!canUpdatePayroll)return;
   setSaving(true);
   const {data:row,error:readError}=await db.from("sales_incentive_accruals").select("earned_amount").eq("tenant_id",tenantId).eq("id",id).eq("status","accrued").single();
   if(readError){setNotice(readError.message);setSaving(false);return;}
