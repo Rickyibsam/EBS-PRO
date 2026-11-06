@@ -20,7 +20,8 @@ const launchers=[
 export default function DashboardModule({db,tenantId,company,allowedModules,onNavigate}:{db:SupabaseClient;tenantId:string;company:string;allowedModules:string[];onNavigate:(module:string)=>void}){
  const [metrics,setMetrics]=useState<Metric[]>([]),[recentActivity,setRecentActivity]=useState<any[]>([]),[notifications,setNotifications]=useState<Notice[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState("");
  const [updatedAt,setUpdatedAt]=useState("");
- const [monthlyTrend,setMonthlyTrend]=useState<MonthlyTrend[]>([]);\n const [integrationCheck,setIntegrationCheck]=useState<any|null>(null);
+ const [monthlyTrend,setMonthlyTrend]=useState<MonthlyTrend[]>([]);
+ const [integrationCheck,setIntegrationCheck]=useState<any|null>(null);
  const [trendMonths,setTrendMonths]=useState<6|12>(6);
  const [expandedLauncher,setExpandedLauncher]=useState("1. Dashboard & Management");
  useEffect(()=>{let live=true;async function load(){setLoading(true);setError("");try{
