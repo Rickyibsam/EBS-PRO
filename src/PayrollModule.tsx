@@ -1,5 +1,6 @@
 import {FormEvent,useEffect,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
+import {useModuleAction} from "./lib/modulePermissionContext";
 type Row=Record<string,any>;
 export default function PayrollModule({db,tenantId,currentRole}:{db:SupabaseClient;tenantId:string;currentRole:string}){
  const [employees,setEmployees]=useState<Row[]>([]),[runs,setRuns]=useState<Row[]>([]),[lines,setLines]=useState<Row[]>([]);
@@ -7,7 +8,11 @@ export default function PayrollModule({db,tenantId,currentRole}:{db:SupabaseClie
  const [periodStart,setPeriodStart]=useState(new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString().slice(0,10));
  const [periodEnd,setPeriodEnd]=useState(new Date(new Date().getFullYear(),new Date().getMonth()+1,0).toISOString().slice(0,10));
  const [payDate,setPayDate]=useState(new Date().toISOString().slice(0,10));
- const canManage=["owner","admin","manager","accounts"].includes(currentRole);const canEditSalary=["owner","admin","manager"].includes(currentRole);
+ const roleCanManage=["owner","admin","manager","accounts"].includes(currentRole);
+ const canCreate=useModuleAction("hr_payroll","create",roleCanManage);
+ const canUpdate=useModuleAction("hr_payroll","update",roleCanManage);
+ const canManage=canCreate||canUpdate;
+ const canEditSalary=useModuleAction("hr_payroll","update",["owner","admin","manager"].includes(currentRole));
  const money=(v:number)=>"PKR "+Number(v||0).toLocaleString("en-PK",{minimumFractionDigits:2,maximumFractionDigits:2});
  async function load(){
   setLoading(true);setNotice("");
@@ -33,7 +38,7 @@ export default function PayrollModule({db,tenantId,currentRole}:{db:SupabaseClie
   if(error)setNotice(error.message);else{setEmployees(old=>old.map(x=>x.id===id?{...x,basic_salary:amount}:x));setNotice("Employee salary master updated.");}
  }
  async function createRun(e:FormEvent){
-  e.preventDefault();if(!canManage)return;setSaving(true);setNotice("");
+  e.preventDefault();if(!canCreate)return;setSaving(true);setNotice("");
   try{
    if(!periodStart||!periodEnd||periodEnd<periodStart)throw new Error("Enter a valid payroll period.");
    const staff=employees.filter(x=>x.employment_status==="active"&&Number(x.basic_salary)>0);
@@ -84,12 +89,12 @@ export default function PayrollModule({db,tenantId,currentRole}:{db:SupabaseClie
   {notice&&<div className="notice">{notice}</div>}
   <h3>Employee salary master</h3>
   <div className="data-table-wrap"><table className="data-table"><thead><tr><th>Employee</th><th>Code</th><th>Designation</th><th>Employment</th><th>Basic salary (PKR / month)</th><th>Joining date</th></tr></thead><tbody>{employees.map(x=><tr key={x.id}><td>{x.full_name}</td><td>{x.employee_code}</td><td>{x.job_title||"—"}</td><td>{x.employment_status}</td><td><input type="number" min="0" step="0.01" disabled={!canEditSalary} value={x.basic_salary??0} onChange={e=>setEmployees(old=>old.map(y=>y.id===x.id?{...y,basic_salary:e.target.value}:y))} onBlur={e=>void updateSalary(x.id,e.target.value)}/></td><td>{x.joining_date||"—"}</td></tr>)}{!employees.length&&<tr><td colSpan={6} className="table-empty">No employee records found.</td></tr>}</tbody></table></div>
-  {canManage&&<form className="transaction-form" onSubmit={createRun}><h3>Generate monthly payroll draft</h3><div className="form-grid"><label>Period start<input type="date" required value={periodStart} onChange={e=>setPeriodStart(e.target.value)}/></label><label>Period end<input type="date" required value={periodEnd} onChange={e=>setPeriodEnd(e.target.value)}/></label><label>Pay date<input type="date" required value={payDate} onChange={e=>setPayDate(e.target.value)}/></label></div><button disabled={saving}>{saving?"Generating…":"Generate draft payroll"}</button></form>}
+  {canCreate&&<form className="transaction-form" onSubmit={createRun}><h3>Generate monthly payroll draft</h3><div className="form-grid"><label>Period start<input type="date" required value={periodStart} onChange={e=>setPeriodStart(e.target.value)}/></label><label>Period end<input type="date" required value={periodEnd} onChange={e=>setPeriodEnd(e.target.value)}/></label><label>Pay date<input type="date" required value={payDate} onChange={e=>setPayDate(e.target.value)}/></label></div><button disabled={saving}>{saving?"Generating…":"Generate draft payroll"}</button></form>}
   <h3>Payroll runs</h3>
   <div className="table-tools"><select value={selected} onChange={e=>setSelected(e.target.value)}><option value="">Select payroll run</option>{runs.map(x=><option key={x.id} value={x.id}>{x.run_number} · {x.period_start} to {x.period_end} · {x.status}</option>)}</select><span>{runs.length} runs</span><button onClick={exportPayroll}>Export Excel (CSV)</button><button onClick={()=>window.print()}>Print / PDF</button></div>
   {activeRun&&<><div className="stats report-stats"><article><small>Gross salary</small><strong>{money(activeRun.gross_total)}</strong></article><article><small>Deductions</small><strong>{money(activeRun.deductions_total)}</strong></article><article><small>Net payroll</small><strong>{money(activeRun.net_total)}</strong></article><article><small>Status</small><strong>{activeRun.status}</strong></article></div>
-   <div className="data-table-wrap"><table className="data-table"><thead><tr><th>Employee</th><th>Basic</th><th>Allowances</th><th>Overtime</th><th>Sales / Delivery Incentive</th><th>Deductions</th><th>Net</th><th>Payment</th><th>Action</th></tr></thead><tbody>{lines.map(x=><tr key={x.id}><td>{x.employee}</td><td>{money(x.basic_salary)}</td><td><input type="number" min="0" step="0.01" disabled={!canManage||activeRun.status!=="draft"} value={x.allowances} onBlur={e=>void updateLine(x,"allowances",e.target.value)}/></td><td><input type="number" min="0" step="0.01" disabled={!canManage||activeRun.status!=="draft"} value={x.overtime} onBlur={e=>void updateLine(x,"overtime",e.target.value)}/></td><td><input type="number" min="0" step="0.01" disabled={!canManage||activeRun.status!=="draft"} value={x.sales_incentive??0} onBlur={e=>void updateLine(x,"sales_incentive",e.target.value)}/></td><td><input type="number" min="0" step="0.01" disabled={!canManage||activeRun.status!=="draft"} value={x.deductions} onBlur={e=>void updateLine(x,"deductions",e.target.value)}/></td><td>{money(x.net_salary)}</td><td>{x.payment_status}</td><td>{activeRun.status==="posted"&&x.payment_status==="unpaid"&&canManage?<button disabled={saving} onClick={()=>void payLine(x)}>Pay salary</button>:x.payment_status==="paid"?"Paid":"—"}</td></tr>)}{!lines.length&&<tr><td colSpan={9} className="table-empty">No payroll lines found.</td></tr>}</tbody></table></div>
-   {activeRun.status==="draft"&&canManage&&<button disabled={saving||!lines.length} onClick={()=>void postRun()}>Post payroll to accounts</button>}
+   <div className="data-table-wrap"><table className="data-table"><thead><tr><th>Employee</th><th>Basic</th><th>Allowances</th><th>Overtime</th><th>Sales / Delivery Incentive</th><th>Deductions</th><th>Net</th><th>Payment</th><th>Action</th></tr></thead><tbody>{lines.map(x=><tr key={x.id}><td>{x.employee}</td><td>{money(x.basic_salary)}</td><td><input type="number" min="0" step="0.01" disabled={!canUpdate||activeRun.status!=="draft"} value={x.allowances} onBlur={e=>void updateLine(x,"allowances",e.target.value)}/></td><td><input type="number" min="0" step="0.01" disabled={!canUpdate||activeRun.status!=="draft"} value={x.overtime} onBlur={e=>void updateLine(x,"overtime",e.target.value)}/></td><td><input type="number" min="0" step="0.01" disabled={!canUpdate||activeRun.status!=="draft"} value={x.sales_incentive??0} onBlur={e=>void updateLine(x,"sales_incentive",e.target.value)}/></td><td><input type="number" min="0" step="0.01" disabled={!canUpdate||activeRun.status!=="draft"} value={x.deductions} onBlur={e=>void updateLine(x,"deductions",e.target.value)}/></td><td>{money(x.net_salary)}</td><td>{x.payment_status}</td><td>{activeRun.status==="posted"&&x.payment_status==="unpaid"&&canUpdate?<button disabled={saving} onClick={()=>void payLine(x)}>Pay salary</button>:x.payment_status==="paid"?"Paid":"—"}</td></tr>)}{!lines.length&&<tr><td colSpan={9} className="table-empty">No payroll lines found.</td></tr>}</tbody></table></div>
+   {activeRun.status==="draft"&&canUpdate&&<button disabled={saving||!lines.length} onClick={()=>void postRun()}>Post payroll to accounts</button>}
   </>}
  </section>;
 }
