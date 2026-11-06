@@ -26,6 +26,17 @@ declare
   v_order_request uuid := gen_random_uuid();
   v_order_first uuid;
   v_order_retry uuid;
+  v_supplier uuid := gen_random_uuid();
+  v_purchase_order uuid := gen_random_uuid();
+  v_purchase_order_line uuid := gen_random_uuid();
+  v_grn uuid := gen_random_uuid();
+  v_grn_line uuid := gen_random_uuid();
+  v_purchase_invoice uuid;
+  v_invoice_result jsonb;
+  v_inventory_account uuid := gen_random_uuid();
+  v_grni_account uuid := gen_random_uuid();
+  v_tax_account uuid := gen_random_uuid();
+  v_ap_account uuid := gen_random_uuid();
   v_rejected boolean := false;
 begin
   select user_id into v_user
@@ -114,7 +125,42 @@ begin
   insert into public.chart_of_accounts(id,tenant_id,account_code,account_name,account_type)
   values
     (v_account_debit,v_tenant_a,'TX-1000','Smoke Test Cash','asset'),
-    (v_account_credit,v_tenant_a,'TX-4000','Smoke Test Income','income');
+    (v_account_credit,v_tenant_a,'TX-4000','Smoke Test Income','income'),
+    (v_inventory_account,v_tenant_a,'1200','Inventory','asset'),
+    (v_grni_account,v_tenant_a,'2100','Goods Received Not Invoiced','liability'),
+    (v_tax_account,v_tenant_a,'1300','Input Tax','asset'),
+    (v_ap_account,v_tenant_a,'2000','Accounts Payable','liability');
+
+  -- Purchase -> GRN -> stock ledger -> supplier invoice -> GL workflow.
+  insert into public.parties(id,tenant_id,party_code,party_type,name)
+  values(v_supplier,v_tenant_a,'TX-SUP','supplier','Smoke Test Supplier');
+  insert into public.purchase_orders(id,tenant_id,branch_id,warehouse_id,supplier_id,po_number,status,created_by)
+  values(v_purchase_order,v_tenant_a,v_branch_a,
+    (select id from public.warehouses where tenant_id=v_tenant_a and code='TX-WH'),
+    v_supplier,'TX-PO-001','approved',v_user);
+  insert into public.purchase_order_lines(id,tenant_id,purchase_order_id,product_id,unit_id,quantity,conversion_to_base,unit_cost,tax_rate,line_total)
+  values(v_purchase_order_line,v_tenant_a,v_purchase_order,v_product,v_unit,10,1,20,10,200);
+  insert into public.goods_receipts(id,tenant_id,purchase_order_id,warehouse_id,grn_number,received_date,status,received_by)
+  values(v_grn,v_tenant_a,v_purchase_order,
+    (select id from public.warehouses where tenant_id=v_tenant_a and code='TX-WH'),
+    'TX-GRN-001',current_date,'draft',v_user);
+  insert into public.goods_receipt_lines(id,tenant_id,goods_receipt_id,product_id,unit_id,quantity,conversion_to_base,accepted_quantity,rejected_quantity,unit_cost,purchase_order_line_id)
+  values(v_grn_line,v_tenant_a,v_grn,v_product,v_unit,5,1,5,0,20,v_purchase_order_line);
+  perform public.post_goods_receipt(v_grn);
+  if not exists(select 1 from public.stock_movements where tenant_id=v_tenant_a
+    and reference_type='goods_receipt' and reference_id=v_grn and quantity_in=5) then
+    raise exception 'FAIL: GRN did not create the expected stock movement';
+  end if;
+  v_invoice_result:=public.create_purchase_invoice(v_grn,'TX-SUP-INV-001',current_date,current_date+30,10,'Smoke test supplier invoice');
+  v_purchase_invoice:=(v_invoice_result->>'purchase_invoice_id')::uuid;
+  perform public.post_purchase_invoice(v_purchase_invoice);
+  if not exists(select 1 from public.purchase_invoices where id=v_purchase_invoice and status='posted' and grand_total=110) then
+    raise exception 'FAIL: supplier invoice did not post with expected total';
+  end if;
+  if not exists(select 1 from public.journal_entries where tenant_id=v_tenant_a
+    and source_type='purchase_invoice' and source_id=v_purchase_invoice and status='posted') then
+    raise exception 'FAIL: supplier invoice posting did not create a GL journal';
+  end if;
 
   -- Balanced journal must post and preserve double-entry equality.
   insert into public.journal_entries(id,tenant_id,journal_number,entry_date,narration,status,created_by)
