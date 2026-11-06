@@ -97,8 +97,8 @@ begin
     and subtotal=100 and tax_total=17 and grand_total=117) then
     raise exception 'FAIL: Booker order totals were not calculated by the server';
   end if;
-  update public.route_assignments set assigned_to=current_date-1
-  where tenant_id=v_tenant_a and route_id=v_route and employee_id=v_employee;
+  update public.sales_routes set is_active=false
+  where tenant_id=v_tenant_a and id=v_route;
   v_order_retry:=public.create_order_booker_order(
     v_tenant_a,v_route,v_customer,v_order_request,current_date+1,'Retry after route change',
     jsonb_build_array(jsonb_build_object('product_id',v_product,'unit_id',v_unit,'quantity',2))
