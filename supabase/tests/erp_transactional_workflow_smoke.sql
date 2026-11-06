@@ -349,7 +349,7 @@ begin
   values(v_tenant_a,v_budget,v_account_credit,null,1000,'Company-wide sales budget'),
         (v_tenant_a,v_budget,v_account_credit,v_branch_a,500,'Branch sales budget');
   select bool_or(actual_scope_supported) filter(where branch_id is null),
-         max(actual_scope_supported) filter(where branch_id=v_branch_a)
+         bool_or(actual_scope_supported) filter(where branch_id=v_branch_a)
     into v_budget_company_supported,v_budget_branch_supported
   from public.get_budget_actuals(v_tenant_a)
   where budget_id=v_budget;
