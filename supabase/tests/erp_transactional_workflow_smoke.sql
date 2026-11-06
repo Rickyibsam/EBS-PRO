@@ -206,7 +206,7 @@ begin
   v_delivery_id:=(v_delivery_result->>'delivery_id')::uuid;
   select id into v_delivery_line from public.delivery_lines
   where tenant_id=v_tenant_a and delivery_id=v_delivery_id;
-  if (select id from public.sales_orders where id=v_order_first) is distinct from
+  if (select warehouse_id from public.sales_orders where id=v_order_first) is distinct from
      (select warehouse_id from public.deliveries where id=v_delivery_id) then
     raise exception 'FAIL: sales order and delivery warehouse do not match';
   end if;
