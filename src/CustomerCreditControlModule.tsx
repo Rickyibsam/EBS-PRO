@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {useModuleAction} from "./lib/modulePermissionContext";
 type Party={id:string;party_code:string;name:string;phone:string|null;credit_limit:number;opening_balance:number;payment_terms_days:number};
 type Invoice={id:string;customer_id:string;invoice_number:string;invoice_date:string;due_date:string|null;grand_total:number};
 type Balance={customer:Party;current:number;d1_30:number;d31_60:number;d61_90:number;over90:number;opening:number;total:number};
@@ -39,12 +40,13 @@ export default function CustomerCreditControlModule({db,tenantId,currentRole}:{d
  const filtered=balances.filter(x=>(filter==="all"||(filter==="overlimit"&&x.customer.credit_limit>0&&x.total>x.customer.credit_limit)||(filter==="overdue"&&x.d1_30+x.d31_60+x.d61_90+x.over90>0))&&[x.customer.name,x.customer.party_code,x.customer.phone||""].some(v=>v.toLowerCase().includes(search.toLowerCase())));
  const totalExposure=balances.reduce((s,x)=>s+x.total,0),overdue=balances.reduce((s,x)=>s+x.d1_30+x.d31_60+x.d61_90+x.over90,0),overLimit=balances.filter(x=>x.customer.credit_limit>0&&x.total>x.customer.credit_limit).length;
  async function saveLimit(p:Party){
+  if(!canEdit)return;
   const value=Number(limits[p.id]);if(!Number.isFinite(value)||value<0){setNotice("Credit limit must be a valid non-negative amount.");return;}
   setSavingId(p.id);setNotice("");const {error}=await db.from("parties").update({credit_limit:value}).eq("tenant_id",tenantId).eq("id",p.id);
   if(error)setNotice(error.message);else{setNotice("Credit limit updated for "+p.name+".");await load();}setSavingId("");
  }
  function exportCsv(){const rows=filtered.map(x=>({customer:x.customer.name,code:x.customer.party_code,credit_limit:x.customer.credit_limit,opening_balance:x.opening,current:x.current,days_1_30:x.d1_30,days_31_60:x.d31_60,days_61_90:x.d61_90,over_90:x.over90,total_outstanding:x.total,available_credit:x.customer.credit_limit>0?x.customer.credit_limit-x.total:""}));const keys=Object.keys(rows[0]||{customer:"",code:"",credit_limit:"",opening_balance:"",current:"",days_1_30:"",days_31_60:"",days_61_90:"",over_90:"",total_outstanding:"",available_credit:""});const csv=[keys.join(","),...rows.map(r=>keys.map(k=>'"'+String(r[k as keyof typeof r]??"").replace(/"/g,'""')+'"').join(","))].join("\r\n");const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="ebs-pro-customer-credit-ageing.csv";a.click();URL.revokeObjectURL(url);}
- const canEdit=["owner","admin","manager","accounts","sales"].includes(currentRole);
+ const canEdit=useModuleAction("sales_customer","update",["owner","admin","manager","accounts","sales"].includes(currentRole));
  return <section className="module-page"><div className="module-toolbar"><div><h2>Customer Credit Control</h2><p>Credit limits, invoice outstanding, overdue ageing and customer exposure. Posted invoices, receipts and posted credit notes only.</p></div><button onClick={()=>void load()}>↻ Refresh</button></div>
  {notice&&<div className="notice">{notice}</div>}
  <div className="stats report-stats"><article><small>Total receivables</small><strong>{money(totalExposure)}</strong></article><article><small>Overdue receivables</small><strong>{money(overdue)}</strong></article><article><small>Customers over limit</small><strong>{overLimit}</strong></article><article><small>Customer accounts</small><strong>{parties.length}</strong></article></div>
