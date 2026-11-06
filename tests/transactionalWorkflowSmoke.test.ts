@@ -49,6 +49,25 @@ test("payroll workflow posts accrual, pays once, and rejects invalid calculation
   assert.ok(smoke.includes("invalid payroll arithmetic was not safely rejected"));
 });
 
+test("fixed asset workflow posts depreciation once and disposes with a balanced GL journal", () => {
+  assert.ok(smoke.includes("public.post_asset_monthly_depreciation("));
+  assert.ok(smoke.includes("v_depreciation_retry"));
+  assert.ok(smoke.includes("public.dispose_fixed_asset("));
+  assert.ok(smoke.includes("asset disposal did not post its GL journal"));
+});
+
+test("budget actuals report supported company and source-inferred branch scope", () => {
+  assert.ok(smoke.includes("public.get_budget_actuals(v_tenant_a)"));
+  assert.ok(smoke.includes("company-wide budget actuals were not supported"));
+  assert.ok(smoke.includes("source-inferred branch attribution"));
+});
+
+test("backup export and same-tenant additive restore are complete and idempotent", () => {
+  assert.ok(smoke.includes("public.export_tenant_backup(v_tenant_a)"));
+  assert.ok(smoke.includes("public.restore_tenant_backup(v_tenant_a,v_backup)"));
+  assert.ok(smoke.includes("additive_only_no_overwrite_no_delete"));
+});
+
 test("accounting workflow posts balanced journals and rejects unbalanced journals", () => {
   assert.ok(smoke.includes("public.post_journal_entry(v_journal_ok)"));
   assert.ok(smoke.includes("public.post_journal_entry(v_journal_bad)"));
