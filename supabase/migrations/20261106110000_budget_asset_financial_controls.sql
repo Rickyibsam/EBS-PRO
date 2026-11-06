@@ -76,8 +76,8 @@ begin
  if not (public.has_tenant_role(p_tenant_id,array['owner','admin','manager','accounts']) or private.module_permission_grant_internal(p_tenant_id,'accounts_finance','view')) then raise exception 'Accounts/budget view permission required.' using errcode='42501'; end if;
  return query
  select bl.id,bl.budget_id,bl.account_id,bl.branch_id,bl.budget_amount,
-  case when bl.branch_id is null then coalesce(sum(case when coa.account_type='income' then jl.credit-jl.debit else jl.debit-jl.credit end),0) else null end,
-  case when bl.branch_id is null then bl.budget_amount-coalesce(sum(case when coa.account_type='income' then jl.credit-jl.debit else jl.debit-jl.credit end),0) else null end,
+  case when bl.branch_id is null then coalesce(sum(case when je.id is not null then case when coa.account_type='income' then jl.credit-jl.debit else jl.debit-jl.credit end else 0 end),0) else null end,
+  case when bl.branch_id is null then bl.budget_amount-coalesce(sum(case when je.id is not null then case when coa.account_type='income' then jl.credit-jl.debit else jl.debit-jl.credit end else 0 end),0) else null end,
   b.period_start,b.period_end,(bl.branch_id is null)
  from public.budget_lines bl join public.budgets b on b.id=bl.budget_id and b.tenant_id=bl.tenant_id
  join public.chart_of_accounts coa on coa.id=bl.account_id and coa.tenant_id=bl.tenant_id
