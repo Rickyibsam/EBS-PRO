@@ -19,6 +19,13 @@ test("tenant-isolation workflow rejects cross-tenant branch references", () => {
   assert.ok(smoke.includes("cross-tenant branch reference was accepted"));
 });
 
+test("Booker workflow calculates server totals and replays idempotently after route changes", () => {
+  assert.ok(smoke.includes("public.create_order_booker_order("));
+  assert.ok(smoke.includes("server-side price/tax"));
+  assert.ok(smoke.includes("v_order_retry<>v_order_first"));
+  assert.ok(smoke.includes("client_request_id=v_order_request"));
+});
+
 test("accounting workflow posts balanced journals and rejects unbalanced journals", () => {
   assert.ok(smoke.includes("public.post_journal_entry(v_journal_ok)"));
   assert.ok(smoke.includes("public.post_journal_entry(v_journal_bad)"));
