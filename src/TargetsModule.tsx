@@ -98,30 +98,14 @@ export default function TargetsModule({db,tenantId,currentRole}:{db:SupabaseClie
    const completed=targets.filter(t=>t.employee_id&&t.period_start===start&&t.period_end===end&&progress(t).earned>0&&!settledTargetIds.has(t.id));
    if(!completed.length)throw new Error("No employee-specific earned incentives are ready for this period.");
    const {data:runs,error:runError}=await db.from("payroll_runs").select("id,period_start,period_end,status").eq("tenant_id",tenantId).eq("period_start",start).eq("period_end",end).eq("status","draft");
-   if(runError)throw runError;if(!runs?.length)throw new Error("Create a draft payroll run with exactly the same start/end dates first.");
+   if(runError)throw runError;
+   if(!runs?.length)throw new Error("Create a draft payroll run with exactly the same start/end dates first.");
    if(runs.length!==1)throw new Error("More than one draft payroll run matches this period. Resolve duplicate drafts before importing.");
-   const runId=runs[0].id;
-   const {data:payLines,error:lineError}=await db.from("payroll_lines").select("id,employee_id,basic_salary,allowances,overtime,deductions,sales_incentive,net_salary").eq("tenant_id",tenantId).eq("payroll_run_id",runId);
-   if(lineError)throw lineError;
-   const lineByEmployee=new Map((payLines||[]).map(x=>[x.employee_id,x]));
-   const {data:old,error:oldError}=await db.from("payroll_incentive_accruals").select("employee_id,earned_amount").eq("tenant_id",tenantId).eq("payroll_run_id",runId);
-   if(oldError)throw oldError;
-   const oldTotals=(old||[]).reduce((a,x)=>({...a,[x.employee_id]:(a[x.employee_id]||0)+Number(x.earned_amount||0)}),{} as Record<string,number>);
-   const payload=completed.filter(t=>lineByEmployee.has(t.employee_id)).map(t=>({tenant_id:tenantId,payroll_run_id:runId,payroll_line_id:lineByEmployee.get(t.employee_id)!.id,employee_id:t.employee_id,sales_target_id:t.id,earned_amount:Number(progress(t).earned.toFixed(2)),calculated_at:new Date().toISOString()}));
-   if(!payload.length)throw new Error("No matching employee payroll lines found in the draft run.");
-   const {error:upsertError}=await db.from("payroll_incentive_accruals").upsert(payload,{onConflict:"tenant_id,payroll_run_id,sales_target_id"});
-   if(upsertError)throw upsertError;
-   const {data:all,error:allError}=await db.from("payroll_incentive_accruals").select("employee_id,earned_amount").eq("tenant_id",tenantId).eq("payroll_run_id",runId);
-   if(allError)throw allError;
-   const newTotals=(all||[]).reduce((a,x)=>({...a,[x.employee_id]:(a[x.employee_id]||0)+Number(x.earned_amount||0)}),{} as Record<string,number>);
-   for(const [employeeId,line] of lineByEmployee){
-    const manual=Math.max(0,Number(line.sales_incentive||0)-(oldTotals[employeeId]||0));
-    const incentive=manual+(newTotals[employeeId]||0);
-    const net=Number(line.basic_salary)+Number(line.allowances)+Number(line.overtime)+incentive-Number(line.deductions);
-    const {error}=await db.from("payroll_lines").update({sales_incentive:incentive,net_salary:net}).eq("tenant_id",tenantId).eq("id",line.id);
-    if(error)throw error;
-   }
-   setNotice("Earned target incentives imported into the matching draft payroll. Review the draft before posting.");
+   const items=completed.map(t=>({sales_target_id:t.id,earned_amount:Number(progress(t).earned.toFixed(2))}));
+   const {data,error}=await db.rpc("import_employee_incentives_to_payroll",{p_payroll_run_id:runs[0].id,p_items:items});
+   if(error)throw error;
+   if(data?.success!==true)throw new Error("The database did not confirm the incentive import.");
+   setNotice(Number(data.imported_targets||0)+" employee incentive target(s) imported atomically into the matching draft payroll. Review the draft before posting.");
   }catch(err){setNotice(err instanceof Error?err.message:"Incentives could not be imported.");}
   finally{setSaving(false);}
  }
