@@ -26,6 +26,12 @@ test("Booker workflow calculates server totals and replays idempotently after ro
   assert.ok(smoke.includes("client_request_id=v_order_request"));
 });
 
+test("database voucher RPC rejects direct updates denied by custom permissions", () => {
+  assert.ok(smoke.includes("tenant_user_module_permissions"));
+  assert.ok(smoke.includes("public.update_draft_voucher_lines("));
+  assert.ok(smoke.includes("direct voucher RPC bypassed custom update denial"));
+});
+
 test("purchase workflow posts GRN stock, supplier invoice, and purchase return", () => {
   assert.ok(smoke.includes("public.post_goods_receipt(v_grn)"));
   assert.ok(smoke.includes("public.create_purchase_invoice("));
@@ -47,6 +53,25 @@ test("payroll workflow posts accrual, pays once, and rejects invalid calculation
   assert.ok(smoke.includes("public.pay_payroll_line(v_payroll_line"));
   assert.ok(smoke.includes("already_paid"));
   assert.ok(smoke.includes("invalid payroll arithmetic was not safely rejected"));
+});
+
+test("fixed asset workflow posts depreciation once and disposes with a balanced GL journal", () => {
+  assert.ok(smoke.includes("public.post_asset_monthly_depreciation("));
+  assert.ok(smoke.includes("v_depreciation_retry"));
+  assert.ok(smoke.includes("public.dispose_fixed_asset("));
+  assert.ok(smoke.includes("asset disposal did not post its GL journal"));
+});
+
+test("budget actuals report supported company and source-inferred branch scope", () => {
+  assert.ok(smoke.includes("public.get_budget_actuals(v_tenant_a)"));
+  assert.ok(smoke.includes("company-wide budget actuals were not supported"));
+  assert.ok(smoke.includes("source-inferred branch attribution"));
+});
+
+test("backup export and same-tenant additive restore are complete and idempotent", () => {
+  assert.ok(smoke.includes("public.export_tenant_backup(v_tenant_a)"));
+  assert.ok(smoke.includes("public.restore_tenant_backup(v_tenant_a,v_backup)"));
+  assert.ok(smoke.includes("additive_only_no_overwrite_no_delete"));
 });
 
 test("accounting workflow posts balanced journals and rejects unbalanced journals", () => {

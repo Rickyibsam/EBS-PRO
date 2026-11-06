@@ -150,6 +150,13 @@ where n.nspname='public' and not t.tgisinternal and p.proname='set_updated_at'
     where x.table_schema='public' and x.table_name=c.relname and x.column_name='updated_at');
 
 insert into _ebs_integrity_findings
+select 'backup_restore_invalid_jsonb_object_length','high',count(*)::bigint,
+       'Backup restore functions still referencing unsupported jsonb_object_length'
+from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+where n.nspname='private' and p.prokind='f' and p.proname='restore_tenant_backup_internal'
+  and pg_get_functiondef(p.oid) ilike '%jsonb_object_length%';
+
+insert into _ebs_integrity_findings
 select 'security_definer_without_search_path','high',count(*)::bigint,
        'SECURITY DEFINER public functions without an explicit search_path'
 from pg_proc p join pg_namespace n on n.oid=p.pronamespace

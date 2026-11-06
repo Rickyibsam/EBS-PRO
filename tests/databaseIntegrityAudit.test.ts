@@ -32,6 +32,7 @@ test("tenant isolation audit checks cross-tenant references, composite FKs and i
 test("security audit checks SECURITY DEFINER search_path and voucher RPC guards", () => {
   assert.ok(audit.includes("security_definer_without_search_path"));
   assert.ok(audit.includes("updated_at_trigger_missing_column"));
+  assert.ok(audit.includes("backup_restore_invalid_jsonb_object_length"));
   assert.ok(audit.includes("voucher_rpc_custom_permission_guards"));
   assert.ok(audit.includes("module_permission_guard_internal"));
 });
