@@ -44,6 +44,7 @@ export default function PurchaseReturnsModule({db,tenantId,currentRole}:{db:Supa
   }catch(err){setNotice(err instanceof Error?err.message:"Purchase return could not be created.");}finally{setSaving(false);}
  }
  async function post(id:string){
+  if(!canPost)return;
   setSaving(true);setNotice("");
   try{const {data,error}=await db.rpc("post_purchase_debit_note",{p_debit_note_id:id});if(error)throw error;if(data?.success!==true)throw new Error("Vendor return posting was not confirmed.");setNotice("Vendor debit note posted. Stock and GRNI/AP accounting updated.");await load();}
   catch(err){setNotice(err instanceof Error?err.message:"Vendor return posting failed.");}finally{setSaving(false);}
