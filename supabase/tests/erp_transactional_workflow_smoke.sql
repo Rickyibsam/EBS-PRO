@@ -136,7 +136,7 @@ begin
   insert into public.chart_of_accounts(id,tenant_id,account_code,account_name,account_type)
   values
     (v_account_debit,v_tenant_a,'TX-1000','Smoke Test Cash','asset'),
-    (v_account_credit,v_tenant_a,'TX-4000','Smoke Test Income','income'),
+    (v_account_credit,v_tenant_a,'4000','Smoke Test Income','income'),
     (v_inventory_account,v_tenant_a,'1200','Inventory','asset'),
     (v_grni_account,v_tenant_a,'2100','Goods Received Not Invoiced','liability'),
     (v_tax_account,v_tenant_a,'1300','Input Tax','asset'),
