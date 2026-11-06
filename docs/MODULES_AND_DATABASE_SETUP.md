@@ -64,7 +64,7 @@ The application has 10 module groups. The navigation and module screens are pres
 - **Custom permissions:** the owner can enable per-user overrides for 10 module groups with View/Create/Update/Delete actions. If no override exists, the user's existing role rules remain the default. Owner/admin role access remains protected. Database RLS enforces explicit grants and denials on 77 tenant-scoped business tables. Reports access grants read-only access to underlying report data without granting create/update/delete; budget tables are governed by Accounts & Finance permissions.
 - **Barcode camera:** the Booker order form can use the phone camera on supported secure-context browsers that expose the BarcodeDetector API. Handheld keyboard-wedge scanners and manual SKU/barcode entry remain available as fallbacks.
 - **Persistent notifications:** operational alerts are saved per user and tenant with read/unread state, mark-read and mark-all-read actions. Repeated daily alerts update the existing notification instead of creating duplicates.
-- **Automated tests:** `npm test` runs 19 tests for permission resolution, barcode matching, Booker IndexedDB queues/snapshots and deliveryman IndexedDB queues/snapshots. GitHub Actions runs the tests before the TypeScript/Vite production build.
+- **Automated tests:** `npm test` runs 20 tests for permission resolution, barcode matching, Booker IndexedDB queues/snapshots and deliveryman IndexedDB queues/snapshots. GitHub Actions runs the tests before the TypeScript/Vite production build.
 - **Critical workflow defects found and fixed during transactional testing:**
   - The document-number allocator used obsolete column names and omitted the required branch key; it now uses the current branch-aware sequence schema.
   - Approved sales/purchase vouchers can now progress through controlled fulfilment/receipt status transitions without unlocking their business fields.
@@ -83,7 +83,7 @@ The following database smoke workflows were run as authenticated owner/staff con
 - Security: per-user module denial/grant enforcement, owner-managed permission row access, personal notification inbox access, and a cross-company customer-record read/write isolation check.
 - Client offline storage: all Booker and deliveryman IndexedDB unit tests passed.
 
-The latest GitHub Actions run completed successfully: **19/19 tests passed**, TypeScript checks passed and Vite production build passed. The latest code also includes browser-supported BarcodeDetector format detection. Render auto-deploys from `main`; confirm the newest deploy status before treating a just-pushed commit as live.
+The latest GitHub Actions run completed successfully: **19/20 tests passed**, TypeScript checks passed and Vite production build passed. The latest code also includes browser-supported BarcodeDetector format detection. Render auto-deploys from `main`; confirm the newest deploy status before treating a just-pushed commit as live.
 
 ## Remaining verification limits
 
