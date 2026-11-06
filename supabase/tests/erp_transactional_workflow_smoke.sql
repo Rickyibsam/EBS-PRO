@@ -57,6 +57,18 @@ declare
   v_payment_result jsonb;
   v_payment_retry jsonb;
   v_rejected boolean := false;
+  v_asset uuid := gen_random_uuid();
+  v_asset_cost_account uuid := gen_random_uuid();
+  v_accumulated_account uuid := gen_random_uuid();
+  v_depreciation_expense_account uuid := gen_random_uuid();
+  v_disposal_gain_account uuid := gen_random_uuid();
+  v_disposal_loss_account uuid := gen_random_uuid();
+  v_depreciation_result jsonb;
+  v_depreciation_retry jsonb;
+  v_disposal_result jsonb;
+  v_budget uuid := gen_random_uuid();
+  v_budget_company_supported boolean;
+  v_budget_branch_supported boolean;
 begin
   select user_id into v_user
   from public.tenant_memberships
@@ -154,7 +166,12 @@ begin
     (gen_random_uuid(),v_tenant_a,'1010','Bank','asset'),
     (gen_random_uuid(),v_tenant_a,'5200','Salaries Expense','expense'),
     (gen_random_uuid(),v_tenant_a,'2150','Salaries Payable','liability'),
-    (gen_random_uuid(),v_tenant_a,'2160','Payroll Deductions Payable','liability');
+    (gen_random_uuid(),v_tenant_a,'2160','Payroll Deductions Payable','liability'),
+    (v_asset_cost_account,v_tenant_a,'1500','Fixed Asset Cost','asset'),
+    (v_accumulated_account,v_tenant_a,'1590','Accumulated Depreciation','asset'),
+    (v_depreciation_expense_account,v_tenant_a,'5300','Depreciation Expense','expense'),
+    (v_disposal_gain_account,v_tenant_a,'4900','Gain on Asset Disposal','income'),
+    (v_disposal_loss_account,v_tenant_a,'5900','Loss on Asset Disposal','expense');
 
   -- Purchase -> GRN -> stock ledger -> supplier invoice -> GL workflow.
   insert into public.parties(id,tenant_id,party_code,party_type,name)
@@ -285,6 +302,62 @@ begin
   end;
   if not v_rejected or (select status from public.payroll_runs where id=v_bad_payroll_run)<>'draft' then
     raise exception 'FAIL: invalid payroll arithmetic was not safely rejected';
+  end if;
+
+  -- Fixed asset: monthly depreciation, idempotent retry, and disposal journal.
+  insert into public.fixed_asset_account_mappings(
+    tenant_id,asset_cost_account_id,accumulated_depreciation_account_id,
+    depreciation_expense_account_id,cash_account_id,disposal_gain_account_id,
+    disposal_loss_account_id,updated_by
+  ) values(
+    v_tenant_a,v_asset_cost_account,v_accumulated_account,
+    v_depreciation_expense_account,v_account_debit,v_disposal_gain_account,
+    v_disposal_loss_account,v_user
+  );
+  insert into public.fixed_assets(id,tenant_id,asset_code,asset_name,acquisition_date,
+    acquisition_cost,salvage_value,useful_life_months,depreciation_method,status,created_by,branch_id)
+  values(v_asset,v_tenant_a,'TX-ASSET-001','Smoke Test Delivery Vehicle',
+    date_trunc('month',current_date)::date,1200,0,12,'straight_line','active',v_user,v_branch_a);
+  v_depreciation_result:=public.post_asset_monthly_depreciation(
+    v_asset,date_trunc('month',current_date)::date,current_date,
+    v_depreciation_expense_account,v_accumulated_account
+  );
+  v_depreciation_retry:=public.post_asset_monthly_depreciation(
+    v_asset,date_trunc('month',current_date)::date,current_date,
+    v_depreciation_expense_account,v_accumulated_account
+  );
+  if coalesce((v_depreciation_retry->>'already_posted')::boolean,false) is not true then
+    raise exception 'FAIL: depreciation retry was not idempotent';
+  end if;
+  v_disposal_result:=public.dispose_fixed_asset(
+    v_asset,current_date,1000,v_asset_cost_account,v_accumulated_account,
+    v_account_debit,v_disposal_gain_account,v_disposal_loss_account
+  );
+  if not exists(select 1 from public.fixed_assets where id=v_asset and status='disposed') then
+    raise exception 'FAIL: fixed asset disposal did not update asset status';
+  end if;
+  if not exists(select 1 from public.journal_entries where tenant_id=v_tenant_a
+    and source_type='asset_disposal' and source_id=v_asset and status='posted') then
+    raise exception 'FAIL: fixed asset disposal did not post its GL journal';
+  end if;
+
+  -- Budget actuals must identify company-wide values and refuse misleading branch attribution.
+  insert into public.budgets(id,tenant_id,budget_name,period_start,period_end,status,created_by)
+  values(v_budget,v_tenant_a,'Smoke Test Monthly Budget',
+    date_trunc('month',current_date)::date,current_date,'draft',v_user);
+  insert into public.budget_lines(tenant_id,budget_id,account_id,branch_id,budget_amount,notes)
+  values(v_tenant_a,v_budget,v_account_credit,null,1000,'Company-wide sales budget'),
+        (v_tenant_a,v_budget,v_account_credit,v_branch_a,500,'Branch sales budget');
+  select max(actual_scope_supported) filter(where branch_id is null),
+         max(actual_scope_supported) filter(where branch_id=v_branch_a)
+    into v_budget_company_supported,v_budget_branch_supported
+  from public.get_budget_actuals(v_tenant_a)
+  where budget_id=v_budget;
+  if v_budget_company_supported is distinct from true then
+    raise exception 'FAIL: company-wide budget actuals were not supported';
+  end if;
+  if v_budget_branch_supported is distinct from false then
+    raise exception 'FAIL: branch budget did not flag unassigned journal attribution';
   end if;
 
   -- Balanced journal must post and preserve double-entry equality.
