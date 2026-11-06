@@ -76,8 +76,11 @@ export default function AssetBudgetModule({db,tenantId,currentRole}:{db:Supabase
   finally{setSaving(false);}
  }
  async function changeBudgetStatus(budget:any,next:"approved"|"closed"){
+  if(!canEdit)return;
   if(next==="approved"&&budget.status!=="draft")return;
   if(next==="closed"&&budget.status!=="approved")return;
+  if(next==="approved"&&!lines.some(line=>line.budget_id===budget.id)){setNotice("A budget needs at least one account line before it can be approved.");return;}
+  if(next==="approved"&&budgets.some(other=>other.id!==budget.id&&other.status==="approved"&&other.period_start<=budget.period_end&&other.period_end>=budget.period_start)){setNotice("Another approved budget already overlaps this date range. Close or adjust that budget before approval.");return;}
   const {data:user}=await db.auth.getUser();
   const patch:any={status:next};
   if(next==="approved")patch.approved_by=user.user?.id||null;
