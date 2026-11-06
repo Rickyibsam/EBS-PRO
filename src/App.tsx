@@ -95,6 +95,7 @@ export default function App() {
   useEffect(()=>{
     let live=true;
     async function loadOverrides(){
+      if(live){setModulePermissions({});setModuleActionPermissions({});}
       if(!db||!session||!organization||["owner","admin"].includes(currentRole)){if(live){setModulePermissions({});setModuleActionPermissions({});}return;}
       const {data,error}=await db.from("tenant_user_module_permissions").select("module_key,can_view,can_create,can_update,can_delete").eq("tenant_id",organization.id).eq("user_id",session.user.id);
       if(!live)return;
