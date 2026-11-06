@@ -11,6 +11,8 @@ export default function AccountingModule({ db, tenantId,currentRole }: { db: Sup
   const canUpdate=useModuleAction("accounts_finance","update",roleCanManage);
   const [tab, setTab] = useState("journals");
   const [accounts, setAccounts] = useState<Row[]>([]);
+  const [branches,setBranches]=useState<Row[]>([]);
+  const [branchId,setBranchId]=useState("");
   const [journals, setJournals] = useState<Row[]>([]);
   const [trialRows, setTrialRows] = useState<TrialRow[]>([]);
   const [ledgerParties,setLedgerParties]=useState<Row[]>([]);
@@ -44,15 +46,17 @@ export default function AccountingModule({ db, tenantId,currentRole }: { db: Sup
   async function load() {
     setLoading(true);
     setNotice("");
-    const [a, j, t] = await Promise.all([
+    const [a, j, t, br] = await Promise.all([
       db.from("chart_of_accounts").select("id,account_code,account_name,account_type,is_active").eq("tenant_id", tenantId).eq("is_active", true).order("account_code"),
-      db.from("journal_entries").select("id,journal_number,entry_date,narration,status,created_at").eq("tenant_id", tenantId).order("entry_date", { ascending: false }).limit(300),
-      db.rpc("get_trial_balance", { p_tenant_id: tenantId, p_as_of: trialDate })
+      db.from("journal_entries").select("id,journal_number,entry_date,narration,status,created_at,branch_id").eq("tenant_id", tenantId).order("entry_date", { ascending: false }).limit(300),
+      db.rpc("get_trial_balance", { p_tenant_id: tenantId, p_as_of: trialDate }),
+      db.from("branches").select("id,name,branch_code").eq("tenant_id",tenantId).order("name")
     ]);
-    const err = a.error || j.error || t.error;
+    const err = a.error || j.error || t.error || br.error;
     if (err) setNotice(err.message);
     else {
       setAccounts(a.data || []);
+      setBranches(br.data||[]);
       setJournals(j.data || []);
       setTrialRows((t.data || []) as TrialRow[]);
     }
@@ -144,7 +148,7 @@ export default function AccountingModule({ db, tenantId,currentRole }: { db: Sup
       const { data: user } = await db.auth.getUser();
       const number = "EBS-JV-" + Date.now().toString().slice(-9);
       const { data: head, error } = await db.from("journal_entries").insert({
-        tenant_id: tenantId, journal_number: number, entry_date: date, source_type: "manual",
+        tenant_id: tenantId, journal_number: number, entry_date: date, source_type: "manual", branch_id: branchId||null,
         narration: narration.trim(), status: "draft", created_by: user.user?.id ?? null
       }).select("id").single();
       if (error) throw error;
@@ -179,6 +183,7 @@ export default function AccountingModule({ db, tenantId,currentRole }: { db: Sup
         <h3>New balanced journal draft</h3>
         <div className="form-grid">
           <label>Entry date<input type="date" value={date} onChange={e => setDate(e.target.value)} /></label>
+          <label>Branch<select value={branchId} onChange={e=>setBranchId(e.target.value)}><option value="">Company-wide / unassigned</option>{branches.map(b=><option key={b.id} value={b.id}>{b.branch_code} · {b.name}</option>)}</select></label>
           <label>Debit account<select required value={debitAccount} onChange={e => setDebitAccount(e.target.value)}><option value="">Select account</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.account_code} · {a.account_name}</option>)}</select></label>
           <label>Credit account<select required value={creditAccount} onChange={e => setCreditAccount(e.target.value)}><option value="">Select account</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.account_code} · {a.account_name}</option>)}</select></label>
           <label>Amount (PKR)<input required type="number" min="0.01" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} /></label>
