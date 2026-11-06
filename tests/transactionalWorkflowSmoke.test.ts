@@ -26,6 +26,22 @@ test("Booker workflow calculates server totals and replays idempotently after ro
   assert.ok(smoke.includes("client_request_id=v_order_request"));
 });
 
+test("purchase workflow posts GRN stock, supplier invoice, and purchase return", () => {
+  assert.ok(smoke.includes("public.post_goods_receipt(v_grn)"));
+  assert.ok(smoke.includes("public.create_purchase_invoice("));
+  assert.ok(smoke.includes("public.post_purchase_invoice(v_purchase_invoice)"));
+  assert.ok(smoke.includes("public.create_purchase_debit_note("));
+  assert.ok(smoke.includes("public.post_purchase_debit_note(v_debit_note)"));
+  assert.ok(smoke.includes("purchase_return"));
+});
+
+test("sales workflow dispatches stock and creates a posted invoice", () => {
+  assert.ok(smoke.includes("public.create_delivery_for_approved_order("));
+  assert.ok(smoke.includes("public.dispatch_delivery("));
+  assert.ok(smoke.includes("public.complete_delivery("));
+  assert.ok(smoke.includes("sales invoice did not create an AR/revenue journal"));
+});
+
 test("accounting workflow posts balanced journals and rejects unbalanced journals", () => {
   assert.ok(smoke.includes("public.post_journal_entry(v_journal_ok)"));
   assert.ok(smoke.includes("public.post_journal_entry(v_journal_bad)"));
