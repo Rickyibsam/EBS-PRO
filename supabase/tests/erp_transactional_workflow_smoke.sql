@@ -356,8 +356,8 @@ begin
   if v_budget_company_supported is distinct from true then
     raise exception 'FAIL: company-wide budget actuals were not supported';
   end if;
-  if v_budget_branch_supported is distinct from false then
-    raise exception 'FAIL: branch budget did not flag unassigned journal attribution';
+  if v_budget_branch_supported is distinct from true then
+    raise exception 'FAIL: branch budget did not recognize source-inferred branch attribution';
   end if;
 
   -- Balanced journal must post and preserve double-entry equality.
