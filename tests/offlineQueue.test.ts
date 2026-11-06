@@ -53,3 +53,27 @@ test("Deliveryman offline snapshot is saved and restored for its owner",async()=
  assert.deepEqual(snapshot?.data,{deliveries:[{id:"d1"}],route:"north"});
  assert.equal(await getDeliverySnapshot(tenant,"another-user"),null);
 });
+
+
+test("failed offline retries retain stable idempotency keys and delivery POD proof",async()=>{
+ const tenant="tenant-retry-test",user="user-retry-test";
+ const order={id:"retry-order",kind:"order" as const,tenantId:tenant,userId:user,routeId:"route",customerId:"customer",requestId:"stable-order-request",requiredDeliveryDate:null,notes:"retry",lines:[{product_id:"p",unit_id:"u",quantity:1}],createdAt:"2026-11-06T00:00:00.000Z"};
+ await enqueueBookerOrder(order);
+ const firstOrder=(await getPendingBookerOrders(tenant,user))[0];
+ const secondOrder=(await getPendingBookerOrders(tenant,user))[0];
+ assert.equal(firstOrder.requestId,"stable-order-request");
+ assert.equal(secondOrder.requestId,firstOrder.requestId);
+
+ const signature=[{x:10,y:10,move:true},{x:20,y:20,move:false}];
+ const delivery={id:"retry-delivery",idempotency_key:"stable-delivery-request",vehicle_number:"ABC",user_id:user,tenant_id:tenant,delivery_id:"delivery",delivery_man_employee_id:"employee",customer_id:"customer",visit_status:"delivered",shops_visited:1,line_quantities:[],notes:null,created_by:user,queued_at:"2026-11-06T00:00:00.000Z",proof_of_delivery_signature:signature};
+ await queueDeliveryVisit(delivery);
+ const firstDelivery=(await getQueuedDeliveryVisits(tenant,user))[0];
+ const secondDelivery=(await getQueuedDeliveryVisits(tenant,user))[0];
+ assert.equal(firstDelivery.idempotency_key,"stable-delivery-request");
+ assert.equal(secondDelivery.idempotency_key,firstDelivery.idempotency_key);
+ assert.deepEqual(secondDelivery.proof_of_delivery_signature,signature);
+ assert.equal((await getPendingBookerOrders(tenant,user)).length,1);
+ assert.equal((await getQueuedDeliveryVisits(tenant,user)).length,1);
+ await removePendingBookerOrder(order.id);
+ await removeQueuedDeliveryVisit(delivery.id);
+});
