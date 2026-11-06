@@ -37,7 +37,7 @@ npm run build
 npm run preview
 ```
 
-`npm test` runs the automated Node test suite (19 tests currently cover role overrides, barcode matching, Booker IndexedDB queues/snapshots and deliveryman IndexedDB queues/snapshots). `npm run build` runs TypeScript checks and Vite production compilation. These unit tests do not replace browser-level end-to-end testing.
+`npm test` runs the automated Node test suite (20 tests currently cover role overrides, barcode matching, Booker IndexedDB queues/snapshots and deliveryman IndexedDB queues/snapshots). `npm run build` runs TypeScript checks and Vite production compilation. These unit tests do not replace browser-level end-to-end testing.
 
 ## Environment variables
 
@@ -72,4 +72,4 @@ See [the module and database notes](docs/MODULES_AND_DATABASE_SETUP.md) for the 
 
 ## Verification status
 
-The latest source has a successful Render production deployment and GitHub Actions run. All 19 automated tests passed. Rollback-only database workflow smoke tests passed for sales order → delivery → invoice → receipt → credit note/stock return; purchase order → GRN → supplier invoice → payment; payroll posting/payment; Booker order/visit synchronization; deliveryman van dispatch/visit synchronization; backup export/restore RPC; permission enforcement; and a tenant-isolation check. These database tests were rolled back and did not leave test business records. Full browser E2E coverage, real-device camera testing, signup/email confirmation, purchase returns, commission clawback, fixed-asset/budget edge cases, and exhaustive restore reconciliation remain outstanding.
+The latest source has a successful Render production deployment and GitHub Actions run. All 20 automated tests passed. Rollback-only database workflow smoke tests passed for sales order → delivery → invoice → receipt → credit note/stock return; purchase order → GRN → supplier invoice → payment; payroll posting/payment; Booker order/visit synchronization; deliveryman van dispatch/visit synchronization; backup export/restore RPC; permission enforcement; and a tenant-isolation check. These database tests were rolled back and did not leave test business records. Full browser E2E coverage, real-device camera testing, signup/email confirmation, purchase returns, commission clawback, fixed-asset/budget edge cases, and exhaustive restore reconciliation remain outstanding.
