@@ -54,8 +54,27 @@ export default function AssetBudgetModule({db,tenantId,currentRole}:{db:Supabase
  }
  useEffect(()=>{void load();},[tenantId]);
  async function addAsset(e:FormEvent){e.preventDefault();setSaving(true);const {data:user}=await db.auth.getUser();const {error}=await db.from("fixed_assets").insert({tenant_id:tenantId,...a,acquisition_cost:Number(a.acquisition_cost),salvage_value:Number(a.salvage_value),useful_life_months:Number(a.useful_life_months),created_by:user.user?.id||null});setNotice(error?.message||"Asset registered.");if(!error){setA({asset_code:"",asset_name:"",category:"",acquisition_date:new Date().toISOString().slice(0,10),acquisition_cost:"",salvage_value:"0",useful_life_months:"60"});await load();}setSaving(false);}
- async function addBudget(e:FormEvent){e.preventDefault();setSaving(true);const {data:user}=await db.auth.getUser();const {error}=await db.from("budgets").insert({tenant_id:tenantId,...b,created_by:user.user?.id||null});setNotice(error?.message||"Budget created. Add account lines through the approved budget editor in the next iteration.");if(!error)await load();setSaving(false);}
- async function addBudgetLine(budgetId:string,accountId:string,amount:string){const value=Number(amount);if(!accountId||!Number.isFinite(value)||value<0)return;const {error}=await db.from("budget_lines").insert({tenant_id:tenantId,budget_id:budgetId,account_id:accountId,budget_amount:value});setNotice(error?.message||"Budget line saved.");if(!error)await load();}
+ async function addBudget(e:FormEvent){
+  e.preventDefault();if(!canEdit)return;setSaving(true);setNotice("");
+  try{
+   if(!b.budget_name.trim()||!b.period_start||!b.period_end||b.period_end<b.period_start)throw new Error("Enter a budget name and a valid date range.");
+   const {data:user}=await db.auth.getUser();
+   const {error}=await db.from("budgets").insert({tenant_id:tenantId,budget_name:b.budget_name.trim(),period_start:b.period_start,period_end:b.period_end,status:"draft",created_by:user.user?.id||null});
+   if(error)throw error;setNotice("Budget period created. Add expense/income account lines below, compare actuals and then approve it.");await load();
+  }catch(err){setNotice(err instanceof Error?err.message:"Budget could not be created.");}
+  finally{setSaving(false);}
+ }
+ async function addBudgetLine(budgetId:string,accountId:string,amount:string){
+  if(!canEdit)return;const value=Number(amount);
+  if(!accountId||!Number.isFinite(value)||value<=0){setNotice("Select an account and enter a budget amount greater than zero.");return;}
+  const budget=budgets.find(x=>x.id===budgetId);if(!budget||budget.status!=="draft"){setNotice("Budget lines can only be changed while the budget is draft.");return;}
+  const account=accounts.find(x=>x.id===accountId);if(!account||!["expense","income"].includes(account.account_type)){setNotice("Only active income and expense accounts can be budgeted.");return;}
+  if(lines.some(x=>x.budget_id===budgetId&&x.account_id===accountId)){setNotice("This account already has a line in the selected budget. Update that line instead of creating a duplicate.");return;}
+  setSaving(true);setNotice("");
+  try{const {error}=await db.from("budget_lines").insert({tenant_id:tenantId,budget_id:budgetId,account_id:accountId,budget_amount:value});if(error)throw error;setNotice("Budget account line saved. Actuals and variance are calculated from posted journals.");await load();}
+  catch(err){setNotice(err instanceof Error?err.message:"Budget line could not be saved.");}
+  finally{setSaving(false);}
+ }
  async function changeBudgetStatus(budget:any,next:"approved"|"closed"){
   if(next==="approved"&&budget.status!=="draft")return;
   if(next==="closed"&&budget.status!=="approved")return;
