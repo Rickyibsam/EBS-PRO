@@ -16,7 +16,7 @@ begin
  return new;
 end $$;
 drop trigger if exists budgets_integrity_guard on public.budgets;
-create trigger budgets_integrity_guard before insert or update of tenant_id,period_start,period_end,status on public.budgets for each row execute function private.enforce_budget_header_integrity();
+create trigger budgets_integrity_guard before insert or update on public.budgets for each row execute function private.enforce_budget_header_integrity();
 
 create or replace function private.enforce_budget_line_integrity()
 returns trigger language plpgsql set search_path=pg_catalog,public,private,auth as $$
@@ -60,13 +60,13 @@ create trigger fixed_asset_account_mappings_integrity_guard before insert or upd
 create or replace function private.validate_fixed_asset_values()
 returns trigger language plpgsql set search_path=pg_catalog,public,private,auth as $$
 begin
- if new.acquisition_date is null or new.acquisition_cost is null or new.acquisition_cost<=0 or new.salvage_value is null or new.salvage_value<0 or new.salvage_value>=new.acquisition_cost or new.useful_life_months is null or new.useful_life_months<1 then raise exception 'Fixed asset needs valid acquisition date, cost, salvage value and useful life.'; end if;
+ if new.acquisition_date is null or new.acquisition_cost is null or new.acquisition_cost<=0 or new.salvage_value is null or new.salvage_value<0 or new.salvage_value>new.acquisition_cost or new.useful_life_months is null or new.useful_life_months<1 then raise exception 'Fixed asset needs valid acquisition date, cost, salvage value and useful life.'; end if;
  if new.depreciation_method<>'straight_line' then raise exception 'Only straight-line depreciation is supported.'; end if;
  if new.status='disposed' and (new.disposal_date is null or new.disposal_date<new.acquisition_date or new.disposal_amount is null or new.disposal_amount<0) then raise exception 'Disposed assets need a valid disposal date and non-negative proceeds.'; end if;
  return new;
 end $$;
 drop trigger if exists fixed_assets_value_guard on public.fixed_assets;
-create trigger fixed_assets_value_guard before insert or update of acquisition_date,acquisition_cost,salvage_value,useful_life_months,depreciation_method,status,disposal_date,disposal_amount on public.fixed_assets for each row execute function private.validate_fixed_asset_values();
+create trigger fixed_assets_value_guard before insert or update on public.fixed_assets for each row execute function private.validate_fixed_asset_values();
 
 create or replace function public.get_budget_actuals(p_tenant_id uuid)
 returns table(budget_line_id uuid,budget_id uuid,account_id uuid,branch_id uuid,budget_amount numeric,actual_amount numeric,variance numeric,period_start date,period_end date,actual_scope_supported boolean)
