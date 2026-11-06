@@ -49,6 +49,13 @@ declare
   v_dispatch_result jsonb;
   v_complete_result jsonb;
   v_sales_invoice_id uuid;
+  v_payroll_run uuid := gen_random_uuid();
+  v_payroll_line uuid := gen_random_uuid();
+  v_bad_payroll_run uuid := gen_random_uuid();
+  v_bad_payroll_line uuid := gen_random_uuid();
+  v_payroll_result jsonb;
+  v_payment_result jsonb;
+  v_payment_retry jsonb;
   v_rejected boolean := false;
 begin
   select user_id into v_user
@@ -135,7 +142,7 @@ begin
   perform set_config('request.jwt.claim.sub',v_user::text,true);
   insert into public.chart_of_accounts(id,tenant_id,account_code,account_name,account_type)
   values
-    (v_account_debit,v_tenant_a,'TX-1000','Smoke Test Cash','asset'),
+    (v_account_debit,v_tenant_a,'1000','Cash','asset'),
     (v_account_credit,v_tenant_a,'4000','Smoke Test Income','income'),
     (v_inventory_account,v_tenant_a,'1200','Inventory','asset'),
     (v_grni_account,v_tenant_a,'2100','Goods Received Not Invoiced','liability'),
@@ -143,7 +150,11 @@ begin
     (v_ap_account,v_tenant_a,'2000','Accounts Payable','liability'),
     (v_cogs_account,v_tenant_a,'5000','Cost of Goods Sold','expense'),
     (v_ar_account,v_tenant_a,'1100','Accounts Receivable','asset'),
-    (v_sales_tax_account,v_tenant_a,'2200','Sales Tax Payable','liability');
+    (v_sales_tax_account,v_tenant_a,'2200','Sales Tax Payable','liability'),
+    (gen_random_uuid(),v_tenant_a,'1010','Bank','asset'),
+    (gen_random_uuid(),v_tenant_a,'5200','Salaries Expense','expense'),
+    (gen_random_uuid(),v_tenant_a,'2150','Salaries Payable','liability'),
+    (gen_random_uuid(),v_tenant_a,'2160','Payroll Deductions Payable','liability');
 
   -- Purchase -> GRN -> stock ledger -> supplier invoice -> GL workflow.
   insert into public.parties(id,tenant_id,party_code,party_type,name)
@@ -239,6 +250,41 @@ begin
   if not exists(select 1 from public.journal_entries where tenant_id=v_tenant_a
     and source_type='sales_invoice' and source_id=v_sales_invoice_id and status='posted') then
     raise exception 'FAIL: sales invoice did not create an AR/revenue journal';
+  end if;
+
+  -- Payroll accrual -> GL -> salary payment -> idempotent payment retry.
+  insert into public.payroll_runs(id,tenant_id,run_number,period_start,period_end,pay_date,status,created_by)
+  values(v_payroll_run,v_tenant_a,'TX-PAY-001',current_date-30,current_date-1,current_date,'draft',v_user);
+  insert into public.payroll_lines(id,tenant_id,payroll_run_id,employee_id,basic_salary,allowances,overtime,deductions,net_salary,sales_incentive)
+  values(v_payroll_line,v_tenant_a,v_payroll_run,v_employee,1000,100,0,50,1100,50);
+  v_payroll_result:=public.post_payroll_run(v_payroll_run);
+  if not exists(select 1 from public.payroll_runs where id=v_payroll_run and status='posted'
+    and gross_total=1150 and deductions_total=50 and net_total=1100) then
+    raise exception 'FAIL: payroll run did not post expected totals';
+  end if;
+  v_payment_result:=public.pay_payroll_line(v_payroll_line,'cash','TX-PAY-REF');
+  v_payment_retry:=public.pay_payroll_line(v_payroll_line,'cash','TX-PAY-REF');
+  if coalesce((v_payment_retry->>'already_paid')::boolean,false) is not true then
+    raise exception 'FAIL: paid payroll retry was not idempotent';
+  end if;
+  if (select count(*) from public.journal_entries where tenant_id=v_tenant_a
+    and source_type='payroll_payment' and source_id=v_payroll_line and status='posted')<>1 then
+    raise exception 'FAIL: payroll retry created duplicate payment journals';
+  end if;
+
+  -- Invalid payroll arithmetic must be rejected without posting the run.
+  insert into public.payroll_runs(id,tenant_id,run_number,period_start,period_end,pay_date,status,created_by)
+  values(v_bad_payroll_run,v_tenant_a,'TX-PAY-BAD',current_date-30,current_date-1,current_date,'draft',v_user);
+  insert into public.payroll_lines(id,tenant_id,payroll_run_id,employee_id,basic_salary,allowances,overtime,deductions,net_salary)
+  values(v_bad_payroll_line,v_tenant_a,v_bad_payroll_run,v_employee,1000,0,0,100,1);
+  v_rejected:=false;
+  begin
+    perform public.post_payroll_run(v_bad_payroll_run);
+  exception when others then
+    v_rejected:=true;
+  end;
+  if not v_rejected or (select status from public.payroll_runs where id=v_bad_payroll_run)<>'draft' then
+    raise exception 'FAIL: invalid payroll arithmetic was not safely rejected';
   end if;
 
   -- Balanced journal must post and preserve double-entry equality.
