@@ -213,10 +213,11 @@ begin
   if coalesce((select sum(quantity_in-quantity_out) from public.stock_movements
     where tenant_id=v_tenant_a and warehouse_id=(select warehouse_id from public.deliveries where id=v_delivery_id)
       and product_id=v_product),0)<2 then
-    raise exception 'FAIL: stock fixture is short before dispatch: %',
-      coalesce((select sum(quantity_in-quantity_out) from public.stock_movements
-       where tenant_id=v_tenant_a and warehouse_id=(select warehouse_id from public.deliveries where id=v_delivery_id)
-         and product_id=v_product),0);
+    raise exception 'FAIL: stock fixture is short before dispatch. order warehouse %, GRN warehouse %, movements %',
+      (select warehouse_id from public.sales_orders where id=v_order_first),
+      (select warehouse_id from public.goods_receipts where id=v_grn),
+      (select coalesce(jsonb_agg(jsonb_build_object('warehouse',warehouse_id,'type',movement_type,'in',quantity_in,'out',quantity_out)), '[]'::jsonb)
+       from public.stock_movements where tenant_id=v_tenant_a and product_id=v_product);
   end if;
   v_dispatch_result:=public.dispatch_delivery(
     v_delivery_id,
