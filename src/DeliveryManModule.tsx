@@ -8,6 +8,8 @@ if(typeof window!=="undefined")window.addEventListener("beforeinstallprompt",(ev
 export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenantId:string}){
  const [authUserId,setAuthUserId]=useState(""),[employee,setEmployee]=useState<Row|null>(null),[deliveries,setDeliveries]=useState<Row[]>([]),[orders,setOrders]=useState<Row[]>([]),[customers,setCustomers]=useState<Row[]>([]),[products,setProducts]=useState<Row[]>([]),[lines,setLines]=useState<Row[]>([]),[visits,setVisits]=useState<Row[]>([]);
  const [form,setForm]=useState({delivery_id:"",visit_status:"delivered",notes:""}),[lineQuantities,setLineQuantities]=useState<Record<string,{delivered:string;marketReturn:string;returnBatch:string;returnExpiry:string}>>({}),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[notice,setNotice]=useState("");
+ const [pendingVisitCount,setPendingVisitCount]=useState(0);
+ const syncingVisits=useRef(false);
  const [signaturePoints,setSignaturePoints]=useState<Array<{x:number;y:number;move:boolean}>>([]);
  const signatureCanvas=useRef<HTMLCanvasElement|null>(null),signatureDrawing=useRef(false);
  const [installPrompt,setInstallPrompt]=useState<any>(deferredInstallPrompt);
@@ -61,19 +63,27 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
  function endSignature(){signatureDrawing.current=false;}
  function clearSignature(){const canvas=signatureCanvas.current;if(canvas){const ctx=canvas.getContext("2d");ctx?.clearRect(0,0,canvas.width,canvas.height);}setSignaturePoints([]);}
  async function syncPendingVisits(){
-  if(!navigator.onLine)return;
+  if(!navigator.onLine||syncingVisits.current)return;
+  syncingVisits.current=true;
   try{
-   const {data:{session}}=await db.auth.getSession();const userId=session?.user.id||authUserId;if(!userId)return;const pending=await getQueuedDeliveryVisits(tenantId,userId);
+   const {data:{session}}=await db.auth.getSession();const userId=session?.user.id||authUserId;if(!userId)return;const pending=await getQueuedDeliveryVisits(tenantId,userId);setPendingVisitCount(pending.length);
+   let synchronized=0;
    for(const item of pending){
     const {error}=await db.rpc("record_van_delivery_visit",{p_delivery_id:item.delivery_id,p_visit_status:item.visit_status,p_line_quantities:item.line_quantities,p_notes:item.notes,p_idempotency_key:item.idempotency_key});
     if(error)throw error;
     if(item.proof_of_delivery_signature?.length){const signatureResult=await db.rpc("save_delivery_pod_signature",{p_delivery_id:item.delivery_id,p_signature:item.proof_of_delivery_signature});if(signatureResult.error)throw signatureResult.error;}
-    await removeQueuedDeliveryVisit(item.id);
+    await removeQueuedDeliveryVisit(item.id);synchronized+=1;setPendingVisitCount(Math.max(0,pending.length-synchronized));
    }
    if(pending.length)setNotice(pending.length+" offline delivery visit(s) synchronized.");
   }catch(e){setNotice(e instanceof Error?"Offline sync pending: "+e.message:"Offline sync will retry when connected.");}
+  finally{syncingVisits.current=false;}
  }
  useEffect(()=>{void load();if(navigator.onLine)void syncPendingVisits();const onOnline=()=>{void syncPendingVisits().then(()=>load());};window.addEventListener("online",onOnline);return()=>window.removeEventListener("online",onOnline);},[tenantId]);
+ useEffect(()=>{
+  if(!navigator.onLine||saving||pendingVisitCount===0)return;
+  const retry=window.setTimeout(()=>void syncPendingVisits(),30000);
+  return()=>window.clearTimeout(retry);
+ },[pendingVisitCount,saving,tenantId]);
  async function saveVisit(e:FormEvent){
   e.preventDefault();if(!employee)return;setSaving(true);setNotice("");
   try{
