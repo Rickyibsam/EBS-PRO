@@ -10,7 +10,7 @@ declare
  v_user uuid:=auth.uid(); v_asset public.fixed_assets%rowtype;
  v_mapping public.fixed_asset_account_mappings%rowtype;
  v_accum numeric; v_book numeric; v_gain numeric; v_loss numeric;
- v_journal uuid; v_no text; v_month date; v_month_end date;
+ v_journal uuid; v_no text; v_month date; v_month_end date; v_depreciation_end date;
  v_existing public.asset_depreciation_entries%rowtype;
 begin
  if v_user is null then raise exception 'Authentication required.'; end if;
@@ -27,8 +27,9 @@ begin
  if exists(select 1 from public.asset_depreciation_entries d where d.tenant_id=v_asset.tenant_id and d.asset_id=v_asset.id and d.posted and d.period_end>p_disposal_date) then
   raise exception 'Posted depreciation extends beyond disposal date. Reverse/correct future-period depreciation first.';
  end if;
- for v_month in select generate_series(date_trunc('month',v_asset.acquisition_date)::date,date_trunc('month',p_disposal_date)::date,interval '1 month')::date loop
-  v_month_end:=least((v_month+interval '1 month - 1 day')::date,p_disposal_date);
+ v_depreciation_end:=least(p_disposal_date,(v_asset.acquisition_date+make_interval(months=>v_asset.useful_life_months-1))::date);
+ for v_month in select generate_series(date_trunc('month',v_asset.acquisition_date)::date,date_trunc('month',v_depreciation_end)::date,interval '1 month')::date loop
+  v_month_end:=least((v_month+interval '1 month - 1 day')::date,v_depreciation_end);
   select * into v_existing from public.asset_depreciation_entries d
   where d.tenant_id=v_asset.tenant_id and d.asset_id=v_asset.id and d.period_start<=v_month_end and d.period_end>=v_month
   order by d.period_start desc limit 1;
