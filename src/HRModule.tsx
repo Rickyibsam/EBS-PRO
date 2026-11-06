@@ -1,10 +1,14 @@
 import {useEffect,useMemo,useState,type FormEvent} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
+import {useModuleAction} from "./lib/modulePermissionContext";
 type Row=Record<string,any>;
 const localDate=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");};
 const money=(n:number)=>"PKR "+Number(n||0).toLocaleString("en-PK",{maximumFractionDigits:2});
 export default function HRModule({db,tenantId,currentRole}:{db:SupabaseClient;tenantId:string;currentRole:string}){
- const canManage=["owner","admin","manager"].includes(currentRole);
+ const roleCanManage=["owner","admin","manager"].includes(currentRole);
+ const canCreate=useModuleAction("hr_payroll","create",roleCanManage);
+ const canUpdate=useModuleAction("hr_payroll","update",roleCanManage);
+ const canManage=canCreate||canUpdate;
  const [employees,setEmployees]=useState<Row[]>([]),[attendance,setAttendance]=useState<Row[]>([]),[leaves,setLeaves]=useState<Row[]>([]),[advances,setAdvances]=useState<Row[]>([]),[repaymentHistory,setRepaymentHistory]=useState<Row[]>([]),[departments,setDepartments]=useState<Row[]>([]),[designations,setDesignations]=useState<Row[]>([]),[accounts,setAccounts]=useState<Row[]>([]),[cashAccounts,setCashAccounts]=useState<string[]>([]);
  const [employeeId,setEmployeeId]=useState(""),[attendanceDate,setAttendanceDate]=useState(localDate()),[attendanceStatus,setAttendanceStatus]=useState("present"),[checkIn,setCheckIn]=useState(""),[checkOut,setCheckOut]=useState(""),[attendanceNotes,setAttendanceNotes]=useState("");
  const [leaveType,setLeaveType]=useState("Annual"),[leaveStart,setLeaveStart]=useState(localDate()),[leaveEnd,setLeaveEnd]=useState(localDate()),[leaveReason,setLeaveReason]=useState("");
@@ -34,7 +38,7 @@ export default function HRModule({db,tenantId,currentRole}:{db:SupabaseClient;te
   setLoading(false);
  }
  useEffect(()=>{void load();},[tenantId]);
- async function saveAttendance(e:FormEvent){
+ async function saveAttendance(e:FormEvent){if(!canCreate&&!canUpdate)return;
   e.preventDefault();if(!activeEmployeeId)return;setSaving(true);setNotice("");
   try{
    const checkin=checkIn?new Date(attendanceDate+"T"+checkIn+":00+05:00").toISOString():null,checkout=checkOut?new Date(attendanceDate+"T"+checkOut+":00+05:00").toISOString():null;
@@ -42,7 +46,7 @@ export default function HRModule({db,tenantId,currentRole}:{db:SupabaseClient;te
    if(error)throw error;setNotice("Attendance saved.");setAttendanceNotes("");await load();
   }catch(e){setNotice(e instanceof Error?e.message:"Attendance could not be saved.");}finally{setSaving(false);}
  }
- async function requestLeave(e:React.FormEvent){
+ async function requestLeave(e:React.FormEvent){if(!canCreate)return;
   e.preventDefault();if(!activeEmployeeId||dayCount<=0)return;setSaving(true);setNotice("");
   try{
    const {data:{session}}=await db.auth.getSession();
@@ -50,27 +54,27 @@ export default function HRModule({db,tenantId,currentRole}:{db:SupabaseClient;te
    if(error)throw error;setNotice("Leave request submitted for approval.");setLeaveReason("");await load();
   }catch(e){setNotice(e instanceof Error?e.message:"Leave request could not be submitted.");}finally{setSaving(false);}
  }
- async function decideLeave(id:string,decision:"approved"|"rejected"){
+ async function decideLeave(id:string,decision:"approved"|"rejected"){if(!canUpdate)return;
   setSaving(true);const {error}=await db.rpc("decide_employee_leave",{p_leave_id:id,p_decision:decision});if(error)setNotice(error.message);else{setNotice("Leave request "+decision+".");await load();}setSaving(false);
  }
- async function addDepartment(e:React.FormEvent){
+ async function addDepartment(e:React.FormEvent){if(!canCreate)return;
   e.preventDefault();setSaving(true);const {error}=await db.from("departments").insert({tenant_id:tenantId,code:departmentCode.trim(),name:departmentName.trim()});if(error)setNotice(error.message);else{setDepartmentCode("");setDepartmentName("");setNotice("Department added.");await load();}setSaving(false);
  }
- async function addDesignation(e:React.FormEvent){
+ async function addDesignation(e:React.FormEvent){if(!canCreate)return;
   e.preventDefault();setSaving(true);const {error}=await db.from("designations").insert({tenant_id:tenantId,department_id:designationDepartment||null,code:designationCode.trim(),name:designationName.trim()});if(error)setNotice(error.message);else{setDesignationCode("");setDesignationName("");setNotice("Designation added.");await load();}setSaving(false);
  }
- async function updateEmployee(id:string,patch:Row){
+ async function updateEmployee(id:string,patch:Row){if(!canUpdate)return;
   setSaving(true);const {error}=await db.from("employees").update(patch).eq("tenant_id",tenantId).eq("id",id);if(error)setNotice(error.message);else{setNotice("Employee profile updated.");await load();}setSaving(false);
  }
- async function saveAdvanceMapping(e:FormEvent){
+ async function saveAdvanceMapping(e:FormEvent){if(!canUpdate)return;
   e.preventDefault();if(!canManage)return;setSaving(true);const {data:{session}}=await db.auth.getSession();
   const {error}=await db.from("employee_advance_account_mappings").upsert({tenant_id:tenantId,...advanceMapping,updated_by:session?.user.id||null,updated_at:new Date().toISOString()},{onConflict:"tenant_id"});
   if(error)setNotice(error.message);else{setNotice("Employee advance accounts saved. New advances and repayments will post balanced journals.");await load();}setSaving(false);
  }
- async function issueAdvance(e:React.FormEvent){
+ async function issueAdvance(e:React.FormEvent){if(!canCreate)return;
   e.preventDefault();if(!employeeId)return;setSaving(true);const {data,error}=await db.rpc("create_employee_advance",{p_tenant_id:tenantId,p_employee_id:employeeId,p_amount:Number(advanceAmount),p_issue_date:advanceDate,p_notes:advanceNotes.trim()||null});if(error)setNotice(error.message);else{setAdvanceAmount("");setAdvanceNotes("");setNotice("Employee advance created: "+data);await load();}setSaving(false);
  }
- async function repayAdvance(id:string){
+ async function repayAdvance(id:string){if(!canUpdate)return;
   const amount=Number(repayments[id]||0);if(!amount)return;setSaving(true);const {error}=await db.rpc("record_employee_advance_repayment",{p_advance_id:id,p_amount:amount,p_repayment_date:localDate(),p_payment_method:repaymentMethods[id]||"cash",p_reference:null,p_notes:null});if(error)setNotice(error.message);else{setRepayments(x=>({...x,[id]:""}));setNotice("Advance repayment recorded and outstanding balance updated.");await load();}setSaving(false);
  }
  const employeeName=(id:string)=>employees.find(x=>x.id===id)?.full_name||id;
