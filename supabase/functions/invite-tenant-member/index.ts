@@ -93,7 +93,12 @@ Deno.serve(async (req: Request) => {
     }
 
     const { error: profileError } = await admin.from("user_profiles").upsert({ id: user.id, full_name: fullName, phone: phone || null, updated_at: new Date().toISOString() });
-    if (profileError) return reply({ error: "Staff account was created, but the profile could not be updated. Contact the company owner." }, 500);
+    if (profileError) {
+      await admin.from("employees").delete().eq("tenant_id", tenantId).eq("user_id", user.id);
+      await admin.from("tenant_memberships").delete().eq("id", member.id).eq("tenant_id", tenantId);
+      if (invited) await admin.auth.admin.deleteUser(user.id);
+      return reply({ error: "The staff profile could not be saved. No company access was retained; please try again." }, 500);
+    }
     return reply({ success: true, email, role, invited, message: invited ? "Staff invitation sent and company access configured." : "Existing login linked to the company and employee profile." });
   } catch (error) {
     return reply({ error: error instanceof Error ? error.message : "Staff invitation failed." }, 500);
