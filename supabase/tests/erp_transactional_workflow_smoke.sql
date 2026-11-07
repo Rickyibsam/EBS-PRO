@@ -71,6 +71,8 @@ declare
   v_budget_branch_supported boolean;
   v_backup jsonb;
   v_restore jsonb;
+  v_restore_fixture_backup jsonb;
+  v_restore_fixture_result jsonb;
   v_permission_rejected boolean := false;
   v_second_warehouse uuid := gen_random_uuid();
   v_stock_transfer uuid := gen_random_uuid();
@@ -83,6 +85,20 @@ declare
   v_leave_result jsonb;
   v_signature_result jsonb;
   v_rls_rows integer := -1;
+  v_van_route uuid := gen_random_uuid();
+  v_van_order_request uuid := gen_random_uuid();
+  v_van_order uuid;
+  v_van_delivery uuid;
+  v_van_line uuid;
+  v_van_load_result jsonb;
+  v_van_dispatch_result jsonb;
+  v_van_visit_result jsonb;
+  v_van_visit_retry jsonb;
+  v_failed_order_request uuid := gen_random_uuid();
+  v_failed_order uuid;
+  v_failed_delivery uuid;
+  v_failed_line uuid;
+  v_failed_visit_result jsonb;
 begin
   select user_id into v_user
   from public.tenant_memberships
@@ -218,16 +234,16 @@ begin
     v_warehouse,
     'TX-GRN-001',current_date,'draft',v_user);
   insert into public.goods_receipt_lines(id,tenant_id,goods_receipt_id,product_id,unit_id,quantity,conversion_to_base,accepted_quantity,rejected_quantity,unit_cost,purchase_order_line_id)
-  values(v_grn_line,v_tenant_a,v_grn,v_product,v_unit,5,1,5,0,20,v_purchase_order_line);
+  values(v_grn_line,v_tenant_a,v_grn,v_product,v_unit,7,1,7,0,20,v_purchase_order_line);
   perform public.post_goods_receipt(v_grn);
   if not exists(select 1 from public.stock_movements where tenant_id=v_tenant_a
-    and reference_type='goods_receipt' and reference_id=v_grn and quantity_in=5) then
+    and reference_type='goods_receipt' and reference_id=v_grn and quantity_in=7) then
     raise exception 'FAIL: GRN did not create the expected stock movement';
   end if;
   v_invoice_result:=public.create_purchase_invoice(v_grn,'TX-SUP-INV-001',current_date,current_date+30,10,'Smoke test supplier invoice');
   v_purchase_invoice:=(v_invoice_result->>'purchase_invoice_id')::uuid;
   perform public.post_purchase_invoice(v_purchase_invoice);
-  if not exists(select 1 from public.purchase_invoices where id=v_purchase_invoice and status='posted' and grand_total=110) then
+  if not exists(select 1 from public.purchase_invoices where id=v_purchase_invoice and status='posted' and grand_total=150) then
     raise exception 'FAIL: supplier invoice did not post with expected total';
   end if;
   if not exists(select 1 from public.journal_entries where tenant_id=v_tenant_a
@@ -296,6 +312,105 @@ begin
   if not exists(select 1 from public.journal_entries where tenant_id=v_tenant_a
     and source_type='sales_invoice' and source_id=v_sales_invoice_id and status='posted') then
     raise exception 'FAIL: sales invoice did not create an AR/revenue journal';
+  end if;
+
+
+  -- Van delivery PWA: load stock, dispatch to a vehicle, record partial delivery/market return, replay once.
+  insert into public.sales_routes(id,tenant_id,branch_id,route_code,name)
+  values(v_van_route,v_tenant_a,v_branch_a,'TX-VAN-ROUTE','Smoke Test Van Route');
+  insert into public.route_assignments(tenant_id,route_id,employee_id,assigned_from)
+  values(v_tenant_a,v_van_route,v_employee,current_date);
+  insert into public.route_customers(tenant_id,route_id,customer_id)
+  values(v_tenant_a,v_van_route,v_customer);
+  perform set_config('request.jwt.claim.sub',v_booker_user::text,true);
+  v_van_order:=public.create_order_booker_order(
+    v_tenant_a,v_van_route,v_customer,v_van_order_request,current_date+1,'Smoke test van delivery',
+    jsonb_build_array(jsonb_build_object('product_id',v_product,'unit_id',v_unit,'quantity',2))
+  );
+  perform set_config('request.jwt.claim.sub',v_user::text,true);
+  update public.sales_orders set status='approved',approved_by=v_user
+  where id=v_van_order and tenant_id=v_tenant_a;
+  v_van_delivery:=(public.create_delivery_for_approved_order(v_van_order,v_employee)->>'delivery_id')::uuid;
+  select id into v_van_line from public.delivery_lines
+  where tenant_id=v_tenant_a and delivery_id=v_van_delivery;
+  v_van_load_result:=public.record_van_stock_transfer(
+    v_tenant_a,v_warehouse,'TX-VAN-01',v_employee,v_product,'load',2,
+    null,null,'TX-VAN-LOAD-0001','Rollback-only van load'
+  );
+  if coalesce((v_van_load_result->>'replayed')::boolean,true) is not false then
+    raise exception 'FAIL: first van stock load was unexpectedly replayed';
+  end if;
+  v_van_dispatch_result:=public.dispatch_van_delivery(
+    v_van_delivery,'TX-VAN-01',
+    jsonb_build_array(jsonb_build_object('line_id',v_van_line,'picked_quantity_base',2))
+  );
+  if coalesce((v_van_dispatch_result->>'success')::boolean,false) is not true then
+    raise exception 'FAIL: van delivery did not dispatch';
+  end if;
+  v_van_visit_result:=public.record_van_delivery_visit(
+    v_van_delivery,'short_delivered',
+    jsonb_build_array(jsonb_build_object(
+      'delivery_line_id',v_van_line,'delivered_quantity_base',2,
+      'market_return_quantity_base',1,'return_batch_number',null,'return_expiry_date',null
+    )),
+    'One unit sold, one unit returned to van',
+    'TX-VAN-VISIT-0001'
+  );
+  if coalesce((v_van_visit_result->>'success')::boolean,false) is not true
+     or coalesce((v_van_visit_result->>'sold_quantity')::numeric,0)<>1
+     or coalesce((v_van_visit_result->>'returned_quantity')::numeric,0)<>1 then
+    raise exception 'FAIL: partial van delivery and market return did not reconcile: %',v_van_visit_result;
+  end if;
+  v_van_visit_retry:=public.record_van_delivery_visit(
+    v_van_delivery,'short_delivered',
+    jsonb_build_array(jsonb_build_object(
+      'delivery_line_id',v_van_line,'delivered_quantity_base',2,
+      'market_return_quantity_base',1,'return_batch_number',null,'return_expiry_date',null
+    )),
+    'Retry of the same van visit',
+    'TX-VAN-VISIT-0001'
+  );
+  if coalesce((v_van_visit_retry->>'replayed')::boolean,false) is not true then
+    raise exception 'FAIL: van delivery visit retry was not idempotent';
+  end if;
+  if (select count(*) from public.delivery_shop_visits
+      where tenant_id=v_tenant_a and delivery_id=v_van_delivery)<>1 then
+    raise exception 'FAIL: van visit retry created duplicate visit records';
+  end if;
+  if (select coalesce(sum(quantity_in-quantity_out),0) from public.van_stock_movements
+      where tenant_id=v_tenant_a and vehicle_number='TX-VAN-01' and product_id=v_product)<>1 then
+    raise exception 'FAIL: van sale and market return did not reconcile vehicle stock';
+  end if;
+
+  -- Failed visit: zero picked/delivered units must release reservations without issuing stock.
+  perform set_config('request.jwt.claim.sub',v_booker_user::text,true);
+  v_failed_order:=public.create_order_booker_order(
+    v_tenant_a,v_van_route,v_customer,v_failed_order_request,current_date+1,'Smoke test failed van delivery',
+    jsonb_build_array(jsonb_build_object('product_id',v_product,'unit_id',v_unit,'quantity',1))
+  );
+  perform set_config('request.jwt.claim.sub',v_user::text,true);
+  update public.sales_orders set status='approved',approved_by=v_user
+  where id=v_failed_order and tenant_id=v_tenant_a;
+  v_failed_delivery:=(public.create_delivery_for_approved_order(v_failed_order,v_employee)->>'delivery_id')::uuid;
+  select id into v_failed_line from public.delivery_lines
+  where tenant_id=v_tenant_a and delivery_id=v_failed_delivery;
+  perform public.dispatch_van_delivery(
+    v_failed_delivery,'TX-VAN-01',
+    jsonb_build_array(jsonb_build_object('line_id',v_failed_line,'picked_quantity_base',0))
+  );
+  v_failed_visit_result:=public.record_van_delivery_visit(
+    v_failed_delivery,'not_available',
+    jsonb_build_array(jsonb_build_object(
+      'delivery_line_id',v_failed_line,'delivered_quantity_base',0,
+      'market_return_quantity_base',0,'return_batch_number',null,'return_expiry_date',null
+    )),
+    'Customer unavailable',
+    'TX-VAN-FAILED-0001'
+  );
+  if coalesce((v_failed_visit_result->>'success')::boolean,false) is not true
+     or v_failed_visit_result->>'status'<>'failed'
+     or (select status from public.deliveries where id=v_failed_delivery)<>'failed' then
+    raise exception 'FAIL: failed van delivery did not close safely: %',v_failed_visit_result;
   end if;
 
   -- Payroll accrual -> GL -> salary payment -> idempotent payment retry.
@@ -526,6 +641,24 @@ begin
     raise exception 'FAIL: denied custom-permission update changed app settings';
   end if;
   perform set_config('request.jwt.claim.sub',v_user::text,true);
+
+
+  -- Additive restore into a same-tenant fixture with a deliberately missing row.
+  insert into public.tenant_memberships(tenant_id,user_id,role,is_active)
+  values(v_tenant_b,v_user,'owner',true);
+  v_restore_fixture_backup:=public.export_tenant_backup(v_tenant_b);
+  if jsonb_typeof(v_restore_fixture_backup->'tables'->'branches')<>'array'
+     or jsonb_array_length(v_restore_fixture_backup->'tables'->'branches')<1 then
+    raise exception 'FAIL: isolated tenant backup did not include its branch fixture';
+  end if;
+  delete from public.warehouses where tenant_id=v_tenant_b and branch_id=v_branch_b;
+  delete from public.branches where tenant_id=v_tenant_b and id=v_branch_b;
+  v_restore_fixture_result:=public.restore_tenant_backup(v_tenant_b,v_restore_fixture_backup);
+  if coalesce((v_restore_fixture_result->>'success')::boolean,false) is not true
+     or coalesce((v_restore_fixture_result->>'imported_rows')::integer,0)<1
+     or not exists(select 1 from public.branches where tenant_id=v_tenant_b and id=v_branch_b) then
+    raise exception 'FAIL: additive restore did not recover a missing branch row: %',v_restore_fixture_result;
+  end if;
 
   -- Balanced journal must post and preserve double-entry equality.
   insert into public.journal_entries(id,tenant_id,journal_number,entry_date,narration,status,created_by)
