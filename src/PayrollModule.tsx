@@ -1,3 +1,4 @@
+import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import {FormEvent,useEffect,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 import {useModuleAction} from "./lib/modulePermissionContext";
@@ -18,8 +19,7 @@ export default function PayrollModule({db,tenantId,currentRole}:{db:SupabaseClie
   setLoading(true);setNotice("");
   const [e,r]=await Promise.all([
    db.from("employees").select("id,employee_code,full_name,job_title,employment_status,basic_salary,joining_date,bank_name,bank_account_no").eq("tenant_id",tenantId).order("full_name"),
-   db.from("payroll_runs").select("id,run_number,period_start,period_end,pay_date,status,gross_total,deductions_total,net_total,created_at").eq("tenant_id",tenantId).order("period_start",{ascending:false}).limit(100)
-  ]);
+   fetchAllRowsResult<any>((from,to)=>db.from("payroll_runs").select("id,run_number,period_start,period_end,pay_date,status,gross_total,deductions_total,net_total,created_at").eq("tenant_id",tenantId).order("period_start",{ascending:false}).order("id",{ascending:true}).range(from,to))]);
   if(e.error||r.error)setNotice(e.error?.message||r.error?.message||"Payroll records could not be loaded.");
   else{setEmployees(e.data??[]);setRuns(r.data??[]);if(!selected&&r.data?.[0])setSelected(r.data[0].id);}
   setLoading(false);
