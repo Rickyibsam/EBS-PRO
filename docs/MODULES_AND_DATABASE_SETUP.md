@@ -75,6 +75,7 @@ The application has 10 module groups. The navigation and module screens are pres
   - Voucher line guards now use the correct goods-receipt creator column and allow only the received-quantity increment on approved purchase order lines.
 
 - **Branch-aware financial reporting:** the Accounts module now supports branch-filtered trial balance / P&L / balance-sheet summaries, branch-filtered cashbook entries and branch labels in the journal register. Company-wide views remain the default and include unassigned journal entries.
+- **Configurable expense posting:** expense vouchers require an active tenant-owned expense GL account; the selected account is stored on the expense and receives the debit journal line. Legacy expense rows without an account remain identifiable as unassigned.
 - **Branch budget and expense attribution:** budget lines can be assigned per branch, expense vouchers can select a branch, and asset disposal uses the configured cash/bank mapping rather than fixed account-code assumptions.
 - **Complete financial-ledger reads:** customer/supplier payments, invoices, credit notes, party ledgers, cashbook journal lines and bank reconciliation history use stable 500-row pagination instead of silent single-query caps.
 - **Batch & expiry completeness:** stock movements, products and warehouses load in stable pages; expiry warning dates use local calendar dates.
