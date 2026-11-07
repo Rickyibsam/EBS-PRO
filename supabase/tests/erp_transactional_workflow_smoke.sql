@@ -82,6 +82,9 @@ declare
   v_restore jsonb;
   v_restore_fixture_backup jsonb;
   v_restore_fixture_result jsonb;
+  v_cleanroom_unit uuid := gen_random_uuid();
+  v_cleanroom_product uuid := gen_random_uuid();
+  v_cleanroom_warehouse uuid := gen_random_uuid();
   v_permission_rejected boolean := false;
   v_second_warehouse uuid := gen_random_uuid();
   v_stock_transfer uuid := gen_random_uuid();
@@ -815,21 +818,48 @@ begin
   perform set_config('request.jwt.claim.sub',v_user::text,true);
 
 
-  -- Additive restore into a same-tenant fixture with a deliberately missing row.
+  -- Isolated tenant clean-room fixture: export a small dependency graph, remove its
+  -- rows inside this rollback-only transaction, then restore and verify every layer.
   insert into public.tenant_memberships(tenant_id,user_id,role,is_active)
   values(v_tenant_b,v_user,'owner',true);
+  insert into public.warehouses(id,tenant_id,branch_id,name,code)
+  values(v_cleanroom_warehouse,v_tenant_b,v_branch_b,'Restore Fixture Warehouse','RESTORE-WH');
+  insert into public.units_of_measure(id,tenant_id,name,symbol,unit_type,decimal_places)
+  values(v_cleanroom_unit,v_tenant_b,'Restore Fixture Unit','RFU','quantity',0);
+  insert into public.products(id,tenant_id,sku,name,base_unit_id,sales_tax_rate,sale_price)
+  values(v_cleanroom_product,v_tenant_b,'RESTORE-SKU','Restore Fixture Product',v_cleanroom_unit,0,10);
   v_restore_fixture_backup:=public.export_tenant_backup(v_tenant_b);
-  if jsonb_typeof(v_restore_fixture_backup->'tables'->'branches')<>'array'
-     or jsonb_array_length(v_restore_fixture_backup->'tables'->'branches')<1 then
-    raise exception 'FAIL: isolated tenant backup did not include its branch fixture';
+  if v_restore_fixture_backup->>'tenant_id'<>v_tenant_b::text
+     or jsonb_array_length(v_restore_fixture_backup->'tables'->'branches')<1
+     or jsonb_array_length(v_restore_fixture_backup->'tables'->'warehouses')<1
+     or jsonb_array_length(v_restore_fixture_backup->'tables'->'units_of_measure')<1
+     or jsonb_array_length(v_restore_fixture_backup->'tables'->'products')<1 then
+    raise exception 'FAIL: isolated clean-room backup omitted a required dependency layer';
   end if;
-  delete from public.warehouses where tenant_id=v_tenant_b and branch_id=v_branch_b;
+  delete from public.products where tenant_id=v_tenant_b and id=v_cleanroom_product;
+  delete from public.units_of_measure where tenant_id=v_tenant_b and id=v_cleanroom_unit;
+  delete from public.warehouses where tenant_id=v_tenant_b and id=v_cleanroom_warehouse;
   delete from public.branches where tenant_id=v_tenant_b and id=v_branch_b;
+  if exists(select 1 from public.branches where tenant_id=v_tenant_b and id=v_branch_b)
+     or exists(select 1 from public.warehouses where tenant_id=v_tenant_b and id=v_cleanroom_warehouse)
+     or exists(select 1 from public.units_of_measure where tenant_id=v_tenant_b and id=v_cleanroom_unit)
+     or exists(select 1 from public.products where tenant_id=v_tenant_b and id=v_cleanroom_product) then
+    raise exception 'FAIL: clean-room fixture was not empty before restore';
+  end if;
   v_restore_fixture_result:=public.restore_tenant_backup(v_tenant_b,v_restore_fixture_backup);
   if coalesce((v_restore_fixture_result->>'success')::boolean,false) is not true
-     or coalesce((v_restore_fixture_result->>'imported_rows')::integer,0)<1
-     or not exists(select 1 from public.branches where tenant_id=v_tenant_b and id=v_branch_b) then
-    raise exception 'FAIL: additive restore did not recover a missing branch row: %',v_restore_fixture_result;
+     or coalesce((v_restore_fixture_result->>'complete')::boolean,false) is not true
+     or coalesce((v_restore_fixture_result->>'imported_rows')::integer,0)<4
+     or not exists(select 1 from public.branches where tenant_id=v_tenant_b and id=v_branch_b)
+     or not exists(select 1 from public.warehouses where tenant_id=v_tenant_b and id=v_cleanroom_warehouse and branch_id=v_branch_b)
+     or not exists(select 1 from public.units_of_measure where tenant_id=v_tenant_b and id=v_cleanroom_unit)
+     or not exists(select 1 from public.products where tenant_id=v_tenant_b and id=v_cleanroom_product and base_unit_id=v_cleanroom_unit) then
+    raise exception 'FAIL: clean-room restore did not recover the complete dependency graph: %',v_restore_fixture_result;
+  end if;
+  v_restore_fixture_result:=public.restore_tenant_backup(v_tenant_b,v_restore_fixture_backup);
+  if coalesce((v_restore_fixture_result->>'success')::boolean,false) is not true
+     or coalesce((v_restore_fixture_result->>'imported_rows')::integer,-1)<>0 then
+    raise exception 'FAIL: clean-room restore retry was not idempotent: %',v_restore_fixture_result;
   end if;
 
 
