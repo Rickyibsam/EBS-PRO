@@ -1,3 +1,4 @@
+import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import {FormEvent,useEffect,useMemo,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 import {useModuleAction} from "./lib/modulePermissionContext";
@@ -10,24 +11,23 @@ export default function TargetsModule({db,tenantId,currentRole}:{db:SupabaseClie
  const canCreatePayroll=useModuleAction("hr_payroll","create",["owner","admin","manager","sales"].includes(currentRole));
  const canUpdatePayroll=useModuleAction("hr_payroll","update",["owner","admin","manager","accounts"].includes(currentRole));
  async function load(){setLoading(true);setNotice("");const [t,e,v,p,cat,o,ol,d,dl,vis,dvis,inv,il,cn,cnl]=await Promise.all([
- db.from("sales_targets").select("*").eq("tenant_id",tenantId).order("period_start",{ascending:false}),
- db.from("employees").select("id,full_name,employee_code,job_title").eq("tenant_id",tenantId).eq("employment_status","active").order("full_name"),
- db.from("parties").select("id,name,party_code").eq("tenant_id",tenantId).in("party_type",["supplier","both"]).order("name"),
- db.from("products").select("id,name,sku,brand").eq("tenant_id",tenantId).eq("is_active",true).order("name"),
- db.from("vendor_product_catalog").select("product_id,supplier_id").eq("tenant_id",tenantId),
- db.from("sales_orders").select("id,booker_employee_id,order_date,status").eq("tenant_id",tenantId).in("status",["approved","allocated","dispatched","delivered"]),
- db.from("sales_order_lines").select("sales_order_id,product_id,quantity,line_total").eq("tenant_id",tenantId),
- db.from("deliveries").select("id,sales_order_id,delivery_date,status,delivery_man_employee_id,route_id,vehicle_number").eq("tenant_id",tenantId),
- db.from("delivery_lines").select("delivery_id,product_id,delivered_quantity_base").eq("tenant_id",tenantId),
- db.from("booker_visits").select("id,booker_employee_id,visit_at,visit_status").eq("tenant_id",tenantId),
- db.from("delivery_shop_visits").select("id,delivery_id,delivery_man_employee_id,customer_id,visit_at,visit_status,shops_visited,line_quantities").eq("tenant_id",tenantId),
- db.from("sales_invoices").select("id,sales_order_id,delivery_id,invoice_date,grand_total,status").eq("tenant_id",tenantId).eq("status","posted"),
- db.from("sales_invoice_lines").select("sales_invoice_id,product_id,quantity,line_total").eq("tenant_id",tenantId),
- db.from("sales_credit_notes").select("id,sales_invoice_id,credit_note_date,status").eq("tenant_id",tenantId).eq("status","posted"),
- db.from("sales_credit_note_lines").select("credit_note_id,product_id,quantity,conversion_to_base,line_total").eq("tenant_id",tenantId)
- ]);
+ fetchAllRowsResult<any>((from,to)=>db.from("sales_targets").select("*").eq("tenant_id",tenantId).order("period_start",{ascending:false}).order("id",{ascending:true}).range(from,to)),
+ fetchAllRowsResult<any>((from,to)=>db.from("employees").select("id,full_name,employee_code,job_title").eq("tenant_id",tenantId).eq("employment_status","active").order("full_name").order("id",{ascending:true}).range(from,to)),
+ fetchAllRowsResult<any>((from,to)=>db.from("parties").select("id,name,party_code").eq("tenant_id",tenantId).in("party_type",["supplier","both"]).order("name").order("id",{ascending:true}).range(from,to)),
+ fetchAllRowsResult<any>((from,to)=>db.from("products").select("id,name,sku,brand").eq("tenant_id",tenantId).eq("is_active",true).order("name").order("id",{ascending:true}).range(from,to)),
+ fetchAllRowsResult<any>((from,to)=>db.from("vendor_product_catalog").select("product_id,supplier_id").eq("tenant_id",tenantId).order("id",{ascending:true}).range(from,to)),
+ fetchAllRowsResult<any>((from,to)=>db.from("sales_orders").select("id,booker_employee_id,order_date,status").eq("tenant_id",tenantId).in("status",["approved","allocated","dispatched","delivered"]).order("id",{ascending:true}).range(from,to)),
+ fetchAllRowsResult<any>((from,to)=>db.from("sales_order_lines").select("sales_order_id,product_id,quantity,line_total").eq("tenant_id",tenantId).order("id",{ascending:true}).range(from,to)),
+ fetchAllRowsResult<any>((from,to)=>db.from("deliveries").select("id,sales_order_id,delivery_date,status,delivery_man_employee_id,route_id,vehicle_number").eq("tenant_id",tenantId).order("id",{ascending:true}).range(from,to)),
+ fetchAllRowsResult<any>((from,to)=>db.from("delivery_lines").select("delivery_id,product_id,delivered_quantity_base").eq("tenant_id",tenantId).order("id",{ascending:true}).range(from,to)),
+ fetchAllRowsResult<any>((from,to)=>db.from("booker_visits").select("id,booker_employee_id,visit_at,visit_status").eq("tenant_id",tenantId).order("id",{ascending:true}).range(from,to)),
+ fetchAllRowsResult<any>((from,to)=>db.from("delivery_shop_visits").select("id,delivery_id,delivery_man_employee_id,customer_id,visit_at,visit_status,shops_visited,line_quantities").eq("tenant_id",tenantId).order("id",{ascending:true}).range(from,to)),
+ fetchAllRowsResult<any>((from,to)=>db.from("sales_invoices").select("id,sales_order_id,delivery_id,invoice_date,grand_total,status").eq("tenant_id",tenantId).eq("status","posted").order("id",{ascending:true}).range(from,to)),
+ fetchAllRowsResult<any>((from,to)=>db.from("sales_invoice_lines").select("sales_invoice_id,product_id,quantity,line_total").eq("tenant_id",tenantId).order("id",{ascending:true}).range(from,to)),
+ fetchAllRowsResult<any>((from,to)=>db.from("sales_credit_notes").select("id,sales_invoice_id,credit_note_date,status").eq("tenant_id",tenantId).eq("status","posted").order("id",{ascending:true}).range(from,to)),
+ fetchAllRowsResult<any>((from,to)=>db.from("sales_credit_note_lines").select("credit_note_id,product_id,quantity,conversion_to_base,line_total").eq("tenant_id",tenantId).order("id",{ascending:true}).range(from,to))]);
  const errors=[t,e,v,p,cat,o,ol,d,dl,vis,dvis,inv,il,cn,cnl].filter(x=>x.error);if(errors.length){setNotice(errors[0]?.error?.message||"Target data could not be loaded.");}else{setTargets(t.data??[]);setEmployees(e.data??[]);setVendors(v.data??[]);setProducts(p.data??[]);setCatalog(cat.data??[]);setActuals([{orders:o.data??[],orderLines:ol.data??[],deliveries:d.data??[],deliveryLines:dl.data??[],visits:vis.data??[],deliveryVisits:dvis.data??[],invoices:inv.data??[],invoiceLines:il.data??[],creditNotes:cn.data??[],creditLines:cnl.data??[]}]);}setLoading(false);}
- async function loadAccruals(){const {data,error}=await db.from("sales_incentive_accruals").select("*").eq("tenant_id",tenantId).order("calculated_at",{ascending:false}).limit(1000);if(error)setNotice(error.message);else setAccruals(data||[]);}
+ async function loadAccruals(){const {data,error}=await fetchAllRowsResult<any>((from,to)=>db.from("sales_incentive_accruals").select("*").eq("tenant_id",tenantId).order("calculated_at",{ascending:false}).order("id",{ascending:true}).range(from,to));if(error)setNotice(error.message);else setAccruals(data||[]);}
  async function applyReturnAdjustment(id:string){
   if(!canUpdatePayroll)return;
   if(!window.confirm("Apply the outstanding commission return adjustment to the employee's next draft payroll?"))return;
@@ -56,7 +56,7 @@ export default function TargetsModule({db,tenantId,currentRole}:{db:SupabaseClie
   if(!canUpdatePayroll){setNotice("Payroll update permission is required to apply commission adjustments.");return;}
   setSaving(true);setNotice("");
   try{
-   const {data:runs,error:runError}=await db.from("payroll_runs").select("id,period_start,period_end,status").eq("tenant_id",tenantId).eq("status","draft").order("period_start",{ascending:false});
+   const {data:runs,error:runError}=await fetchAllRowsResult<any>((from,to)=>db.from("payroll_runs").select("id,period_start,period_end,status").eq("tenant_id",tenantId).eq("status","draft").order("period_start",{ascending:false}).order("id",{ascending:true}).range(from,to));
    if(runError)throw runError;
    if(!runs?.length)throw new Error("Create a draft payroll run first.");
    if(runs.length!==1)throw new Error("There are multiple draft payroll runs. Keep one draft open while applying commission clawbacks.");
@@ -73,7 +73,7 @@ export default function TargetsModule({db,tenantId,currentRole}:{db:SupabaseClie
   setSaving(true);setNotice("");
   try{
    const {data:user}=await db.auth.getUser();
-   const {data:existing,error:readError}=await db.from("sales_incentive_accruals").select("sales_target_id,status,earned_amount,settled_amount,return_adjustment_applied,settled_at,settled_by").eq("tenant_id",tenantId);
+   const {data:existing,error:readError}=await fetchAllRowsResult<any>((from,to)=>db.from("sales_incentive_accruals").select("sales_target_id,status,earned_amount,settled_amount,return_adjustment_applied,settled_at,settled_by").eq("tenant_id",tenantId).order("id",{ascending:true}).range(from,to));
    if(readError)throw readError;
    const existingMap=new Map((existing||[]).map(x=>[x.sales_target_id,x]));
    const eligible=targets.filter(t=>(t.is_active||existingMap.has(t.id))&&(t.employee_id||t.vendor_id||t.brand||t.product_id)&&(progress(t).earned>0||existingMap.has(t.id)));
@@ -100,7 +100,7 @@ export default function TargetsModule({db,tenantId,currentRole}:{db:SupabaseClie
    const settledTargetIds=new Set(accruals.filter(a=>a.status==="settled").map(a=>a.sales_target_id));
    const completed=targets.filter(t=>t.employee_id&&t.period_start===start&&t.period_end===end&&progress(t).earned>0&&!settledTargetIds.has(t.id));
    if(!completed.length)throw new Error("No employee-specific earned incentives are ready for this period.");
-   const {data:runs,error:runError}=await db.from("payroll_runs").select("id,period_start,period_end,status").eq("tenant_id",tenantId).eq("period_start",start).eq("period_end",end).eq("status","draft");
+   const {data:runs,error:runError}=await fetchAllRowsResult<any>((from,to)=>db.from("payroll_runs").select("id,period_start,period_end,status").eq("tenant_id",tenantId).eq("period_start",start).eq("period_end",end).eq("status","draft").order("id",{ascending:true}).range(from,to));
    if(runError)throw runError;
    if(!runs?.length)throw new Error("Create a draft payroll run with exactly the same start/end dates first.");
    if(runs.length!==1)throw new Error("More than one draft payroll run matches this period. Resolve duplicate drafts before importing.");
