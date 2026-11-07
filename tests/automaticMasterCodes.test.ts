@@ -28,7 +28,7 @@ test("master code sequence is tenant-isolated and inaccessible to client roles",
   assert.match(migration, /revoke all on table public\.master_code_sequences from public, anon, authenticated/i);
   assert.match(migration, /security definer/i);
   assert.match(migration, /set search_path = pg_catalog, public/i);
-  assert.match(securityMigration, /for all to public using \(false\) with check \(false\)/i);
+  assert.match(securityMigration, /for all\\s+to public\\s+using \\(false\\)\\s+with check \\(false\\)/i);
 });
 
 test("master entry forms no longer require manual codes", () => {
