@@ -81,6 +81,12 @@ test("zero-gross payroll is rejected without creating a journal", () => {
   assert.ok(smoke.includes("zero-gross payroll was not rejected without a journal"));
 });
 
+test("isolated clean-room backup restores branch, warehouse, unit and product dependencies idempotently", () => {
+  assert.ok(smoke.includes("Isolated tenant clean-room fixture"));
+  assert.ok(smoke.includes("clean-room restore did not recover the complete dependency graph"));
+  assert.ok(smoke.includes("clean-room restore retry was not idempotent"));
+});
+
 test("fixed asset workflow posts depreciation once and disposes with a balanced GL journal", () => {
   assert.ok(smoke.includes("public.post_asset_monthly_depreciation("));
   assert.ok(smoke.includes("v_depreciation_retry"));
