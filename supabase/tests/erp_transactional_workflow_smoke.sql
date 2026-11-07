@@ -85,6 +85,7 @@ declare
   v_leave_result jsonb;
   v_signature_result jsonb;
   v_rls_rows integer := -1;
+  v_report_result jsonb;
   v_van_route uuid := gen_random_uuid();
   v_van_order_request uuid := gen_random_uuid();
   v_van_order uuid;
@@ -625,6 +626,9 @@ begin
   insert into public.tenant_user_module_permissions(
     tenant_id,user_id,module_key,can_view,can_create,can_update,can_delete
   ) values(v_tenant_a,v_booker_user,'administration_security',true,true,false,false);
+  insert into public.tenant_user_module_permissions(
+    tenant_id,user_id,module_key,can_view,can_create,can_update,can_delete
+  ) values(v_tenant_a,v_booker_user,'reports_analytics',false,false,false,false);
   insert into public.app_settings(tenant_id,settings)
   values(v_tenant_a,'{"permission_test":"original"}'::jsonb);
   perform set_config('request.jwt.claim.sub',v_booker_user::text,true);
@@ -637,6 +641,13 @@ begin
   if v_rls_rows<>0 then
     raise exception 'FAIL: direct RLS update bypassed custom per-user update denial';
   end if;
+  v_rejected:=false;
+  begin
+    perform public.get_erp_report_summary(v_tenant_a,current_date,current_date);
+  exception when insufficient_privilege then
+    v_rejected:=true;
+  end;
+  if not v_rejected then raise exception 'FAIL: custom reports view denial was not enforced'; end if;
   if (select settings->>'permission_test' from public.app_settings where tenant_id=v_tenant_a)<>'original' then
     raise exception 'FAIL: denied custom-permission update changed app settings';
   end if;
@@ -659,6 +670,30 @@ begin
      or not exists(select 1 from public.branches where tenant_id=v_tenant_b and id=v_branch_b) then
     raise exception 'FAIL: additive restore did not recover a missing branch row: %',v_restore_fixture_result;
   end if;
+
+
+  -- Date-filtered report RPC: totals, breakdowns and custom permissions are reconciled.
+  v_report_result:=public.get_erp_report_summary(v_tenant_a,current_date,current_date);
+  if jsonb_typeof(v_report_result->'counts')<>'object'
+     or jsonb_typeof(v_report_result->'totals')<>'object'
+     or jsonb_typeof(v_report_result->'breakdowns')<>'object'
+     or coalesce((v_report_result->'counts'->>'sales_orders')::integer,0)<1
+     or coalesce((v_report_result->'totals'->>'Posted sales invoices')::numeric,0)<>175.5
+     or coalesce((v_report_result->'totals'->>'Accounts receivable')::numeric,0)<>175.5
+     or coalesce((v_report_result->'totals'->>'Accounts payable')::numeric,0)<>130
+     or coalesce((v_report_result->'totals'->>'Cost of goods issued')::numeric,0)<>60
+     or coalesce((v_report_result->'totals'->>'Gross profit (before expenses)')::numeric,0)<>90
+     or jsonb_array_length(v_report_result->'breakdowns'->'customers')<1
+     or jsonb_array_length(v_report_result->'breakdowns'->'vendors')<1 then
+    raise exception 'FAIL: date-filtered report totals or breakdowns did not reconcile: %',v_report_result;
+  end if;
+  v_rejected:=false;
+  begin
+    perform public.get_erp_report_summary(v_tenant_a,current_date,current_date-1);
+  exception when sqlstate '22007' then
+    v_rejected:=true;
+  end;
+  if not v_rejected then raise exception 'FAIL: invalid report date range was accepted'; end if;
 
   -- Balanced journal must post and preserve double-entry equality.
   insert into public.journal_entries(id,tenant_id,journal_number,entry_date,narration,status,created_by)
