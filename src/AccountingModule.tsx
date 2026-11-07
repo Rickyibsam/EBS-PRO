@@ -201,7 +201,7 @@ export default function AccountingModule({ db, tenantId,currentRole }: { db: Sup
       <h3>Journal register</h3>
       {loading ? <div className="table-empty">Loading journals…</div> : <div className="data-table-wrap"><table className="data-table"><thead><tr><th>Journal</th><th>Date</th><th>Branch</th><th>Narration</th><th>Status</th><th>Action</th></tr></thead><tbody>
         {journals.map(j => <tr key={j.id}><td>{j.journal_number}</td><td>{j.entry_date}</td><td>{branches.find(b=>b.id===j.branch_id)?.name||"Company-wide / unassigned"}</td><td>{j.narration}</td><td>{j.status}</td><td>{j.status === "draft"&&canUpdate ? <button disabled={saving} onClick={() => void postJournal(j.id)}>Post journal</button> : j.status === "draft" ? "Draft" : "Posted"}</td></tr>)}
-        {!journals.length && <tr><td colSpan={5} className="table-empty">No journal entries yet.</td></tr>}
+        {!journals.length && <tr><td colSpan={6} className="table-empty">No journal entries yet.</td></tr>}
       </tbody></table></div>}
     </> : tab === "accounts" ? <>
       <h3>Chart of accounts</h3>
