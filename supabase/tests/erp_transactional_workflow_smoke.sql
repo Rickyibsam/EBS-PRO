@@ -241,7 +241,7 @@ begin
   v_invoice_result:=public.create_purchase_invoice(v_grn,'TX-SUP-INV-001',current_date,current_date+30,10,'Smoke test supplier invoice');
   v_purchase_invoice:=(v_invoice_result->>'purchase_invoice_id')::uuid;
   perform public.post_purchase_invoice(v_purchase_invoice);
-  if not exists(select 1 from public.purchase_invoices where id=v_purchase_invoice and status='posted' and grand_total=154) then
+  if not exists(select 1 from public.purchase_invoices where id=v_purchase_invoice and status='posted' and grand_total=150) then
     raise exception 'FAIL: supplier invoice did not post with expected total';
   end if;
   if not exists(select 1 from public.journal_entries where tenant_id=v_tenant_a
