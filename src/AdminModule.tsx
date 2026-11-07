@@ -1,3 +1,4 @@
+import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import { FormEvent, useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -35,7 +36,7 @@ export default function AdminModule({db,tenantId,module,currentRole}:{db:Supabas
     } else if(routes){
      const [r,cu,empRows,b]=await Promise.all([db.from("sales_routes").select("id,route_code,name,area_description,is_active,branch_id").eq("tenant_id",tenantId).order("name"),db.from("parties").select("id,name,party_code").eq("tenant_id",tenantId).in("party_type",["customer","both"]).eq("status","active").order("name"),db.from("employees").select("id,full_name,employee_code").eq("tenant_id",tenantId).eq("employment_status","active").order("full_name"),db.from("branches").select("id,name,code").eq("tenant_id",tenantId).eq("is_active",true).order("name")]);const err=r.error||cu.error||empRows.error||b.error;if(err)throw err;setRows(r.data??[]);setLookups(v=>({...v,customers:cu.data??[],employees:empRows.data??[],routes:r.data??[],branches:b.data??[]}));
    } else if(booker){
-    const [v,c,e,r]=await Promise.all([db.from("booker_visits").select("id,visit_at,visit_status,customer_id,booker_employee_id,route_id,notes").eq("tenant_id",tenantId).order("visit_at",{ascending:false}).limit(300),db.from("parties").select("id,name,party_code").eq("tenant_id",tenantId).in("party_type",["customer","both"]).eq("status","active").order("name"),db.from("employees").select("id,full_name,employee_code").eq("tenant_id",tenantId).eq("employment_status","active").order("full_name"),db.from("sales_routes").select("id,name,route_code").eq("tenant_id",tenantId).eq("is_active",true).order("name")]);
+    const [v,c,e,r]=await Promise.all([fetchAllRowsResult<any>((from,to)=>db.from("booker_visits").select("id,visit_at,visit_status,customer_id,booker_employee_id,route_id,notes").eq("tenant_id",tenantId).order("visit_at",{ascending:false}).order("id",{ascending:true}).range(from,to)),db.from("parties").select("id,name,party_code").eq("tenant_id",tenantId).in("party_type",["customer","both"]).eq("status","active").order("name"),db.from("employees").select("id,full_name,employee_code").eq("tenant_id",tenantId).eq("employment_status","active").order("full_name"),db.from("sales_routes").select("id,name,route_code").eq("tenant_id",tenantId).eq("is_active",true).order("name")]);
     const err=[v.error,c.error,e.error,r.error].find(Boolean);if(err)throw err;setRows(v.data??[]);setLookups(v=>({...v,customers:c.data??[],employees:e.data??[],routes:r.data??[]}));
    } else if(module==="Booker Product Access"){
     const [rules,emp,vendor,prod]=await Promise.all([
