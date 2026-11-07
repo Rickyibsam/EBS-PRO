@@ -120,3 +120,11 @@ test("van delivery PWA safely closes a failed customer visit without stock issue
   assert.ok(smoke.includes("'not_available'"));
   assert.ok(smoke.includes("failed van delivery did not close safely"));
 });
+
+
+test("backup restore imports missing same-tenant rows without overwrite or deletion", () => {
+  assert.ok(smoke.includes("v_restore_fixture_backup:=public.export_tenant_backup(v_tenant_b)"));
+  assert.ok(smoke.includes("delete from public.branches where tenant_id=v_tenant_b"));
+  assert.ok(smoke.includes("public.restore_tenant_backup(v_tenant_b,v_restore_fixture_backup)"));
+  assert.ok(smoke.includes("additive restore did not recover a missing branch row"));
+});
