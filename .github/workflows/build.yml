@@ -22,6 +22,8 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      - name: Audit dependency vulnerabilities
+        run: npm audit --audit-level=high
       - name: Run automated unit tests
         run: npm test
       - name: Build application
