@@ -163,6 +163,16 @@ from pg_proc p join pg_namespace n on n.oid=p.pronamespace
 where n.nspname='public' and p.prosecdef
 and not exists(select 1 from unnest(coalesce(p.proconfig,array[]::text[])) cfg where cfg like 'search_path=%');
 
+
+insert into _ebs_integrity_findings
+select 'custom_permission_guard_policies_permissive','high',count(*)::bigint,
+       'Custom permission guard policies that are permissive; expected zero because guard policies must be RESTRICTIVE'
+from pg_policy p
+join pg_class c on c.oid=p.polrelid
+join pg_namespace n on n.oid=c.relnamespace
+where n.nspname='public' and p.polname like 'module_override_guard_%'
+  and p.polpermissive;
+
 select check_key,severity,finding_count,details
 from _ebs_integrity_findings
 order by case severity when 'critical' then 1 when 'high' then 2 when 'medium' then 3 else 4 end,check_key;

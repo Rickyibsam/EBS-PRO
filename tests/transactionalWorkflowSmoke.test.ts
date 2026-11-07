@@ -99,3 +99,10 @@ test("HR workflow records attendance and approves leave", () => {
   assert.ok(smoke.includes("public.decide_employee_leave("));
   assert.ok(smoke.includes("employee leave approval was not recorded"));
 });
+
+
+test("custom per-user RLS denial blocks direct table UPDATE for a manager", () => {
+  assert.ok(smoke.includes("set local role authenticated"));
+  assert.ok(smoke.includes("'administration_security',true,true,false,false"));
+  assert.ok(smoke.includes("direct RLS update bypassed custom per-user update denial"));
+});
