@@ -118,7 +118,7 @@ The current hosted project has existing organization and sample/test records. Ex
 
 ## Database migration history
 
-The hosted Supabase migration ledger currently records **182 applied migrations**. The repository migration stream has been restored to the same 182 timestamped versions using the original SQL statements retained in `supabase_migrations.schema_migrations`. The recovery was performed as a GitHub source-history change only; it did **not** apply DDL, alter the hosted database, or touch business records.
+The hosted Supabase migration ledger currently records **183 applied migrations**. The repository migration stream has been restored to the same 183 timestamped versions using the original SQL statements retained in `supabase_migrations.schema_migrations`. The recovery was performed as a GitHub source-history change only; it did **not** apply DDL, alter the hosted database, or touch business records.
 
 Two old non-timestamped bootstrap scripts are archived under `docs/legacy-sql/` for historical reference and are not part of the current migration stream. Two duplicate later-version copies of migrations already recorded under their original applied versions have been removed from the migration stream. A version-by-version count match is necessary for reproducibility, but a **clean-room replay has not been certified**; it still requires a separate disposable database/project rehearsal. Do not reset, delete or recreate the existing production project to attempt this.
 
