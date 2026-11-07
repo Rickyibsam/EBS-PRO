@@ -22,3 +22,15 @@ export async function fetchAllRows<T>(
     }
   }
 }
+
+
+export async function fetchAllRowsResult<T>(
+  fetchPage: (from: number, to: number) => PromiseLike<PageResult<T>>,
+  pageSize = 500
+): Promise<PageResult<T>> {
+  try {
+    return { data: await fetchAllRows(fetchPage, pageSize), error: null };
+  } catch (error) {
+    return { data: null, error };
+  }
+}
