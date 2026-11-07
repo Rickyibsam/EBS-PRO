@@ -76,6 +76,11 @@ test("zero-net payroll omits zero-value journal lines while preserving double-en
   assert.ok(smoke.includes("gross_total=200 and deductions_total=60 and net_total=140"));
 });
 
+test("zero-gross payroll is rejected without creating a journal", () => {
+  assert.ok(smoke.includes("v_zero_payroll_run"));
+  assert.ok(smoke.includes("zero-gross payroll was not rejected without a journal"));
+});
+
 test("fixed asset workflow posts depreciation once and disposes with a balanced GL journal", () => {
   assert.ok(smoke.includes("public.post_asset_monthly_depreciation("));
   assert.ok(smoke.includes("v_depreciation_retry"));
