@@ -6,7 +6,7 @@ const migration = await readFile(
   new URL("../supabase/migrations/20261107070000_auto_generate_master_entry_codes.sql", import.meta.url),
   "utf8"
 );
-const integration = await readFile(
+const extension = await readFile(\n  new URL("../supabase/migrations/20261107071000_auto_generate_additional_master_codes.sql", import.meta.url),\n  "utf8"\n);\nconst integration = await readFile(
   new URL("../supabase/tests/auto_generated_master_codes.sql", import.meta.url),
   "utf8"
 );
@@ -46,4 +46,14 @@ test("database acceptance test verifies generated codes and preserves legacy cod
   assert.match(integration, /LEGACY-CODE-KEEP/);
   assert.match(integration.trimEnd(), /rollback;$/i);
   assert.doesNotMatch(integration, /\bcommit\s*;/i);
+});
+
+test("branch, warehouse, department, designation, employee, asset and route codes are generated", () => {
+  for (const table of ["warehouses", "departments", "designations", "employees", "fixed_assets", "sales_routes"]) {
+    assert.match(extension, new RegExp("before insert on public\\\\." + table, "i"));
+  }
+  for (const prefix of ["WH-", "DEP-", "DSG-", "EMP-", "AST-", "RTE-"]) {
+    assert.ok(extension.includes(prefix));
+    assert.ok(integration.includes(prefix));
+  }
 });
