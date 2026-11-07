@@ -26,3 +26,9 @@ jobs:
         run: npm test
       - name: Build application
         run: npm run build
+      - name: Install Chromium for browser smoke tests
+        run: npx playwright install --with-deps chromium
+      - name: Run production browser and mobile-emulation smoke tests
+        run: npm run test:e2e
+        env:
+          EBS_PRO_BASE_URL: https://ebs-pro.onrender.com
