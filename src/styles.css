@@ -696,3 +696,7 @@ body{background:#f4f7fc;color:#172b4d}
  .ai-dashboard .launcher-links{grid-template-columns:1fr;padding:0 17px 14px !important}
  .ai-dashboard .launcher-links button{font-size:14px !important}
 }
+
+/* Keep empty permission categories visible so the final dashboard groups never disappear. */
+.ai-dashboard .launcher-no-access{margin:0;padding:12px 20px 18px;color:#71869b;font-size:14px;line-height:1.55;background:#f8fbfe;border-top:1px solid #e8eff6}
+@media(max-width:760px){.ai-dashboard .launcher-no-access{padding:12px 17px 15px;font-size:13px}}
