@@ -34,8 +34,8 @@ test("forgot-password request returns a clear confirmation without exposing acco
   await expect(page.getByText(/Password recovery email sent/i)).toBeVisible();
 });
 
-test("mobile browser permissions can supply GPS and camera streams to the PWA", async ({ page, context, isMobile }) => {
-  test.skip(!isMobile, "Runs in the mobile Chromium project.");
+test("mobile browser permissions can supply GPS and camera streams to the PWA", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-chromium", "Runs in the mobile Chromium project.");
   await page.goto("/");
   const capabilities = await page.evaluate(async () => {
     const position = await new Promise<{ latitude: number; longitude: number }>((resolve, reject) =>
@@ -55,8 +55,8 @@ test("mobile browser permissions can supply GPS and camera streams to the PWA", 
   expect(capabilities.hasVideoTrack).toBeTruthy();
 });
 
-test("mobile viewport keeps the authentication controls usable", async ({ page, isMobile }) => {
-  test.skip(!isMobile, "Runs in the mobile Chromium project.");
+test("mobile viewport keeps the authentication controls usable", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-chromium", "Runs in the mobile Chromium project.");
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Sign in to your account" })).toBeVisible();
   const email = page.getByLabel("Email address");
