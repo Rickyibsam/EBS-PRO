@@ -522,3 +522,181 @@ body{background:#f4f7fc;color:#172b4d}
  .landscape-nav-trigger{padding:0 8px}
  .dropdown-links{grid-template-columns:1fr}
 }
+
+
+/* EBS PRO — navigation visibility and readable typography fix */
+.landscape-nav{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:stretch;
+  overflow:visible;
+  height:auto;
+  min-height:59px;
+  padding:5px clamp(10px,1.5vw,24px);
+  row-gap:2px;
+}
+.landscape-home,.landscape-nav-trigger{
+  min-height:54px;
+  height:auto;
+  font-size:13px;
+  padding-left:clamp(9px,1vw,16px);
+  padding-right:clamp(9px,1vw,16px);
+}
+.landscape-nav-items{
+  display:flex;
+  flex:1 1 760px;
+  flex-wrap:wrap;
+  align-items:stretch;
+  min-width:0;
+  gap:2px 4px;
+}
+.landscape-nav-group{flex:0 0 auto}
+.landscape-nav-trigger b{font-size:13px;font-weight:750}
+.landscape-nav-icon{font-size:16px}
+.landscape-nav-end{margin-left:auto}
+.landscape-dropdown{z-index:120;width:min(380px,calc(100vw - 24px))}
+.dropdown-heading b{font-size:14px}
+.dropdown-heading small{font-size:11px}
+.dropdown-links button{font-size:13px;padding:11px 10px;min-height:40px}
+.landscape-main>header{font-size:12px}
+.topbar-company strong{font-size:13px}
+.topbar-company small,.topbar-company select{font-size:11px}
+.topbar-role{font-size:10px}
+.topbar-email{font-size:12px}
+.topbar-user button{font-size:12px;padding:9px 12px}
+.launcher-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.launcher-toggle{width:100%;text-align:left}
+.launcher-toggle strong{display:block;font-size:16px;line-height:1.4}
+.launcher-toggle>small{display:block;font-size:12px;line-height:1.55}
+.launcher-count{font-size:12px}
+.launcher-links button{font-size:13px;padding:10px 2px}
+.dashboard-section-head h2{font-size:23px}
+.dashboard-section-head p{font-size:13px}
+.metric-label{font-size:12px}
+.ai-metric small{font-size:11px}
+.dashboard-chart-title h3{font-size:16px}
+.dashboard-legend span,.dashboard-finance-strip small{font-size:11px}
+.dashboard-finance-strip span{font-size:10px}
+@media(max-width:1180px){
+ .landscape-nav{overflow:visible;flex-wrap:wrap}
+ .landscape-nav-items{flex:1 1 100%;flex-wrap:wrap}
+ .landscape-nav-end{display:none}
+ .landscape-nav-trigger{padding-left:10px;padding-right:10px}
+}
+@media(max-width:760px){
+ .landscape-nav{overflow:visible;min-height:0;padding:5px 8px;gap:2px}
+ .landscape-home,.landscape-nav-trigger{min-height:46px;height:auto;font-size:12px;padding:0 9px}
+ .landscape-nav-items{flex:1 1 100%;gap:2px}
+ .landscape-nav-group{flex:1 1 auto}
+ .landscape-nav-trigger{width:100%;justify-content:center}
+ .landscape-nav-trigger b{font-size:12px}
+ .landscape-dropdown{position:absolute;top:100%;left:0;right:auto;width:min(340px,calc(100vw - 20px));max-height:65vh;overflow:auto}
+ .dropdown-links{grid-template-columns:1fr 1fr}
+ .dropdown-links button{font-size:12px}
+ .launcher-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+ .launcher-toggle{padding:14px}
+ .launcher-toggle strong{font-size:14px}
+ .launcher-toggle>small{font-size:11px}
+ .launcher-links button{font-size:12px}
+}
+@media(max-width:480px){
+ .landscape-nav{display:block}
+ .landscape-home{width:100%;justify-content:flex-start;border-right:0;border-bottom:1px solid #ffffff18}
+ .landscape-nav-items{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ .landscape-nav-group{min-width:0}
+ .landscape-nav-trigger{justify-content:flex-start;min-height:44px;padding:0 8px}
+ .landscape-nav-trigger b{font-size:11px}
+ .landscape-dropdown{left:0;right:0;width:calc(100vw - 16px);margin:0 auto}
+ .dropdown-links{grid-template-columns:1fr}
+ .launcher-grid{grid-template-columns:1fr}
+}
+
+
+/* Dashboard launcher: prevent clipped category panels and make every group readable */
+.ai-dashboard .launcher-grid{
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  align-items:start;
+  gap:18px !important;
+  overflow:visible !important;
+}
+.ai-dashboard .launcher-card{
+  display:block;
+  width:100%;
+  min-width:0;
+  height:auto !important;
+  min-height:0;
+  overflow:visible !important;
+  align-self:start;
+}
+.ai-dashboard .launcher-toggle{
+  display:block;
+  width:100%;
+  min-width:0;
+  min-height:150px;
+  height:auto !important;
+  white-space:normal !important;
+  overflow:visible !important;
+  padding:20px !important;
+}
+.ai-dashboard .launcher-toggle strong{
+  display:block;
+  white-space:normal !important;
+  overflow:visible !important;
+  overflow-wrap:anywhere;
+  font-size:17px !important;
+  line-height:1.45 !important;
+  margin:0 0 8px !important;
+}
+.ai-dashboard .launcher-toggle>small{
+  display:block;
+  min-height:0 !important;
+  white-space:normal !important;
+  overflow:visible !important;
+  font-size:14px !important;
+  line-height:1.6 !important;
+  overflow-wrap:anywhere;
+}
+.ai-dashboard .launcher-count{
+  min-height:38px;
+  font-size:13px !important;
+  line-height:1.4;
+}
+.ai-dashboard .launcher-links{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:0 18px;
+  width:100%;
+  min-width:0;
+  max-height:none !important;
+  height:auto !important;
+  overflow:visible !important;
+  padding:0 20px 18px !important;
+}
+.ai-dashboard .launcher-links button{
+  display:flex;
+  width:100%;
+  min-width:0;
+  min-height:46px;
+  height:auto !important;
+  white-space:normal !important;
+  overflow:visible !important;
+  overflow-wrap:anywhere;
+  font-size:14px !important;
+  line-height:1.45 !important;
+  padding:11px 3px !important;
+  text-align:left;
+}
+.ai-dashboard .launcher-links button span{flex:0 0 auto;margin-left:8px}
+@media(max-width:760px){
+ .ai-dashboard .launcher-grid{grid-template-columns:1fr !important;gap:12px !important}
+ .ai-dashboard .launcher-toggle{min-height:0;padding:17px !important}
+ .ai-dashboard .launcher-toggle strong{font-size:16px !important}
+ .ai-dashboard .launcher-toggle>small{font-size:13px !important}
+ .ai-dashboard .launcher-links{grid-template-columns:1fr;padding:0 17px 14px !important}
+ .ai-dashboard .launcher-links button{font-size:14px !important}
+}
+
+/* Keep empty permission categories visible so the final dashboard groups never disappear. */
+.ai-dashboard .launcher-no-access{margin:0;padding:12px 20px 18px;color:#71869b;font-size:14px;line-height:1.55;background:#f8fbfe;border-top:1px solid #e8eff6}
+@media(max-width:760px){.ai-dashboard .launcher-no-access{padding:12px 17px 15px;font-size:13px}}
