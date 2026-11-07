@@ -428,3 +428,97 @@ body{background:#f4f7fc;color:#172b4d}
   .dashboard-section-head{flex-direction:column;align-items:flex-start}
   .dashboard-period-switch{align-self:flex-end}
 }
+
+
+/* EBS PRO landscape navigation — full-width ERP command bar */
+.landscape-shell{display:block;min-height:100vh;background:#f2f6fb}
+.workspace-topbar{
+  min-height:76px;display:flex;align-items:center;gap:24px;padding:10px clamp(16px,2.2vw,34px);
+  background:#fff;border-bottom:1px solid #e5edf5;box-shadow:0 3px 16px rgba(25,55,90,.045);position:relative;z-index:45
+}
+.topbar-brand{display:flex;align-items:center;gap:12px;min-width:205px}
+.topbar-brand .logo{width:44px;height:44px;border-radius:14px;background:linear-gradient(145deg,#21b9d2,#087bc8);color:#fff;box-shadow:0 7px 17px #0784c52b}
+.topbar-brand>div:last-child{display:grid;gap:3px}
+.topbar-brand b{font-size:19px;letter-spacing:-.8px;color:#173d63}
+.topbar-brand em{font-style:normal;color:#078dc9}
+.topbar-brand small{font-size:8px;letter-spacing:1.25px;color:#8ca0b5;font-weight:800}
+.topbar-company{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 14px;border:1px solid #e3ebf3;border-radius:11px;background:#f8fbfe}
+.topbar-company strong{font-size:11px;color:#294c70}
+.topbar-company small{font-size:9px;color:#8297ad}
+.topbar-company select{max-width:170px;border:1px solid #dce7f1;border-radius:7px;background:#fff;color:#426887;padding:5px 7px;font-size:10px}
+.topbar-user{margin-left:auto;display:flex;align-items:center;justify-content:flex-end;gap:15px;min-width:0}
+.topbar-role{white-space:nowrap;border:1px solid #cdeee6;background:#effbf8;color:#13856f;border-radius:30px;padding:8px 11px;font-size:8px;letter-spacing:.8px;font-weight:800}
+.topbar-email{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#637e98;font-size:10px}
+.topbar-user button{border:1px solid #dce7f1;border-radius:8px;background:#fff;color:#426887;padding:8px 11px;font-size:10px;font-weight:700;white-space:nowrap}
+.topbar-user button:hover{border-color:#8fc8e8;background:#f4faff;color:#087fc5}
+.landscape-nav{
+  min-height:59px;display:flex;align-items:stretch;gap:5px;padding:0 clamp(10px,1.5vw,24px);
+  color:#eaf5ff;background:linear-gradient(100deg,#12365d 0%,#174c78 60%,#126b91 100%);
+  box-shadow:0 7px 20px rgba(16,57,96,.12);position:relative;z-index:40
+}
+.landscape-home,.landscape-nav-trigger{height:59px;border:0;background:transparent;color:#dceaf7;display:flex;align-items:center;gap:9px;padding:0 13px;font-size:10px;white-space:nowrap;cursor:pointer}
+.landscape-home{font-weight:800;border-right:1px solid #ffffff18;padding:0 17px}
+.landscape-home>span{font-size:17px;color:#67d7e8}
+.landscape-home:hover,.landscape-home.active{background:#ffffff13;color:#fff}
+.landscape-nav-items{display:flex;align-items:stretch;gap:2px;min-width:0;flex:1}
+.landscape-nav-group{position:relative;display:flex;align-items:stretch}
+.landscape-nav-trigger{border-bottom:3px solid transparent;padding:0 clamp(7px,.9vw,14px);gap:7px}
+.landscape-nav-trigger b{font-weight:750}
+.landscape-nav-icon{font-size:13px;color:#76d7eb}
+.landscape-caret{font-size:13px;color:#93b8d5;margin-left:2px}
+.landscape-nav-trigger:hover,.landscape-nav-trigger.is-open{background:#ffffff12;color:#fff}
+.landscape-nav-trigger.has-active{border-bottom-color:#48d3df;color:#fff;background:#ffffff0b}
+.landscape-nav-trigger.has-active .landscape-nav-icon{color:#8be9ef}
+.landscape-nav-end{display:flex;align-items:center;padding:0 8px}
+.landscape-nav-end span{font-size:8px;letter-spacing:1px;color:#9cebdc;white-space:nowrap}
+.landscape-dropdown{
+  position:absolute;top:calc(100% - 1px);left:0;z-index:100;width:min(340px,calc(100vw - 24px));
+  padding:14px;border:1px solid #dce8f3;border-top:3px solid #26b8d1;border-radius:0 0 14px 14px;
+  background:rgba(255,255,255,.985);box-shadow:0 18px 42px rgba(15,48,83,.2);color:#234766
+}
+.dropdown-heading{display:flex;align-items:center;gap:11px;padding:3px 4px 12px;border-bottom:1px solid #edf2f7}
+.dropdown-heading>span{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:#e7f6fc;color:#078bc4;font-size:17px}
+.dropdown-heading>div{display:grid;gap:3px}
+.dropdown-heading b{font-size:12px;color:#1b4267}
+.dropdown-heading small{font-size:9px;color:#879db2}
+.dropdown-links{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding-top:10px}
+.dropdown-links button{display:flex;align-items:center;justify-content:space-between;gap:7px;min-width:0;border:1px solid transparent;border-radius:8px;background:transparent;color:#536f8a;text-align:left;padding:9px 8px;font-size:10px}
+.dropdown-links button span{color:#a0b5c7}
+.dropdown-links button:hover,.dropdown-links button.selected{border-color:#d8edf7;background:#f0f9fd;color:#087fc5}
+.dropdown-links button.selected{font-weight:800}
+.landscape-main{min-width:0}
+.landscape-main>header{height:54px;padding:0 clamp(16px,2.5vw,38px);background:#fff;border-bottom:1px solid #e8eef5;font-size:10px}
+.landscape-main>header i{font-style:normal;color:#b3c1cf;margin:0 5px}
+.landscape-main .content{max-width:1760px;padding:clamp(18px,2.3vw,34px)}
+/* Do not retain any vertical-sidebar layout constraints */
+.landscape-shell .sidebar{display:none}
+@media(max-width:1180px){
+ .landscape-nav{overflow-x:auto;scrollbar-width:thin;scrollbar-color:#5b8eaf transparent}
+ .landscape-nav-items{flex:0 0 auto}
+ .landscape-nav-trigger{padding:0 10px}
+ .landscape-nav-end{display:none}
+}
+@media(max-width:760px){
+ .workspace-topbar{min-height:68px;gap:10px;padding:9px 12px;flex-wrap:wrap}
+ .topbar-brand{min-width:0;flex:1}
+ .topbar-brand .logo{width:38px;height:38px}
+ .topbar-brand b{font-size:16px}
+ .topbar-company{order:3;width:100%;padding:7px 10px}
+ .topbar-user{gap:7px}
+ .topbar-email{display:none}
+ .topbar-role{font-size:7px;padding:7px 8px}
+ .topbar-user button{padding:7px 8px;font-size:9px}
+ .landscape-nav{min-height:53px;padding:0 7px}
+ .landscape-home,.landscape-nav-trigger{height:53px;padding:0 10px;font-size:9px}
+ .landscape-nav-icon{display:none}
+ .landscape-dropdown{position:fixed;top:121px;left:8px;right:8px;width:auto;max-height:65vh;overflow:auto;border-radius:0 0 13px 13px}
+ .landscape-main>header{height:48px;padding:0 13px}
+ .landscape-main .content{padding:17px 12px}
+}
+@media(max-width:420px){
+ .topbar-brand small{font-size:7px}
+ .topbar-role{max-width:105px;overflow:hidden;text-overflow:ellipsis}
+ .landscape-home{padding:0 9px}
+ .landscape-nav-trigger{padding:0 8px}
+ .dropdown-links{grid-template-columns:1fr}
+}
