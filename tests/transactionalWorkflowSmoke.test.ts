@@ -80,3 +80,22 @@ test("accounting workflow posts balanced journals and rejects unbalanced journal
   assert.ok(smoke.includes("balanced journal did not post"));
   assert.ok(smoke.includes("unbalanced journal was accepted"));
 });
+
+
+test("inventory workflow transfers stock and posts physical stock-count variances", () => {
+  assert.ok(smoke.includes("public.post_stock_transfer(v_stock_transfer)"));
+  assert.ok(smoke.includes("public.create_stock_take("));
+  assert.ok(smoke.includes("public.post_stock_take(v_stock_take)"));
+  assert.ok(smoke.includes("physical stock count did not create the variance movement"));
+});
+
+test("delivery workflow persists POD signature after delivery outcome", () => {
+  assert.ok(smoke.includes("public.save_delivery_pod_signature("));
+  assert.ok(smoke.includes("delivery POD signature was not persisted"));
+});
+
+test("HR workflow records attendance and approves leave", () => {
+  assert.ok(smoke.includes("public.record_employee_attendance("));
+  assert.ok(smoke.includes("public.decide_employee_leave("));
+  assert.ok(smoke.includes("employee leave approval was not recorded"));
+});
