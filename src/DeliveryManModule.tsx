@@ -1,6 +1,7 @@
 import {FormEvent,useEffect,useState,useRef} from "react";
 import type {PointerEvent as ReactPointerEvent} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
+import {isTransientNetworkError} from "./lib/network";
 import {getQueuedDeliveryVisits,queueDeliveryVisit,removeQueuedDeliveryVisit,cacheDeliverySnapshot,getDeliverySnapshot} from "./deliveryOfflineQueue";
 type Row=Record<string,any>;
 let deferredInstallPrompt:any=null;
@@ -101,7 +102,7 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
    }else{
     const {data:result,error}=await db.rpc("record_van_delivery_visit",{p_delivery_id:d.id,p_visit_status:form.visit_status,p_line_quantities:quantityReport,p_notes:form.notes.trim()||null,p_idempotency_key:payload.idempotency_key});
     if(error){
-     if(/fetch|network|offline|connection/i.test(error.message||"")){
+     if(isTransientNetworkError(error)){
       await queueDeliveryVisit({...payload,id:crypto.randomUUID(),created_by:payload.created_by||null});
       setNotice("Connection interrupted: delivery visit queued for automatic synchronization.");
      }else throw error;
