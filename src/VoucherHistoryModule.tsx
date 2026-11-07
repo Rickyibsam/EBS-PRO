@@ -1,3 +1,4 @@
+import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import {useEffect,useMemo,useState} from "react";
 type Row=Record<string,any>;
 import type {SupabaseClient} from "@supabase/supabase-js";
@@ -30,10 +31,10 @@ export default function VoucherHistoryModule({db,tenantId,currentRole}:{db:Supab
  const config=useMemo(()=>TYPES.find(x=>x.table===table)||TYPES[0],[table]);
  const canEdit=permissionForTable(table);
  const canApprove=canEdit&&config.approval;
- async function load(){setLoading(true);const {data,error}=await db.from("voucher_revisions").select("id,entity_table,entity_id,action,before_data,after_data,changed_by,changed_at").eq("tenant_id",tenantId).order("changed_at",{ascending:false}).limit(1000);if(error)setNotice(error.message);else setRows(data||[]);setLoading(false);}
+ async function load(){setLoading(true);const {data,error}=await fetchAllRowsResult<any>((from,to)=>db.from("voucher_revisions").select("id,entity_table,entity_id,action,before_data,after_data,changed_by,changed_at").eq("tenant_id",tenantId).order("changed_at",{ascending:false}).order("id",{ascending:true}).range(from,to));if(error)setNotice(error.message);else setRows(data||[]);setLoading(false);}
  async function loadDrafts(nextTable=table){
   setSelectedId("");setDraftDate("");setDraftNotes("");setLineRows([]);
-  const {data,error}=await db.from(nextTable as any).select("*").eq("tenant_id",tenantId).eq("status","draft").order("created_at",{ascending:false}).limit(200);
+  const {data,error}=await fetchAllRowsResult<any>((from,to)=>db.from(nextTable as any).select("*").eq("tenant_id",tenantId).eq("status","draft").order("created_at",{ascending:false}).order("id",{ascending:true}).range(from,to));
   if(error){setDrafts([]);setNotice(error.message);return;}
   setDrafts(data||[]);
  }
