@@ -126,3 +126,8 @@ The CI workflow now runs Playwright against the deployed EBS PRO production URL 
 
 
 The rollback-only database smoke test now exercises a clean isolated tenant fixture containing a branch, warehouse, unit of measure and product. It exports that tenant's backup, removes the dependency graph inside the test transaction, restores it additively, verifies all four records and their foreign-key relationships, then repeats restore to confirm idempotency. The entire test transaction is rolled back; it does not delete or alter live business data.
+
+
+## Supabase Auth plan limitation
+
+The EBS-PRO Supabase organization is currently on the Free plan. Supabase documents leaked-password protection (HaveIBeenPwned checks) as a Pro-plan-and-above feature. This setting cannot be enabled on the current Free plan. Do not upgrade or incur billing without explicit owner approval. EBS PRO's signup and password-reset UI independently enforces a 12-character password with uppercase, lowercase, digit and symbol; this client-side rule is not a substitute for Supabase's server-side compromised-password block.
