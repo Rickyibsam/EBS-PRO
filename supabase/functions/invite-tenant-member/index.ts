@@ -35,8 +35,8 @@ Deno.serve(async (req: Request) => {
     const phone = String(body.phone || "").trim();
     const jobTitle = String(body.job_title || "").trim();
 
-    if (!tenantId || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || fullName.length < 2 || employeeCode.length < 2 || !branchId) {
-      return reply({ error: "Enter a valid company, email, full name, employee code and branch." }, 400);
+    if (!tenantId || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || fullName.length < 2 || !branchId) {
+      return reply({ error: "Enter a valid company, email, full name and branch. Employee code is generated automatically." }, 400);
     }
     const allowed = ["admin","manager","accounts","purchase","sales","order_booker","delivery_man","warehouse","cashier","viewer"];
     if (!allowed.includes(role)) return reply({ error: "Invalid staff role. Owner access cannot be granted through staff invitations." }, 400);
@@ -52,9 +52,7 @@ Deno.serve(async (req: Request) => {
       .eq("tenant_id", tenantId).eq("id", branchId).eq("is_active", true).maybeSingle();
     if (branchError || !branch) return reply({ error: "Select an active branch belonging to this company." }, 400);
 
-    const { data: duplicateCode } = await admin.from("employees").select("id")
-      .eq("tenant_id", tenantId).eq("employee_code", employeeCode).maybeSingle();
-    if (duplicateCode) return reply({ error: "That employee code is already in use." }, 409);
+    
 
     const { data: users, error: usersError } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
     if (usersError) return reply({ error: "Could not verify the staff account. Try again." }, 500);
@@ -83,7 +81,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const { error: employeeError } = await admin.from("employees").insert({
-      tenant_id: tenantId, user_id: user.id, branch_id: branchId, employee_code: employeeCode,
+      tenant_id: tenantId, user_id: user.id, branch_id: branchId, employee_code: "",
       full_name: fullName, phone: phone || null, job_title: jobTitle || null, employment_status: "active"
     });
     if (employeeError) {
