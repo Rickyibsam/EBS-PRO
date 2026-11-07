@@ -639,7 +639,10 @@ begin
     (v_tenant_a,v_booker_user,'inventory',true,false,false,false),
     (v_tenant_a,v_booker_user,'purchase_supplier',true,false,false,false),
     (v_tenant_a,v_booker_user,'accounts_finance',true,false,false,false),
-    (v_tenant_a,v_booker_user,'distribution_delivery',true,false,false,false);
+    (v_tenant_a,v_booker_user,'distribution_delivery',true,false,false,false)
+  on conflict(tenant_id,user_id,module_key) do update set
+    can_view=excluded.can_view,can_create=excluded.can_create,
+    can_update=excluded.can_update,can_delete=excluded.can_delete;
 
   insert into public.app_settings(tenant_id,settings)
   values(v_tenant_a,'{"permission_test":"original"}'::jsonb);
