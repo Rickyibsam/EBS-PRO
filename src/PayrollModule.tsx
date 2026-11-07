@@ -43,7 +43,10 @@ export default function PayrollModule({db,tenantId,currentRole}:{db:SupabaseClie
    if(!periodStart||!periodEnd||periodEnd<periodStart)throw new Error("Enter a valid payroll period.");
    const staff=employees.filter(x=>x.employment_status==="active"&&Number(x.basic_salary)>0);
    if(!staff.length)throw new Error("Set basic salary for at least one active employee before generating payroll.");
-   const {data:auth}=await db.auth.getUser();const runNo="EBS-PR-"+Date.now().toString().slice(-10);
+   const {data:runNo,error:numberError}=await db.rpc("next_document_number",{p_tenant_id:tenantId,p_document_type:"payroll_run"});
+   if(numberError)throw numberError;
+   if(typeof runNo!=="string"||!runNo)throw new Error("Payroll run number could not be generated.");
+   const {data:auth}=await db.auth.getUser();
    const {data:head,error}=await db.from("payroll_runs").insert({tenant_id:tenantId,run_number:runNo,period_start:periodStart,period_end:periodEnd,pay_date:payDate,status:"draft",created_by:auth.user?.id??null}).select("id").single();
    if(error)throw error;
    const payload=staff.map(x=>({tenant_id:tenantId,payroll_run_id:head.id,employee_id:x.id,basic_salary:Number(x.basic_salary),allowances:0,overtime:0,sales_incentive:0,deductions:0,net_salary:Number(x.basic_salary)}));
