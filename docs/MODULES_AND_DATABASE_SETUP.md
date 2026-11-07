@@ -74,6 +74,11 @@ The application has 10 module groups. The navigation and module screens are pres
   - Approved sales/purchase vouchers can now progress through controlled fulfilment/receipt status transitions without unlocking their business fields.
   - Voucher line guards now use the correct goods-receipt creator column and allow only the received-quantity increment on approved purchase order lines.
 
+- **Branch-aware financial reporting:** the Accounts module now supports branch-filtered trial balance / P&L / balance-sheet summaries, branch-filtered cashbook entries and branch labels in the journal register. Company-wide views remain the default and include unassigned journal entries.
+- **Branch budget and expense attribution:** budget lines can be assigned per branch, expense vouchers can select a branch, and asset disposal uses the configured cash/bank mapping rather than fixed account-code assumptions.
+- **Complete financial-ledger reads:** customer/supplier payments, invoices, credit notes, party ledgers, cashbook journal lines and bank reconciliation history use stable 500-row pagination instead of silent single-query caps.
+- **Batch & expiry completeness:** stock movements, products and warehouses load in stable pages; expiry warning dates use local calendar dates.
+
 ## Transactional verification completed
 
 The following database smoke workflows were run as authenticated owner/staff contexts inside explicit transactions and rolled back after assertions. The latest run, including the additional legacy `FOR ALL` RLS checks, completed successfully. No test business records were retained:
@@ -87,7 +92,7 @@ The following database smoke workflows were run as authenticated owner/staff con
 - Security: per-user module denial/grant enforcement, owner-managed permission row access, personal notification inbox access, cross-company customer-record read/write isolation, direct custom-denial checks on app settings/fixed assets/budgets/budget lines, and restrictive guards for all 308 module/action policy commands.
 - Client offline storage: all Booker and deliveryman IndexedDB unit tests passed.
 
-The latest main-branch GitHub Actions run completed successfully: **73/73 automated tests passed**, the TypeScript/Vite production build passed, and 10 production browser/mobile-emulation tests passed (2 desktop-only skips). The current Render deployment is live.
+The latest main-branch GitHub Actions run completed successfully: **77/77 automated tests passed**, the TypeScript/Vite production build passed, and 10 production browser/mobile-emulation tests passed (2 desktop-only skips). The current Render deployment is live.
 
 The commission clawback regression workflow verifies partial recovery capped by available net salary, zero-net payroll posting, duplicate retry prevention, carry-forward into a later payroll, and payroll GL totals. The payroll posting function omits zero-value journal lines and rejects zero-gross runs. Purchase returns, fixed-asset depreciation/disposal, budget controls, and backup/restore dependency checks are also covered by rollback-only database scenarios.
 
@@ -114,7 +119,7 @@ The current hosted project has existing organization and sample/test records. Ex
 
 Do **not** run only `001_initial_erp_core.sql` against the already configured hosted database. That file is an older bootstrap artifact and is not the complete current schema. The hosted database has a much larger sequence of later migrations.
 
-For a fresh Supabase project, first confirm that every migration required to reproduce the current hosted schema is present in `supabase/migrations` and can be replayed in order. Historical database migrations may predate the current repository migration set; therefore a clean-room rebuild has not been certified. Do not reset or delete the existing project to try it.
+The hosted database currently records **181 applied migrations**, while the repository contains **64 SQL migration files**. A timestamp-level comparison finds **121 applied migration versions that are not present under the same version in the current repository file set**; two later repository migrations correspond to earlier applied versions, and the two untimestamped bootstrap files are not the current hosted schema. Therefore a clean-room rebuild is **not reproducible/certified yet**. This is a real development/release blocker: the full historical migration chain or a reviewed baseline schema snapshot must be restored to version control before creating a fresh production database. Do not reset or delete the existing project to try it.
 
 Apply future schema changes as versioned migrations, keep the matching SQL file in this repository, and explicitly grant only the API roles that need access. Never expose the service-role key in frontend code.
 
