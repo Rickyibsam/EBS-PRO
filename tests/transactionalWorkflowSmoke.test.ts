@@ -238,3 +238,22 @@ test("delivered outcomes require an atomic customer signature and legacy RPC can
   assert.ok(smoke.includes("POD signature was not saved atomically with delivery posting"));
   assert.ok(smoke.includes("delivered outcome was accepted without a customer signature"));
 });
+
+
+test("delivered outcomes require an atomic customer signature and legacy RPC cannot bypass it", async () => {
+  const atomicMigration = await readFile(
+    new URL("../supabase/migrations/20261107070728_add_atomic_delivery_pod_signature_rpc.sql", import.meta.url),
+    "utf8"
+  );
+  const legacyGuard = await readFile(
+    new URL("../supabase/migrations/20261107071000_require_signature_for_legacy_delivery_rpc.sql", import.meta.url),
+    "utf8"
+  );
+  assert.ok(atomicMigration.includes("p_signature jsonb"));
+  assert.ok(atomicMigration.includes("A customer signature is required for delivered or short-delivered outcomes."));
+  assert.ok(atomicMigration.includes("perform public.save_delivery_pod_signature(p_delivery_id, p_signature)"));
+  assert.ok(legacyGuard.includes("A customer signature is required; use the signature-aware delivery workflow."));
+  assert.ok(smoke.includes("POD signature was not saved atomically with delivery posting"));
+  assert.ok(smoke.includes("delivered outcome was accepted without a customer signature"));
+  assert.ok(smoke.includes("legacy delivery RPC bypassed POD signature requirement"));
+});
