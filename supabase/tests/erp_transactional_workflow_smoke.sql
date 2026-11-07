@@ -86,6 +86,8 @@ declare
   v_signature_result jsonb;
   v_rls_rows integer := -1;
   v_report_result jsonb;
+  v_module_key text;
+  v_action text;
   v_van_route uuid := gen_random_uuid();
   v_van_order_request uuid := gen_random_uuid();
   v_van_order uuid;
@@ -629,10 +631,37 @@ begin
   insert into public.tenant_user_module_permissions(
     tenant_id,user_id,module_key,can_view,can_create,can_update,can_delete
   ) values(v_tenant_a,v_booker_user,'reports_analytics',false,false,false,false);
+  insert into public.tenant_user_module_permissions(
+    tenant_id,user_id,module_key,can_view,can_create,can_update,can_delete
+  ) values
+    (v_tenant_a,v_booker_user,'sales_customer',true,false,false,false),
+    (v_tenant_a,v_booker_user,'order_booking',true,false,false,false),
+    (v_tenant_a,v_booker_user,'inventory',true,false,false,false),
+    (v_tenant_a,v_booker_user,'purchase_supplier',true,false,false,false),
+    (v_tenant_a,v_booker_user,'accounts_finance',true,false,false,false),
+    (v_tenant_a,v_booker_user,'distribution_delivery',true,false,false,false);
+
   insert into public.app_settings(tenant_id,settings)
   values(v_tenant_a,'{"permission_test":"original"}'::jsonb);
   perform set_config('request.jwt.claim.sub',v_booker_user::text,true);
   execute 'set local role authenticated';
+
+  foreach v_module_key in array array[
+    'sales_customer','order_booking','inventory','purchase_supplier',
+    'accounts_finance','distribution_delivery','administration_security'
+  ] loop
+    if not private.module_permission_guard_internal(v_tenant_a,v_module_key,'view') then
+      raise exception 'FAIL: custom view grant was not honored for module %',v_module_key;
+    end if;
+    foreach v_action in array array['create','update','delete'] loop
+      if private.module_permission_guard_internal(v_tenant_a,v_module_key,v_action) then
+        raise exception 'FAIL: denied % action was granted for module %',v_action,v_module_key;
+      end if;
+    end loop;
+  end loop;
+  if private.module_permission_guard_internal(v_tenant_a,'reports_analytics','view') then
+    raise exception 'FAIL: explicit reports view denial was ignored';
+  end if;
   update public.app_settings
   set settings='{"permission_test":"should_not_change"}'::jsonb
   where tenant_id=v_tenant_a;
