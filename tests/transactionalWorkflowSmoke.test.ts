@@ -55,6 +55,32 @@ test("payroll workflow posts accrual, pays once, and rejects invalid calculation
   assert.ok(smoke.includes("invalid payroll arithmetic was not safely rejected"));
 });
 
+test("commission clawback caps deductions, retries idempotently, carries balances forward and posts to payroll GL", () => {
+  assert.ok(smoke.includes("public.apply_commission_return_adjustments(v_clawback_run_one)"));
+  assert.ok(smoke.includes("public.apply_commission_return_adjustments(v_clawback_run_two)"));
+  assert.ok(smoke.includes("partial commission clawback did not cap recovery"));
+  assert.ok(smoke.includes("commission clawback retry applied a duplicate adjustment"));
+  assert.ok(smoke.includes("outstanding clawback did not carry forward"));
+  assert.ok(smoke.includes("recovered commission clawback did not reconcile to payroll GL"));
+});
+
+test("zero-net payroll omits zero-value journal lines while preserving double-entry totals", async () => {
+  const migration = await readFile(
+    new URL("../supabase/migrations/20261107060457_fix_zero_net_payroll_journal_lines.sql", import.meta.url),
+    "utf8"
+  );
+  assert.ok(migration.includes("if v_net>0 then"));
+  assert.ok(migration.includes("if v_ded>0 then"));
+  assert.ok(migration.includes("if v_gross<=0 then"));
+  assert.ok(smoke.includes("gross_total=100 and deductions_total=100 and net_total=0"));
+  assert.ok(smoke.includes("gross_total=200 and deductions_total=60 and net_total=140"));
+});
+
+test("zero-gross payroll is rejected without creating a journal", () => {
+  assert.ok(smoke.includes("v_zero_payroll_run"));
+  assert.ok(smoke.includes("zero-gross payroll was not rejected without a journal"));
+});
+
 test("fixed asset workflow posts depreciation once and disposes with a balanced GL journal", () => {
   assert.ok(smoke.includes("public.post_asset_monthly_depreciation("));
   assert.ok(smoke.includes("v_depreciation_retry"));
