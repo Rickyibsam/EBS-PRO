@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {useModuleAction} from "./lib/modulePermissionContext";
+import {fetchAllRows} from "./lib/fetchAllRows";
 
 type Row = Record<string, any>;
 type TrialRow = { account_id: string; account_code: string; account_name: string; account_type: string; total_debit: number; total_credit: number; balance: number };
@@ -68,19 +69,21 @@ export default function AccountingModule({ db, tenantId,currentRole }: { db: Sup
 
   async function loadLedger(){
     setNotice("");
-    const [coa,party,journal]=await Promise.all([
+    const [coa,partyRows,journalRows]=await Promise.all([
       db.from("chart_of_accounts").select("id,account_code").eq("tenant_id",tenantId).in("account_code",["1100","2000"]),
-      db.from("parties").select("id,party_code,name,party_type,opening_balance").eq("tenant_id",tenantId).order("name"),
-      db.from("journal_entries").select("id,journal_number,entry_date,narration,status").eq("tenant_id",tenantId).eq("status","posted").order("entry_date",{ascending:false}).limit(5000)
+      fetchAllRows<any>((from,to)=>db.from("parties").select("id,party_code,name,party_type,opening_balance").eq("tenant_id",tenantId).order("name").order("id",{ascending:true}).range(from,to)),
+      fetchAllRows<any>((from,to)=>db.from("journal_entries").select("id,journal_number,entry_date,narration,status").eq("tenant_id",tenantId).eq("status","posted").order("entry_date",{ascending:false}).order("id",{ascending:true}).range(from,to))
     ]);
-    if(coa.error||party.error||journal.error){setNotice(coa.error?.message||party.error?.message||journal.error?.message||"Party ledger could not be loaded.");return;}
+    if(coa.error){setNotice(coa.error.message);return;}
     const ids=(coa.data||[]).map(x=>x.id);if(!ids.length){setNotice("Accounts receivable and payable control accounts are missing.");return;}
-    const {data:lines,error}=await db.from("journal_lines").select("journal_entry_id,party_id,account_id,debit,credit,memo").eq("tenant_id",tenantId).in("account_id",ids).not("party_id","is",null).limit(20000);
-    if(error){setNotice(error.message);return;}
-    const journalMap=new Map((journal.data||[]).map(x=>[x.id,x]));
+    let lines:any[];
+    try{
+      lines=await fetchAllRows<any>((from,to)=>db.from("journal_lines").select("journal_entry_id,party_id,account_id,debit,credit,memo").eq("tenant_id",tenantId).in("account_id",ids).not("party_id","is",null).order("journal_entry_id",{ascending:true}).order("id",{ascending:true}).range(from,to));
+    }catch(error){setNotice(error instanceof Error?error.message:"Party ledger lines could not be loaded.");return;}
+    const journalMap=new Map(journalRows.map(x=>[x.id,x]));
     const codeMap=new Map((coa.data||[]).map(x=>[x.id,x.account_code]));
-    setLedgerParties((party.data||[]).filter(x=>ledgerType==="customer"?["customer","both"].includes(x.party_type):["supplier","both"].includes(x.party_type)));
-    setLedgerRows((lines||[]).filter(x=>journalMap.has(x.journal_entry_id)).map(x=>({...x,...journalMap.get(x.journal_entry_id),account_code:codeMap.get(x.account_id)})));
+    setLedgerParties(partyRows.filter(x=>ledgerType==="customer"?["customer","both"].includes(x.party_type):["supplier","both"].includes(x.party_type)));
+    setLedgerRows(lines.filter(x=>journalMap.has(x.journal_entry_id)).map(x=>({...x,...journalMap.get(x.journal_entry_id),account_code:codeMap.get(x.account_id)})));
   }
 
   async function loadCashBook(){
@@ -90,15 +93,17 @@ export default function AccountingModule({ db, tenantId,currentRole }: { db: Sup
     setCashAccounts(accountsData||[]);
     if(!accountsData?.length){setNotice("Cash and bank control accounts are not configured.");return;}
     const ids=accountsData.map(x=>x.id);
-    const [j,l,r]=await Promise.all([
-      db.from("journal_entries").select("id,journal_number,entry_date,narration").eq("tenant_id",tenantId).eq("status","posted").order("entry_date",{ascending:true}).limit(5000),
-      db.from("journal_lines").select("journal_entry_id,account_id,debit,credit,memo").eq("tenant_id",tenantId).in("account_id",ids).limit(20000),
-      db.from("bank_reconciliations").select("id,account_id,statement_date,statement_balance,book_balance,difference,notes,created_at").eq("tenant_id",tenantId).order("statement_date",{ascending:false}).limit(100)
-    ]);
-    if(j.error||l.error||r.error){setNotice(j.error?.message||l.error?.message||r.error?.message||"Cashbook could not be loaded.");return;}
-    const jm=new Map((j.data||[]).map(x=>[x.id,x])),am=new Map(accountsData.map(x=>[x.id,x]));
-    setCashRows((l.data||[]).filter(x=>jm.has(x.journal_entry_id)).map(x=>({...x,...jm.get(x.journal_entry_id),...(am.get(x.account_id)||{})})).sort((a,b)=>String(a.entry_date).localeCompare(String(b.entry_date))||String(a.journal_number).localeCompare(String(b.journal_number))));setCashRecons(r.data||[]);
-    if(!cashAccountId)setCashAccountId(ids[0]);
+    try{
+      const [journalRows,lineRows,reconciliationRows]=await Promise.all([
+        fetchAllRows<any>((from,to)=>db.from("journal_entries").select("id,journal_number,entry_date,narration").eq("tenant_id",tenantId).eq("status","posted").order("entry_date",{ascending:true}).order("id",{ascending:true}).range(from,to)),
+        fetchAllRows<any>((from,to)=>db.from("journal_lines").select("journal_entry_id,account_id,debit,credit,memo").eq("tenant_id",tenantId).in("account_id",ids).order("journal_entry_id",{ascending:true}).order("id",{ascending:true}).range(from,to)),
+        fetchAllRows<any>((from,to)=>db.from("bank_reconciliations").select("id,account_id,statement_date,statement_balance,book_balance,difference,notes,created_at").eq("tenant_id",tenantId).order("statement_date",{ascending:false}).order("id",{ascending:true}).range(from,to))
+      ]);
+      const jm=new Map(journalRows.map(x=>[x.id,x])),am=new Map(accountsData.map(x=>[x.id,x]));
+      setCashRows(lineRows.filter(x=>jm.has(x.journal_entry_id)).map(x=>({...x,...jm.get(x.journal_entry_id),...(am.get(x.account_id)||{})})).sort((a,b)=>String(a.entry_date).localeCompare(String(b.entry_date))||String(a.journal_number).localeCompare(String(b.journal_number))));
+      setCashRecons(reconciliationRows);
+      if(!cashAccountId)setCashAccountId(ids[0]);
+    }catch(error){setNotice(error instanceof Error?error.message:"Cashbook could not be loaded.");}
   }
 
   async function saveReconciliation(){
