@@ -152,8 +152,10 @@ export default function AccountingModule({ db, tenantId,currentRole }: { db: Sup
       if (!debitAccount || !creditAccount || debitAccount === creditAccount || !Number.isFinite(value) || value <= 0 || !narration.trim()) {
         throw new Error("Choose two different accounts, enter a positive amount and narration.");
       }
+      const { data: number, error: numberError } = await db.rpc("next_document_number", { p_tenant_id: tenantId, p_document_type: "journal_entry" });
+      if (numberError) throw numberError;
+      if (typeof number !== "string" || !number) throw new Error("Journal number could not be generated."); 
       const { data: user } = await db.auth.getUser();
-      const number = "EBS-JV-" + Date.now().toString().slice(-9);
       const { data: head, error } = await db.from("journal_entries").insert({
         tenant_id: tenantId, journal_number: number, entry_date: date, source_type: "manual", branch_id: branchId||null,
         narration: narration.trim(), status: "draft", created_by: user.user?.id ?? null
