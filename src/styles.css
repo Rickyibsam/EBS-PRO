@@ -610,3 +610,89 @@ body{background:#f4f7fc;color:#172b4d}
  .dropdown-links{grid-template-columns:1fr}
  .launcher-grid{grid-template-columns:1fr}
 }
+
+
+/* Dashboard launcher: prevent clipped category panels and make every group readable */
+.ai-dashboard .launcher-grid{
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  align-items:start;
+  gap:18px !important;
+  overflow:visible !important;
+}
+.ai-dashboard .launcher-card{
+  display:block;
+  width:100%;
+  min-width:0;
+  height:auto !important;
+  min-height:0;
+  overflow:visible !important;
+  align-self:start;
+}
+.ai-dashboard .launcher-toggle{
+  display:block;
+  width:100%;
+  min-width:0;
+  min-height:150px;
+  height:auto !important;
+  white-space:normal !important;
+  overflow:visible !important;
+  padding:20px !important;
+}
+.ai-dashboard .launcher-toggle strong{
+  display:block;
+  white-space:normal !important;
+  overflow:visible !important;
+  overflow-wrap:anywhere;
+  font-size:17px !important;
+  line-height:1.45 !important;
+  margin:0 0 8px !important;
+}
+.ai-dashboard .launcher-toggle>small{
+  display:block;
+  min-height:0 !important;
+  white-space:normal !important;
+  overflow:visible !important;
+  font-size:14px !important;
+  line-height:1.6 !important;
+  overflow-wrap:anywhere;
+}
+.ai-dashboard .launcher-count{
+  min-height:38px;
+  font-size:13px !important;
+  line-height:1.4;
+}
+.ai-dashboard .launcher-links{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:0 18px;
+  width:100%;
+  min-width:0;
+  max-height:none !important;
+  height:auto !important;
+  overflow:visible !important;
+  padding:0 20px 18px !important;
+}
+.ai-dashboard .launcher-links button{
+  display:flex;
+  width:100%;
+  min-width:0;
+  min-height:46px;
+  height:auto !important;
+  white-space:normal !important;
+  overflow:visible !important;
+  overflow-wrap:anywhere;
+  font-size:14px !important;
+  line-height:1.45 !important;
+  padding:11px 3px !important;
+  text-align:left;
+}
+.ai-dashboard .launcher-links button span{flex:0 0 auto;margin-left:8px}
+@media(max-width:760px){
+ .ai-dashboard .launcher-grid{grid-template-columns:1fr !important;gap:12px !important}
+ .ai-dashboard .launcher-toggle{min-height:0;padding:17px !important}
+ .ai-dashboard .launcher-toggle strong{font-size:16px !important}
+ .ai-dashboard .launcher-toggle>small{font-size:13px !important}
+ .ai-dashboard .launcher-links{grid-template-columns:1fr;padding:0 17px 14px !important}
+ .ai-dashboard .launcher-links button{font-size:14px !important}
+}
