@@ -428,6 +428,23 @@ begin
     raise exception 'FAIL: failed van delivery did not close safely: %',v_failed_visit_result;
   end if;
 
+  -- A failed or refused visit must never post non-zero delivered/returned quantities.
+  v_rejected:=false;
+  begin
+    update public.delivery_shop_visits
+    set line_quantities=jsonb_build_array(jsonb_build_object(
+      'delivery_line_id',v_failed_line,
+      'delivered_quantity_base',1,
+      'market_return_quantity_base',0
+    ))
+    where tenant_id=v_tenant_a and delivery_id=v_failed_delivery;
+  exception when check_violation then
+    v_rejected:=true;
+  end;
+  if not v_rejected then
+    raise exception 'FAIL: not-available visit accepted delivered quantity';
+  end if;
+
   -- Payroll accrual -> GL -> salary payment -> idempotent payment retry.
   insert into public.payroll_runs(id,tenant_id,run_number,period_start,period_end,pay_date,status,created_by)
   values(v_payroll_run,v_tenant_a,'TX-PAY-001',current_date-30,current_date-1,current_date,'draft',v_user);

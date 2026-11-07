@@ -208,3 +208,15 @@ test("legacy FOR ALL policies receive restrictive per-action custom permission g
   assert.ok(smoke.includes("budget FOR ALL policy bypassed finance update denial"));
   assert.ok(smoke.includes("budget line FOR ALL policy bypassed finance update denial"));
 });
+
+
+test("failed delivery outcomes reject non-zero quantities at the database boundary", async () => {
+  const migration = await readFile(
+    new URL("../supabase/migrations/20261107070202_guard_failed_delivery_visit_quantities.sql", import.meta.url),
+    "utf8"
+  );
+  assert.ok(migration.includes("before insert or update of visit_status, line_quantities"));
+  assert.ok(migration.includes("new.visit_status in ('not_available', 'refused')"));
+  assert.ok(migration.includes("A not-available or refused visit cannot post delivered or returned quantities."));
+  assert.ok(smoke.includes("not-available visit accepted delivered quantity"));
+});
