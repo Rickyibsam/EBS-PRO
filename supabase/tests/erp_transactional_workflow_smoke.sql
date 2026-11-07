@@ -51,6 +51,13 @@ declare
   v_sales_invoice_id uuid;
   v_payroll_run uuid := gen_random_uuid();
   v_payroll_line uuid := gen_random_uuid();
+  v_clawback_target_a uuid := gen_random_uuid();
+  v_clawback_target_b uuid := gen_random_uuid();
+  v_clawback_run_one uuid := gen_random_uuid();
+  v_clawback_run_two uuid := gen_random_uuid();
+  v_clawback_line_one uuid := gen_random_uuid();
+  v_clawback_line_two uuid := gen_random_uuid();
+  v_clawback_result jsonb;
   v_bad_payroll_run uuid := gen_random_uuid();
   v_bad_payroll_line uuid := gen_random_uuid();
   v_payroll_result jsonb;
@@ -434,6 +441,89 @@ begin
   if (select count(*) from public.journal_entries where tenant_id=v_tenant_a
     and source_type='payroll_payment' and source_id=v_payroll_line and status='posted')<>1 then
     raise exception 'FAIL: payroll retry created duplicate payment journals';
+  end if;
+
+  -- Commission clawback: partial recovery, zero-net protection, retry idempotency,
+  -- carry-forward to the next payroll, and GL reconciliation.
+  insert into public.sales_targets(
+    id,tenant_id,target_name,period_start,period_end,employee_id,target_role,
+    target_metric,target_value,incentive_amount,created_by
+  ) values
+    (v_clawback_target_a,v_tenant_a,'Smoke clawback A',current_date-90,current_date-61,
+     v_employee,'order_booker','net_sales',1,80,v_user),
+    (v_clawback_target_b,v_tenant_a,'Smoke clawback B',current_date-90,current_date-61,
+     v_employee,'order_booker','net_sales',1,30,v_user);
+  insert into public.sales_incentive_accruals(
+    tenant_id,sales_target_id,period_start,period_end,scope_type,employee_id,
+    actual_value,target_value,earned_amount,status,created_by,settled_amount,
+    return_adjustment_due,settled_at,settled_by,calculated_at
+  ) values
+    (v_tenant_a,v_clawback_target_a,current_date-90,current_date-61,'employee',v_employee,
+     1,1,80,'settled',v_user,80,80,now(),v_user,now()-interval '2 minutes'),
+    (v_tenant_a,v_clawback_target_b,current_date-90,current_date-61,'employee',v_employee,
+     1,1,30,'settled',v_user,30,30,now(),v_user,now()-interval '1 minute');
+
+  insert into public.payroll_runs(id,tenant_id,run_number,period_start,period_end,pay_date,status,created_by)
+  values(v_clawback_run_one,v_tenant_a,'TX-CLAWBACK-001',current_date-60,current_date-31,current_date-30,'draft',v_user);
+  insert into public.payroll_lines(id,tenant_id,payroll_run_id,employee_id,basic_salary,allowances,overtime,deductions,net_salary,sales_incentive)
+  values(v_clawback_line_one,v_tenant_a,v_clawback_run_one,v_employee,100,0,0,50,50,0);
+
+  v_clawback_result:=public.apply_commission_return_adjustments(v_clawback_run_one);
+  if coalesce((v_clawback_result->>'success')::boolean,false) is not true
+     or coalesce((v_clawback_result->>'adjusted_targets')::integer,0)<>1
+     or coalesce((v_clawback_result->>'applied_amount')::numeric,0)<>50
+     or coalesce((v_clawback_result->>'remaining_amount')::numeric,0)<>60 then
+    raise exception 'FAIL: partial commission clawback did not cap recovery at available net salary: %',v_clawback_result;
+  end if;
+  if not exists(select 1 from public.sales_incentive_adjustments
+      where tenant_id=v_tenant_a and sales_target_id=v_clawback_target_a
+        and payroll_run_id=v_clawback_run_one and applied_amount=50
+        and remaining_amount=30 and status='partial')
+     or not exists(select 1 from public.sales_incentive_accruals
+      where tenant_id=v_tenant_a and sales_target_id=v_clawback_target_a
+        and return_adjustment_due=30 and return_adjustment_applied=50)
+     or (select deductions from public.payroll_lines where id=v_clawback_line_one)<>100
+     or (select net_salary from public.payroll_lines where id=v_clawback_line_one)<>0 then
+    raise exception 'FAIL: partial clawback ledger or payroll line did not reconcile';
+  end if;
+
+  v_clawback_result:=public.apply_commission_return_adjustments(v_clawback_run_one);
+  if coalesce((v_clawback_result->>'adjusted_targets')::integer,-1)<>0
+     or coalesce((v_clawback_result->>'applied_amount')::numeric,-1)<>0
+     or (select count(*) from public.sales_incentive_adjustments
+       where tenant_id=v_tenant_a and payroll_run_id=v_clawback_run_one)<>1 then
+    raise exception 'FAIL: commission clawback retry applied a duplicate adjustment';
+  end if;
+  perform public.post_payroll_run(v_clawback_run_one);
+  if not exists(select 1 from public.payroll_runs where id=v_clawback_run_one
+      and status='posted' and gross_total=100 and deductions_total=100 and net_total=0)
+     or not exists(select 1 from public.journal_entries where tenant_id=v_tenant_a
+      and source_type='payroll' and source_id=v_clawback_run_one and status='posted') then
+    raise exception 'FAIL: partially clawed-back payroll did not post balanced totals';
+  end if;
+
+  insert into public.payroll_runs(id,tenant_id,run_number,period_start,period_end,pay_date,status,created_by)
+  values(v_clawback_run_two,v_tenant_a,'TX-CLAWBACK-002',current_date-30,current_date-1,current_date,'draft',v_user);
+  insert into public.payroll_lines(id,tenant_id,payroll_run_id,employee_id,basic_salary,allowances,overtime,deductions,net_salary,sales_incentive)
+  values(v_clawback_line_two,v_tenant_a,v_clawback_run_two,v_employee,200,0,0,0,200,0);
+
+  v_clawback_result:=public.apply_commission_return_adjustments(v_clawback_run_two);
+  if coalesce((v_clawback_result->>'adjusted_targets')::integer,0)<>2
+     or coalesce((v_clawback_result->>'applied_amount')::numeric,0)<>60
+     or coalesce((v_clawback_result->>'remaining_amount')::numeric,0)<>0
+     or (select deductions from public.payroll_lines where id=v_clawback_line_two)<>60
+     or (select net_salary from public.payroll_lines where id=v_clawback_line_two)<>140
+     or (select count(*) from public.sales_incentive_adjustments
+       where tenant_id=v_tenant_a and payroll_run_id=v_clawback_run_two
+         and status='applied' and remaining_amount=0)<>2 then
+    raise exception 'FAIL: outstanding clawback did not carry forward and clear in the next payroll: %',v_clawback_result;
+  end if;
+  perform public.post_payroll_run(v_clawback_run_two);
+  if not exists(select 1 from public.payroll_runs where id=v_clawback_run_two
+      and status='posted' and gross_total=200 and deductions_total=60 and net_total=140)
+     or not exists(select 1 from public.journal_entries where tenant_id=v_tenant_a
+      and source_type='payroll' and source_id=v_clawback_run_two and status='posted') then
+    raise exception 'FAIL: recovered commission clawback did not reconcile to payroll GL';
   end if;
 
   -- Invalid payroll arithmetic must be rejected without posting the run.
