@@ -669,10 +669,31 @@ begin
   set settings='{"permission_test":"should_not_change"}'::jsonb
   where tenant_id=v_tenant_a;
   get diagnostics v_rls_rows = row_count;
-  execute 'reset role';
   if v_rls_rows<>0 then
-    raise exception 'FAIL: direct RLS update bypassed custom per-user update denial';
+    raise exception 'FAIL: app settings update bypassed custom per-user update denial';
   end if;
+
+  -- Legacy FOR ALL policies must not bypass restrictive per-module update guards.
+  update public.fixed_assets set asset_name=asset_name
+  where tenant_id=v_tenant_a and id=v_asset;
+  get diagnostics v_rls_rows = row_count;
+  if v_rls_rows<>0 then
+    raise exception 'FAIL: fixed asset FOR ALL policy bypassed finance update denial';
+  end if;
+  update public.budgets set budget_name=budget_name
+  where tenant_id=v_tenant_a and id=v_budget;
+  get diagnostics v_rls_rows = row_count;
+  if v_rls_rows<>0 then
+    raise exception 'FAIL: budget FOR ALL policy bypassed finance update denial';
+  end if;
+  update public.budget_lines set notes=notes
+  where tenant_id=v_tenant_a and budget_id=v_budget;
+  get diagnostics v_rls_rows = row_count;
+  if v_rls_rows<>0 then
+    raise exception 'FAIL: budget line FOR ALL policy bypassed finance update denial';
+  end if;
+
+  execute 'reset role';
   v_rejected:=false;
   begin
     perform public.get_erp_report_summary(v_tenant_a,current_date,current_date);

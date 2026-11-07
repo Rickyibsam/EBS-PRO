@@ -104,7 +104,7 @@ test("HR workflow records attendance and approves leave", () => {
 test("custom per-user RLS denial blocks direct table UPDATE for a manager", () => {
   assert.ok(smoke.includes("set local role authenticated"));
   assert.ok(smoke.includes("'administration_security',true,false,false,false"));
-  assert.ok(smoke.includes("direct RLS update bypassed custom per-user update denial"));
+  assert.ok(smoke.includes("app settings update bypassed custom per-user update denial"));
 });
 
 
@@ -152,4 +152,25 @@ test("custom permission matrix enforces view and create/update/delete actions ac
   assert.ok(smoke.includes("'accounts_finance','distribution_delivery','administration_security'"));
   assert.ok(smoke.includes("denied % action was granted for module %"));
   assert.ok(smoke.includes("explicit reports view denial was ignored"));
+});
+
+
+test("legacy FOR ALL policies receive restrictive per-action custom permission guards", async () => {
+  const migration = await readFile(
+    new URL("../supabase/migrations/20261107060000_guard_legacy_all_command_rls_policies.sql", import.meta.url),
+    "utf8"
+  );
+  for (const table of [
+    "asset_depreciation_entries", "booker_product_visibility", "budget_lines", "budgets",
+    "delivery_charge_account_mappings", "delivery_charge_rules", "departments", "designations",
+    "employee_advance_account_mappings", "fixed_assets", "payroll_incentive_accruals",
+    "van_stock_movements"
+  ]) {
+    assert.ok(migration.includes(`('${table}'`), `missing table guard for ${table}`);
+  }
+  assert.ok(migration.includes("foreach v_action in array array['select','insert','update','delete']"));
+  assert.ok(migration.includes("as restrictive for %s"));
+  assert.ok(smoke.includes("fixed asset FOR ALL policy bypassed finance update denial"));
+  assert.ok(smoke.includes("budget FOR ALL policy bypassed finance update denial"));
+  assert.ok(smoke.includes("budget line FOR ALL policy bypassed finance update denial"));
 });
