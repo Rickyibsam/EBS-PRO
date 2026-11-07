@@ -128,3 +128,19 @@ test("backup restore imports missing same-tenant rows without overwrite or delet
   assert.ok(smoke.includes("public.restore_tenant_backup(v_tenant_b,v_restore_fixture_backup)"));
   assert.ok(smoke.includes("additive restore did not recover a missing branch row"));
 });
+
+
+test("date-filtered report RPC reconciles receivables, payables, COGS and gross profit", () => {
+  assert.ok(smoke.includes("public.get_erp_report_summary(v_tenant_a,current_date,current_date)"));
+  assert.ok(smoke.includes("'Posted sales invoices')::numeric,0)<>175.5"));
+  assert.ok(smoke.includes("'Accounts receivable')::numeric,0)<>175.5"));
+  assert.ok(smoke.includes("'Accounts payable')::numeric,0)<>130"));
+  assert.ok(smoke.includes("'Cost of goods issued')::numeric,0)<>60"));
+  assert.ok(smoke.includes("'Gross profit (before expenses)')::numeric,0)<>90"));
+});
+
+test("report RPC enforces explicit custom view denial and rejects reversed dates", () => {
+  assert.ok(smoke.includes("'reports_analytics',false,false,false,false"));
+  assert.ok(smoke.includes("custom reports view denial was not enforced"));
+  assert.ok(smoke.includes("invalid report date range was accepted"));
+});
