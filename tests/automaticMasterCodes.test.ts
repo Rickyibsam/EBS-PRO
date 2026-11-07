@@ -14,7 +14,7 @@ const securityMigration = await readFile(
   new URL("../supabase/migrations/20261107064324_deny_client_access_to_master_code_sequences.sql", import.meta.url),
   "utf8"
 );
-const integration = await readFile(
+const branchMigration = await readFile(\n  new URL("../supabase/migrations/20261107064450_fix_branch_warehouse_auto_code.sql", import.meta.url),\n  "utf8"\n);\nconst integration = await readFile(
   new URL("../supabase/tests/auto_generated_master_codes.sql", import.meta.url),
   "utf8"
 );
@@ -65,4 +65,9 @@ test("database acceptance test verifies generated codes and preserves legacy cod
   assert.match(integration, /LEGACY-CODE-KEEP/);
   assert.match(integration.trimEnd(), /rollback;$/i);
   assert.doesNotMatch(integration, /\bcommit\s*;/i);
+});
+
+test("new branch bootstrap uses the generated warehouse-code trigger rather than a tenant-global constant", () => {
+  assert.match(branchMigration, /values\(new\.tenant_id,new\.id,'Main Warehouse','',true\)/i);
+  assert.match(integration, /Branch bootstrap warehouse code was not generated/);
 });
