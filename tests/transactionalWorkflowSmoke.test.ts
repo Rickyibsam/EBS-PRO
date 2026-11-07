@@ -106,3 +106,17 @@ test("custom per-user RLS denial blocks direct table UPDATE for a manager", () =
   assert.ok(smoke.includes("'administration_security',true,true,false,false"));
   assert.ok(smoke.includes("direct RLS update bypassed custom per-user update denial"));
 });
+
+
+test("van delivery PWA reconciles load, partial delivery, market return and idempotent replay", () => {
+  assert.ok(smoke.includes("public.record_van_stock_transfer("));
+  assert.ok(smoke.includes("public.dispatch_van_delivery("));
+  assert.ok(smoke.includes("public.record_van_delivery_visit("));
+  assert.ok(smoke.includes("van delivery visit retry was not idempotent"));
+  assert.ok(smoke.includes("van sale and market return did not reconcile vehicle stock"));
+});
+
+test("van delivery PWA safely closes a failed customer visit without stock issue", () => {
+  assert.ok(smoke.includes("'not_available'"));
+  assert.ok(smoke.includes("failed van delivery did not close safely"));
+});
