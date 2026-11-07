@@ -46,3 +46,10 @@ test("production audit limits writes to its transaction-scoped findings table", 
   assert.ok(!normalized.includes("drop table public."));
   assert.ok(!normalized.includes("alter table public."));
 });
+
+
+test("RLS custom permission guard policies must be restrictive, never permissive", () => {
+  assert.ok(audit.includes("custom_permission_guard_policies_permissive"));
+  assert.ok(audit.includes("p.polpermissive"));
+  assert.ok(audit.includes("expected zero"));
+});
