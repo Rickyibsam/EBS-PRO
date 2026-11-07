@@ -118,3 +118,8 @@ Apply future schema changes as versioned migrations, keep the matching SQL file 
 The latest production build/deploy succeeded. Read-only smoke checks confirmed the trial balance query returned equal debits and credits (PKR 1,200 each in the current test data), and stock-balance, inventory-valuation and low-stock RPCs returned successfully for the owner context.
 
 The remaining verification limits are listed in **Remaining verification limits** above. Do not certify the system as fully production-ready until those are closed.
+
+
+## Browser and mobile-emulation verification
+
+The CI workflow now runs Playwright against the deployed EBS PRO production URL after unit tests and the production build. It checks the public sign-in page, signup form requirements, password-recovery UI response, mobile viewport layout, and Chromium GPS/camera permission APIs using a simulated device. The simulated camera/GPS checks are browser automation only; they do not certify a physical Android/iOS handset, real camera hardware, background suspension, network transitions, or field-worker end-to-end sync. Those still require a real device and a test tenant.
