@@ -104,7 +104,7 @@ test("HR workflow records attendance and approves leave", () => {
 test("custom per-user RLS denial blocks direct table UPDATE for a manager", () => {
   assert.ok(smoke.includes("set local role authenticated"));
   assert.ok(smoke.includes("'administration_security',true,false,false,false"));
-  assert.ok(smoke.includes("direct RLS update bypassed custom per-user update denial"));
+  assert.ok(smoke.includes("app settings update bypassed custom per-user update denial"));
 });
 
 
@@ -168,10 +168,8 @@ test("legacy FOR ALL policies receive restrictive per-action custom permission g
   ]) {
     assert.ok(migration.includes(`('${table}'`), `missing table guard for ${table}`);
   }
-  assert.ok(migration.includes("as restrictive for insert"));
-  assert.ok(migration.includes("as restrictive for update"));
-  assert.ok(migration.includes("as restrictive for delete"));
-  assert.ok(migration.includes("as restrictive for select"));
+  assert.ok(migration.includes("foreach v_action in array array['select','insert','update','delete']"));
+  assert.ok(migration.includes("as restrictive for %s"));
   assert.ok(smoke.includes("fixed asset FOR ALL policy bypassed finance update denial"));
   assert.ok(smoke.includes("budget FOR ALL policy bypassed finance update denial"));
   assert.ok(smoke.includes("budget line FOR ALL policy bypassed finance update denial"));
