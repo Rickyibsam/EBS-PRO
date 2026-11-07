@@ -77,7 +77,7 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
     e.preventDefault(); if(editingProductId?!canUpdate:!canCreate)return; setSaving(true); setNotice("");
     const unitName = productForm.unit_name.trim() || "Piece";
     const unitSymbol = productForm.unit_symbol.trim() || "pcs";
-    if(!productForm.sku.trim()||!productForm.name.trim()) {setNotice("SKU and product name are required.");setSaving(false);return;}
+    if(!productForm.name.trim()) {setNotice("Product name is required.");setSaving(false);return;}
     const conversion=Number(productForm.conversion_to_base);
     if(productForm.alternate_unit_symbol.trim()&&(!Number.isFinite(conversion)||conversion<=0)){setNotice("Alternate unit conversion must be greater than zero.");setSaving(false);return;}
     if(productForm.alternate_unit_symbol.trim().toLowerCase()===unitSymbol.toLowerCase()){setNotice("Alternate unit symbol must differ from the base unit symbol.");setSaving(false);return;}
@@ -89,7 +89,7 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
       if (unitError) { setNotice(unitError.message); setSaving(false); return; }
       unitId = createdUnit.id;
     }
-    const productPayload={sku:productForm.sku.trim(),name:productForm.name.trim(),brand:productForm.brand.trim()||null,barcode:productForm.barcode.trim()||null,category_id:productForm.category_id||null,description:productForm.description.trim()||null,base_unit_id:unitId,cost_price:Number(productForm.cost_price),sale_price:Number(productForm.sale_price),purchase_tax_rate:Number(productForm.purchase_tax_rate),sales_tax_rate:Number(productForm.sales_tax_rate),min_stock:Number(productForm.min_stock)||0,reorder_level:Number(productForm.reorder_level)||0,track_batch:productForm.track_batch,track_expiry:productForm.track_expiry};
+    const productPayload={sku:editingProductId?productForm.sku.trim():"",name:productForm.name.trim(),brand:productForm.brand.trim()||null,barcode:productForm.barcode.trim()||null,category_id:productForm.category_id||null,description:productForm.description.trim()||null,base_unit_id:unitId,cost_price:Number(productForm.cost_price),sale_price:Number(productForm.sale_price),purchase_tax_rate:Number(productForm.purchase_tax_rate),sales_tax_rate:Number(productForm.sales_tax_rate),min_stock:Number(productForm.min_stock)||0,reorder_level:Number(productForm.reorder_level)||0,track_batch:productForm.track_batch,track_expiry:productForm.track_expiry};
     if(!Number.isFinite(productPayload.cost_price)||productPayload.cost_price<0||!Number.isFinite(productPayload.sale_price)||productPayload.sale_price<0||!Number.isFinite(productPayload.purchase_tax_rate)||productPayload.purchase_tax_rate<0||!Number.isFinite(productPayload.sales_tax_rate)||productPayload.sales_tax_rate<0){setNotice("Cost and sale prices must be valid non-negative amounts.");setSaving(false);return;}
     const productWrite=editingProductId?await db.from("products").update(productPayload).eq("tenant_id",tenantId).eq("id",editingProductId).select("id").single():await db.from("products").insert({tenant_id:tenantId,...productPayload}).select("id").single();
     const createdProduct=productWrite.data;const error=productWrite.error;
@@ -127,7 +127,7 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
     <div className="module-toolbar"><div><h2>{isProducts ? "Product Master" : partyType === "supplier" ? "Vendor Master" : "Customer Master"}</h2><p>{isProducts ? "Manage SKUs, brands, barcodes, and stock controls." : "Manage business contacts, credit limits, and opening balances."}</p></div>{canCreate&&<button className="primary-action" onClick={() => { setShowForm(!showForm); setNotice(""); }}>{showForm ? "Close form" : isProducts ? "+ Add product" : partyType === "supplier" ? "+ Add Vendor" : "+ Add customer"}</button>}</div>
     {notice && <div className="notice">{notice}</div>}
     {showForm && (isProducts ? (canCreate||canUpdate)&&<form className="data-form" onSubmit={saveProduct}>
-      <label>SKU / Item code<input required value={productForm.sku} onChange={e=>setProductForm({...productForm,sku:e.target.value})} /></label>
+      <label>SKU / Item code<input readOnly value={editingProductId?productForm.sku:"Auto-generated on save"} /></label>
       <label>Product name<input required value={productForm.name} onChange={e=>setProductForm({...productForm,name:e.target.value})} /></label>
       <label>Description<input value={productForm.description} onChange={e=>setProductForm({...productForm,description:e.target.value})}/></label>
       <label>Brand<input value={productForm.brand} onChange={e=>setProductForm({...productForm,brand:e.target.value})} /></label>
@@ -151,7 +151,7 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
       <label className="check-label"><input type="checkbox" checked={productForm.track_expiry} onChange={e=>setProductForm({...productForm,track_expiry:e.target.checked})}/> Track expiry</label>
       <button disabled={saving}>{saving ? "Saving…" : "Save product"}</button>
     </form> : canCreate&&<form className="data-form" onSubmit={saveParty}>
-      <label>Party code<input required value={partyForm.party_code} onChange={e=>setPartyForm({...partyForm,party_code:e.target.value})}/></label>
+      <label>Party code<input readOnly value="Auto-generated on save"/></label>
       <label>{partyType === "supplier" ? "Vendor name" : "Customer name"}<input required value={partyForm.name} onChange={e=>setPartyForm({...partyForm,name:e.target.value})}/></label>
       <label>Contact person<input value={partyForm.contact_person} onChange={e=>setPartyForm({...partyForm,contact_person:e.target.value})}/></label>
       <label>Phone<input value={partyForm.phone} onChange={e=>setPartyForm({...partyForm,phone:e.target.value})}/></label>
