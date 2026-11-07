@@ -262,6 +262,8 @@ export default function App() {
               ? <section className="module-empty"><h2>Module route unavailable</h2><p>This navigation item has no assigned workflow component. Please contact the system administrator.</p></section>
               : <DashboardModule db={db} tenantId={organization.id} company={organization.name} allowedModules={allowedNav} onNavigate={setActive} />;
 
+  const renderNavigationGroups=(groups:typeof navGroups)=>groups.map(group=>{const items=group.items.filter(item=>allowedNav.includes(item));if(!items.length)return null;const opened=expandedGroup===group.name;const hasActive=items.includes(active);return <div className="landscape-nav-group" key={group.name}><button className={"landscape-nav-trigger"+(hasActive?" has-active":"")+(opened?" is-open":"")} aria-expanded={opened} onClick={()=>setExpandedGroup(opened?"":group.name)}><span className="landscape-nav-icon">{group.icon}</span><b>{group.name.replace(/^\d+\.\s*/,"")}</b><span className="landscape-caret">⌄</span></button>{opened&&<div className="landscape-dropdown"><div className="dropdown-heading"><span>{group.icon}</span><div><b>{group.name.replace(/^\d+\.\s*/,"")}</b><small>{items.length} available workspaces</small></div></div><div className="dropdown-links">{items.map(item=><button className={active===item?"selected":""} key={item} onClick={()=>{setActive(item);setExpandedGroup("");}}>{item}<span>→</span></button>)}</div></div>}</div>});
+
   return <div className="shell landscape-shell">
     <div className="workspace-topbar">
       <div className="topbar-brand"><div className="logo">E</div><div><b>EBS <em>PRO</em></b><small>V.01 · DISTRIBUTION ERP</small></div></div>
@@ -270,7 +272,10 @@ export default function App() {
     </div>
     <nav className="landscape-nav" aria-label="ERP modules">
       <button className={"landscape-home"+(active==="Overview"?" active":"")} onClick={()=>{setActive("Overview");setExpandedGroup("");}}><span>⌂</span> Dashboard</button>
-      <div className="landscape-nav-items">{navGroups.map(group=>{const items=group.items.filter(item=>allowedNav.includes(item));if(!items.length)return null;const opened=expandedGroup===group.name;const hasActive=items.includes(active);return <div className="landscape-nav-group" key={group.name}><button className={"landscape-nav-trigger"+(hasActive?" has-active":"")+(opened?" is-open":"")} aria-expanded={opened} onClick={()=>setExpandedGroup(opened?"":group.name)}><span className="landscape-nav-icon">{group.icon}</span><b>{group.name.replace(/^\\d+\\.\\s*/,"")}</b><span className="landscape-caret">⌄</span></button>{opened&&<div className="landscape-dropdown"><div className="dropdown-heading"><span>{group.icon}</span><div><b>{group.name.replace(/^\\d+\\.\\s*/,"")}</b><small>{items.length} available workspaces</small></div></div><div className="dropdown-links">{items.map(item=><button className={active===item?"selected":""} key={item} onClick={()=>{setActive(item);setExpandedGroup("");}}>{item}<span>→</span></button>)}</div></div>}</div>})}</div>
+      <div className="landscape-nav-rows">
+        <div className="landscape-nav-items landscape-nav-row" aria-label="Primary modules">{renderNavigationGroups(navGroups.slice(0,5))}</div>
+        <div className="landscape-nav-items landscape-nav-row" aria-label="Finance and administration modules">{renderNavigationGroups(navGroups.slice(5))}</div>
+      </div>
       <div className="landscape-nav-end"><span>● LIVE</span></div>
     </nav>
     <main className="main landscape-main">

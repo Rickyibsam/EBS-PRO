@@ -4,6 +4,7 @@ import App from "./App";
 import "./styles.css";
 import "./modern-theme.css";
 import "./executive-dashboard.css";
+import "./oracle-classic-dashboard.css";
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
   window.addEventListener("load", () => {
