@@ -11,7 +11,7 @@ test("production app serves the EBS PRO sign-in screen", async ({ page }) => {
 
 test("signup form exposes required fields and strong-password guidance", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "Create account" }).click();
+  await page.getByText("Create account", { exact: true }).click();
   await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible();
   await expect(page.getByLabel("Full name")).toBeVisible();
   await expect(page.getByLabel("Email address")).toBeVisible();
@@ -30,7 +30,7 @@ test("forgot-password request returns a clear confirmation without exposing acco
   });
   await page.goto("/");
   await page.getByLabel("Email address").fill("browser-smoke@example.invalid");
-  await page.getByRole("link", { name: "Forgot password?" }).click();
+  await page.getByText("Forgot password?", { exact: true }).click();
   await expect(page.getByText(/Password recovery email sent/i)).toBeVisible();
 });
 
