@@ -60,6 +60,8 @@ declare
   v_clawback_result jsonb;
   v_bad_payroll_run uuid := gen_random_uuid();
   v_bad_payroll_line uuid := gen_random_uuid();
+  v_zero_payroll_run uuid := gen_random_uuid();
+  v_zero_payroll_line uuid := gen_random_uuid();
   v_payroll_result jsonb;
   v_payment_result jsonb;
   v_payment_retry jsonb;
@@ -539,6 +541,22 @@ begin
   end;
   if not v_rejected or (select status from public.payroll_runs where id=v_bad_payroll_run)<>'draft' then
     raise exception 'FAIL: invalid payroll arithmetic was not safely rejected';
+  end if;
+
+  -- A zero-gross payroll must be rejected before any empty journal can be created.
+  insert into public.payroll_runs(id,tenant_id,run_number,period_start,period_end,pay_date,status,created_by)
+  values(v_zero_payroll_run,v_tenant_a,'TX-PAY-ZERO',current_date-30,current_date-1,current_date,'draft',v_user);
+  insert into public.payroll_lines(id,tenant_id,payroll_run_id,employee_id,basic_salary,allowances,overtime,deductions,net_salary)
+  values(v_zero_payroll_line,v_tenant_a,v_zero_payroll_run,v_employee,0,0,0,0,0);
+  v_rejected:=false;
+  begin
+    perform public.post_payroll_run(v_zero_payroll_run);
+  exception when others then
+    v_rejected:=true;
+  end;
+  if not v_rejected or (select status from public.payroll_runs where id=v_zero_payroll_run)<>'draft'
+     or exists(select 1 from public.journal_entries where tenant_id=v_tenant_a and source_type='payroll' and source_id=v_zero_payroll_run) then
+    raise exception 'FAIL: zero-gross payroll was not rejected without a journal';
   end if;
 
   -- Fixed asset: monthly depreciation, idempotent retry, and disposal journal.
