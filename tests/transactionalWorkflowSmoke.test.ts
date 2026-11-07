@@ -81,6 +81,12 @@ test("zero-gross payroll is rejected without creating a journal", () => {
   assert.ok(smoke.includes("zero-gross payroll was not rejected without a journal"));
 });
 
+test("isolated clean-room backup restores branch, warehouse, unit and product dependencies idempotently", () => {
+  assert.ok(smoke.includes("Isolated tenant clean-room fixture"));
+  assert.ok(smoke.includes("clean-room restore did not recover the complete dependency graph"));
+  assert.ok(smoke.includes("clean-room restore retry was not idempotent"));
+});
+
 test("fixed asset workflow posts depreciation once and disposes with a balanced GL journal", () => {
   assert.ok(smoke.includes("public.post_asset_monthly_depreciation("));
   assert.ok(smoke.includes("v_depreciation_retry"));
@@ -148,11 +154,13 @@ test("van delivery PWA safely closes a failed customer visit without stock issue
 });
 
 
-test("backup restore imports missing same-tenant rows without overwrite or deletion", () => {
+test("backup restore recovers a clean isolated tenant dependency graph without overwrite or deletion", () => {
   assert.ok(smoke.includes("v_restore_fixture_backup:=public.export_tenant_backup(v_tenant_b)"));
-  assert.ok(smoke.includes("delete from public.branches where tenant_id=v_tenant_b"));
-  assert.ok(smoke.includes("public.restore_tenant_backup(v_tenant_b,v_restore_fixture_backup)"));
-  assert.ok(smoke.includes("additive restore did not recover a missing branch row"));
+  assert.ok(smoke.includes("delete from public.branches where tenant_id=v_tenant_b and id=v_branch_b"));
+  assert.ok(smoke.includes("delete from public.warehouses where tenant_id=v_tenant_b and branch_id=v_branch_b"));
+  assert.ok(smoke.includes("clean-room fixture was not empty before restore"));
+  assert.ok(smoke.includes("clean-room restore did not recover the complete dependency graph"));
+  assert.ok(smoke.includes("clean-room restore retry was not idempotent"));
 });
 
 

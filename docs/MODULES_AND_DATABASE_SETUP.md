@@ -118,3 +118,16 @@ Apply future schema changes as versioned migrations, keep the matching SQL file 
 The latest production build/deploy succeeded. Read-only smoke checks confirmed the trial balance query returned equal debits and credits (PKR 1,200 each in the current test data), and stock-balance, inventory-valuation and low-stock RPCs returned successfully for the owner context.
 
 The remaining verification limits are listed in **Remaining verification limits** above. Do not certify the system as fully production-ready until those are closed.
+
+
+## Browser and mobile-emulation verification
+
+The CI workflow now runs Playwright against the deployed EBS PRO production URL after unit tests and the production build. It checks the public sign-in page, signup form requirements, password-recovery UI response, mobile viewport layout, and Chromium GPS/camera permission APIs using a simulated device. The simulated camera/GPS checks are browser automation only; they do not certify a physical Android/iOS handset, real camera hardware, background suspension, network transitions, or field-worker end-to-end sync. Those still require a real device and a test tenant.
+
+
+The rollback-only database smoke test now exercises a clean isolated tenant fixture containing a branch, warehouse, unit of measure and product. It exports that tenant's backup, removes the dependency graph inside the test transaction, restores it additively, verifies all four records and their foreign-key relationships, then repeats restore to confirm idempotency. The entire test transaction is rolled back; it does not delete or alter live business data.
+
+
+## Supabase Auth plan limitation
+
+The EBS-PRO Supabase organization is currently on the Free plan. Supabase documents leaked-password protection (HaveIBeenPwned checks) as a Pro-plan-and-above feature. This setting cannot be enabled on the current Free plan. Do not upgrade or incur billing without explicit owner approval. EBS PRO's signup and password-reset UI independently enforces a 12-character password with uppercase, lowercase, digit and symbol; this client-side rule is not a substitute for Supabase's server-side compromised-password block.
