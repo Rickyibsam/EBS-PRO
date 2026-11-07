@@ -1,4 +1,5 @@
 import {findProductByBarcodeOrSku} from "./lib/erpAccess";
+import {isTransientNetworkError} from "./lib/network";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {enqueueBookerOrder,getPendingBookerOrders,removePendingBookerOrder,cacheBookerSnapshot,getBookerSnapshot,enqueueBookerVisit,getPendingBookerVisits,removePendingBookerVisit} from "./bookerOfflineQueue";
@@ -141,7 +142,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       if (!routeId && routeResult.data?.[0]) setRouteId(routeResult.data[0].id);
       await cacheBookerSnapshot(tenantId,auth.user.id,{employee:emp.data,products:visibleProducts,productUnits:pu.data||[],units:u.data||[],orders:recent.data||[],routes:routeResult.data||[],routeId:effectiveRouteId});
     } catch (e) {
-      if(!navigator.onLine||/fetch|network|offline|connection|timeout/i.test(e instanceof Error?e.message:"")){
+      if(!navigator.onLine||isTransientNetworkError(e)){
         try{const {data:{session}}=await db.auth.getSession();const offlineUserId=session?.user.id||"";if(!offlineUserId)throw new Error("Sign in on this device before using offline Booker data.");setAuthUserId(offlineUserId);const cached=await getBookerSnapshot(tenantId,offlineUserId);const d=cached?.data;if(d){setEmployee((d.employee as Row)||null);setProducts((d.products as Row[])||[]);setProductUnits((d.productUnits as Row[])||[]);setUnits((d.units as Row[])||[]);setOrders((d.orders as Row[])||[]);setRoutes((d.routes as Row[])||[]);setRouteId(String(d.routeId||""));setCustomers((d.customers as Row[])||[]);setCustomerId(String(d.customerId||""));setPrices((d.prices as Row[])||[]);setListId(String(d.listId||""));setNotice("Offline mode: using the last saved route, customer list and price list. Orders will sync when online.");}else setNotice("Offline and no saved Booker catalogue is available on this device. Connect once to cache route data.");}
         catch(cacheError){setNotice(cacheError instanceof Error?cacheError.message:"Offline Booker data could not be loaded.");}
       }else setNotice(e instanceof Error ? e.message : "Booker workspace could not be loaded.");
@@ -302,7 +303,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
           if(error)throw error;
           setNotice("Order submitted successfully. Reference: "+String(data).slice(0,8));
         }catch(networkError){
-          if(navigator.onLine)throw networkError;
+          if(navigator.onLine&&!isTransientNetworkError(networkError))throw networkError;
           await enqueueBookerOrder(queuedOrder);setPendingCount(n=>n+1);setNotice("Connection dropped. Order saved on this device and will sync automatically.");
         }
       }
