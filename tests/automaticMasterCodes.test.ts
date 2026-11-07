@@ -6,7 +6,7 @@ const migration = await readFile(
   new URL("../supabase/migrations/20261107070000_auto_generate_master_entry_codes.sql", import.meta.url),
   "utf8"
 );
-const extension = await readFile(\n  new URL("../supabase/migrations/20261107071000_auto_generate_additional_master_codes.sql", import.meta.url),\n  "utf8"\n);\nconst integration = await readFile(
+const extension = await readFile(\n  new URL("../supabase/migrations/20261107071000_auto_generate_additional_master_codes.sql", import.meta.url),\n  "utf8"\n);\nconst securityMigration = await readFile(\n  new URL("../supabase/migrations/20261107071500_deny_client_access_to_master_code_sequences.sql", import.meta.url),\n  "utf8"\n);\nconst integration = await readFile(
   new URL("../supabase/tests/auto_generated_master_codes.sql", import.meta.url),
   "utf8"
 );
@@ -56,4 +56,8 @@ test("branch, warehouse, department, designation, employee, asset and route code
     assert.ok(extension.includes(prefix));
     assert.ok(integration.includes(prefix));
   }
+});
+
+test("internal code counters remain inaccessible even if table grants change later", () => {
+  assert.match(securityMigration, /for all to public using \(false\) with check \(false\)/i);
 });
