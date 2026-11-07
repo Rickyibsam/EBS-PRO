@@ -79,6 +79,7 @@ The application has 10 module groups. The navigation and module screens are pres
 - **Branch budget and expense attribution:** budget lines can be assigned per branch, expense vouchers can select a branch, and asset disposal uses the configured cash/bank mapping rather than fixed account-code assumptions.
 - **Complete financial-ledger reads:** customer/supplier payments, invoices, credit notes, party ledgers, cashbook journal lines and bank reconciliation history use stable 500-row pagination instead of silent single-query caps.
 - **Batch & expiry completeness:** stock movements, products and warehouses load in stable pages; expiry warning dates use local calendar dates.
+- **Complete operational-register pagination:** invoice and purchase registers, GRNs, sales orders, deliveries, returns, stock movements, expenses, journals, transfers, cheque and delivery-charge registers, credit control, payroll, HR, tax, audit, voucher history, van stock and reference selectors now load stable 500-row pages instead of silently stopping at a fixed row cap. Booker/Delivery target and commission calculations also page every source dataset; intentionally recent dashboard previews remain bounded.
 
 ## Transactional verification completed
 
@@ -93,7 +94,7 @@ The following database smoke workflows were run as authenticated owner/staff con
 - Security: per-user module denial/grant enforcement, owner-managed permission row access, personal notification inbox access, cross-company customer-record read/write isolation, direct custom-denial checks on app settings/fixed assets/budgets/budget lines, and restrictive guards for all 308 module/action policy commands.
 - Client offline storage: all Booker and deliveryman IndexedDB unit tests passed.
 
-The latest main-branch GitHub Actions run completed successfully: **77/77 automated tests passed**, the TypeScript/Vite production build passed, and 10 production browser/mobile-emulation tests passed (2 desktop-only skips). The current Render deployment is live.
+The latest main-branch GitHub Actions run completed successfully: **79/79 automated tests passed**, the TypeScript/Vite production build passed, and 10 production browser/mobile-emulation tests passed (2 desktop-only skips). The current Render deployment is live.
 
 The commission clawback regression workflow verifies partial recovery capped by available net salary, zero-net payroll posting, duplicate retry prevention, carry-forward into a later payroll, and payroll GL totals. The payroll posting function omits zero-value journal lines and rejects zero-gross runs. Purchase returns, fixed-asset depreciation/disposal, budget controls, and backup/restore dependency checks are also covered by rollback-only database scenarios.
 
