@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fetchAllRows } from "../src/lib/fetchAllRows";
+import { fetchAllRows, fetchAllRowsResult } from "../src/lib/fetchAllRows";
 
 test("fetchAllRows returns a single short page", async () => {
   const rows = await fetchAllRows(async () => ({ data: [1, 2, 3], error: null }), 5);
@@ -35,7 +35,7 @@ test("fetchAllRows rejects invalid page sizes", async () => {
 
 test("fetchAllRowsResult returns every page in a data/error result", async () => {
   const source = Array.from({ length: 1_201 }, (_, index) => index + 1);
-  const result = await (await import("../src/lib/fetchAllRows")).fetchAllRowsResult<number>(
+  const result = await fetchAllRowsResult<number>(
     async (from, to) => ({ data: source.slice(from, to + 1), error: null }),
     500
   );
