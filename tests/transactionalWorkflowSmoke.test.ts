@@ -228,7 +228,7 @@ test("delivered outcomes require an atomic customer signature and legacy RPC can
     "utf8"
   );
   const legacyGuard = await readFile(
-    new URL("../supabase/migrations/20261107071000_require_signature_for_legacy_delivery_rpc.sql", import.meta.url),
+    new URL("../supabase/migrations/20261107071055_require_signature_for_legacy_delivery_rpc.sql", import.meta.url),
     "utf8"
   );
   assert.ok(atomicMigration.includes("p_signature jsonb"));
@@ -246,7 +246,7 @@ test("delivered outcomes require an atomic customer signature and legacy RPC can
     "utf8"
   );
   const legacyGuard = await readFile(
-    new URL("../supabase/migrations/20261107071000_require_signature_for_legacy_delivery_rpc.sql", import.meta.url),
+    new URL("../supabase/migrations/20261107071055_require_signature_for_legacy_delivery_rpc.sql", import.meta.url),
     "utf8"
   );
   assert.ok(atomicMigration.includes("p_signature jsonb"));

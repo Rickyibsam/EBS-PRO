@@ -86,13 +86,22 @@ The following database smoke workflows were run as authenticated owner/staff con
 - Security: per-user module denial/grant enforcement, owner-managed permission row access, personal notification inbox access, cross-company customer-record read/write isolation, direct custom-denial checks on app settings/fixed assets/budgets/budget lines, and restrictive guards for all 308 module/action policy commands.
 - Client offline storage: all Booker and deliveryman IndexedDB unit tests passed.
 
-The latest GitHub Actions run completed successfully: **58/58 tests passed**, and the TypeScript/Vite production build passed. Main commit `dc1e19d7d50920f21786f36dfe0b9791720a5987` contains the commission-clawback payroll fix and is deploying to Render. The latest code also includes browser-supported BarcodeDetector format detection.
+The latest main-branch GitHub Actions run completed successfully: **71/71 automated tests passed**, the TypeScript/Vite production build passed, and 10 production browser/mobile-emulation tests passed (2 desktop-only skips). The current Render deployment is live.
 
-The commission clawback regression workflow now verifies partial recovery capped by available net salary, zero-net payroll posting, duplicate retry prevention, carry-forward into a later payroll, and the resulting payroll GL totals. The payroll posting function omits zero-value journal lines and rejects zero-gross runs. The expanded rollback-only database smoke test passed against the hosted EBS-PRO database; its fixture transaction was rolled back.
+The commission clawback regression workflow verifies partial recovery capped by available net salary, zero-net payroll posting, duplicate retry prevention, carry-forward into a later payroll, and payroll GL totals. The payroll posting function omits zero-value journal lines and rejects zero-gross runs. Purchase returns, fixed-asset depreciation/disposal, budget controls, and backup/restore dependency checks are also covered by rollback-only database scenarios.
+
+The delivery workflow now requires a customer signature for delivered and short-delivered outcomes and saves the POD proof in the same database transaction as delivery completion, stock/COGS movements and invoice posting. The legacy five-argument delivery RPC cannot post completed deliveries without a signature. Booker and Delivery PWA queues also retry transient network failures even when the browser still reports an online connection.
 
 ## Remaining verification limits
 
-This is stronger coverage than a build-only check, but it is not a claim of complete production certification. Browser-level E2E coverage with real login sessions and user interfaces, physical mobile camera/offline testing, signup/email confirmation, commission clawback edge cases, and exhaustive backup/restore reconciliation in an isolated clean-room tenant are still outstanding. The current tenant has only a small sample dataset, so all business edge cases cannot be proven from its existing records.
+This is stronger coverage than a build-only check, but it is not a claim of complete production certification. The remaining acceptance gates are:
+- Full authenticated browser workflows across sales, purchasing, inventory, returns, payroll/commission, finance, assets/budgets, reporting and permissions using a dedicated test tenant and test users.
+- Physical Android handset testing of camera barcode scan, GPS, touch signature, offline queue persistence, app restart, network recovery and duplicate-free sync. Browser emulation is not a physical handset test.
+- Real Supabase signup confirmation and password-reset email delivery to a dedicated test inbox.
+- A clean-room backup/restore rehearsal in a separate test tenant/project. The current database tests use isolated fixtures inside rollback-only transactions; no destructive restore has been run against production.
+- Performance/load acceptance with representative business data and concurrent users.
+
+The current production tenant contains only a small sample dataset, so its existing records cannot prove every real-world business edge case.
 
 ## Current hosted database
 
