@@ -2,6 +2,7 @@ CREATE OR REPLACE FUNCTION public.get_erp_report_summary(p_tenant_id uuid, p_fro
  RETURNS jsonb
  LANGUAGE plpgsql
  STABLE
+ SECURITY INVOKER
  SET search_path TO 'pg_catalog', 'public', 'private', 'auth'
 AS $function$
 declare
@@ -259,3 +260,6 @@ begin
 end;
 $function$
 
+
+revoke all on function public.get_erp_report_summary(uuid,date,date) from public, anon;
+grant execute on function public.get_erp_report_summary(uuid,date,date) to authenticated;
