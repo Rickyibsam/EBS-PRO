@@ -1,3 +1,4 @@
+import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import { useEffect, useMemo, useState, FormEvent } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {useModuleAction} from "./lib/modulePermissionContext";
@@ -44,14 +45,14 @@ export default function TransactionsModule({db,tenantId,module,currentRole}:{db:
  async function loadAll(){
   setLoading(true);setNotice("");
   const [p,pa,u,pu,vc,w,br,h,emp,rt]=await Promise.all([
-   db.from("products").select("id,name,sku,barcode,is_active,cost_price,sale_price,purchase_tax_rate,sales_tax_rate").eq("tenant_id",tenantId).eq("is_active",true).order("name").limit(1000),
-   db.from("parties").select("id,name,party_code").eq("tenant_id",tenantId).in("party_type",purchase?["supplier","both"]:["customer","both"]).eq("status","active").order("name").limit(1000),
+   fetchAllRowsResult<any>((from,to)=>db.from("products").select("id,name,sku,barcode,is_active,cost_price,sale_price,purchase_tax_rate,sales_tax_rate").eq("tenant_id",tenantId).eq("is_active",true).order("name").order("id",{ascending:true}).range(from,to)),
+   fetchAllRowsResult<any>((from,to)=>db.from("parties").select("id,name,party_code").eq("tenant_id",tenantId).in("party_type",purchase?["supplier","both"]:["customer","both"]).eq("status","active").order("name").order("id",{ascending:true}).range(from,to)),
    db.from("units_of_measure").select("id,name,symbol").eq("tenant_id",tenantId).order("name"),
    db.from("product_units").select("id,product_id,unit_id,conversion_to_base,is_purchase_unit,is_sales_unit").eq("tenant_id",tenantId),
     db.from("vendor_product_catalog").select("supplier_id,product_id,purchase_cost,is_preferred").eq("tenant_id",tenantId),
    db.from("warehouses").select("id,name,branch_id").eq("tenant_id",tenantId).eq("is_active",true).order("name"),
    db.from("branches").select("id,name,code,is_default,is_active").eq("tenant_id",tenantId).eq("is_active",true).order("name"),
-   db.from(table).select("id,"+(purchase?"po_number":"order_number")+",order_date,status,grand_total,branch_id"+(purchase?"":",booker_employee_id,route_id,delivery_man_employee_id")).eq("tenant_id",tenantId).order("created_at",{ascending:false}).limit(200),
+   fetchAllRowsResult<any>((from,to)=>db.from(table).select("id,"+(purchase?"po_number":"order_number")+",order_date,status,grand_total,branch_id"+(purchase?"":",booker_employee_id,route_id,delivery_man_employee_id")).eq("tenant_id",tenantId).order("created_at",{ascending:false}).order("id",{ascending:true}).range(from,to)),
    db.from("employees").select("id,full_name,job_title").eq("tenant_id",tenantId).eq("employment_status","active").order("full_name"),
    db.from("sales_routes").select("id,name,route_code").eq("tenant_id",tenantId).eq("is_active",true).order("name")
   ]);
