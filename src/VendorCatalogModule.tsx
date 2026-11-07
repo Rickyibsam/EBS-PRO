@@ -1,3 +1,4 @@
+import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import {FormEvent,useEffect,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 import {useModuleAction} from "./lib/modulePermissionContext";
@@ -13,7 +14,7 @@ export default function VendorCatalogModule({db,tenantId,currentRole}:{db:Supaba
  async function load(){
   setLoading(true);setNotice("");
   const [v,s,p]=await Promise.all([
-   db.from("vendor_product_catalog").select("id,supplier_id,product_id,supplier_item_code,purchase_cost,minimum_order_qty,lead_time_days,is_preferred,last_cost_date,notes").eq("tenant_id",tenantId).order("updated_at",{ascending:false}).limit(1000),
+   fetchAllRowsResult<any>((from,to)=>db.from("vendor_product_catalog").select("id,supplier_id,product_id,supplier_item_code,purchase_cost,minimum_order_qty,lead_time_days,is_preferred,last_cost_date,notes").eq("tenant_id",tenantId).order("updated_at",{ascending:false}).order("id",{ascending:true}).range(from,to)),
    db.from("parties").select("id,party_code,name").eq("tenant_id",tenantId).in("party_type",["supplier","both"]).eq("status","active").order("name"),
    db.from("products").select("id,sku,name,cost_price,sale_price").eq("tenant_id",tenantId).eq("is_active",true).order("name")
   ]);

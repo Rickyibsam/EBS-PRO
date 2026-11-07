@@ -1,3 +1,4 @@
+import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import {useEffect,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 import {useModuleAction} from "./lib/modulePermissionContext";
@@ -14,7 +15,7 @@ export default function StockTakeModule({db,tenantId,currentRole}:{db:SupabaseCl
  const canEdit=canCreate||canUpdate;
  async function load(){
   setLoading(true);setNotice("");
-  const [w,t]=await Promise.all([db.from("warehouses").select("id,code,name,is_active").eq("tenant_id",tenantId).eq("is_active",true).order("name"),db.from("stock_takes").select("id,warehouse_id,stock_take_number,count_date,status,notes,created_at").eq("tenant_id",tenantId).order("created_at",{ascending:false}).limit(50)]);
+  const [w,t]=await Promise.all([db.from("warehouses").select("id,code,name,is_active").eq("tenant_id",tenantId).eq("is_active",true).order("name"),fetchAllRowsResult<any>((from,to)=>db.from("stock_takes").select("id,warehouse_id,stock_take_number,count_date,status,notes,created_at").eq("tenant_id",tenantId).order("created_at",{ascending:false}).order("id",{ascending:true}).range(from,to))]);
   const err=w.error||t.error;if(err)setNotice(err.message);else{setWarehouses(w.data||[]);setTakes(t.data||[]);if(!warehouseId&&w.data?.[0])setWarehouseId(w.data[0].id);}
   setLoading(false);
  }

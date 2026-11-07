@@ -1,3 +1,4 @@
+import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import { useEffect, useMemo, useState, FormEvent } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {useModuleAction} from "./lib/modulePermissionContext";
@@ -39,19 +40,19 @@ export default function TransactionsModule({db,tenantId,module,currentRole}:{db:
  const [showForm,setShowForm]=useState(false);
  const [search,setSearch]=useState("");const [printDoc,setPrintDoc]=useState<Header|null>(null),[printLines,setPrintLines]=useState<PrintLine[]>([]),[printParty,setPrintParty]=useState<{name:string;phone:string|null;address:string|null}|null>(null);
  const money=(v:number)=>"PKR "+Number(v||0).toLocaleString("en-PK",{minimumFractionDigits:2,maximumFractionDigits:2});
- function exportOrders(){const data=filtered.map(r=>({document:purchase?r.po_number:r.order_number,date:r.order_date,party:parties.find(p=>p.id===(purchase?r.supplier_id:r.customer_id))?.name||"",status:r.status,total:r.grand_total,booker:employees.find(e=>e.id===r.booker_employee_id)?.full_name||"",route:routes.find(x=>x.id===r.route_id)?.name||"",branch:branches.find(b=>b.id===r.branch_id)?.name||"Unassigned",booker:employees.find(e=>e.id===r.booker_employee_id)?.full_name||"",route:routes.find(x=>x.id===r.route_id)?.name||"",delivery_man:employees.find(e=>e.id===r.delivery_man_employee_id)?.full_name||""}));const keys=Object.keys(data[0]||{document:"",date:"",branch:"",party:"",status:"",total:""});const csv=[keys.join(","),...data.map(x=>keys.map(k=>'"'+String(x[k as keyof typeof x]??"").replace(/"/g,'""')+'"').join(","))].join("\r\n");const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=(purchase?"purchase-orders":"sales-orders")+".csv";a.click();URL.revokeObjectURL(url);}
+ function exportOrders(){const data=filtered.map(r=>({document:purchase?r.po_number:r.order_number,date:r.order_date,party:parties.find(p=>p.id===(purchase?r.supplier_id:r.customer_id))?.name||"",status:r.status,total:r.grand_total,booker:employees.find(e=>e.id===r.booker_employee_id)?.full_name||"",route:routes.find(x=>x.id===r.route_id)?.name||"",branch:branches.find(b=>b.id===r.branch_id)?.name||"Unassigned",delivery_man:employees.find(e=>e.id===r.delivery_man_employee_id)?.full_name||""}));const keys=Object.keys(data[0]||{document:"",date:"",branch:"",party:"",status:"",total:""});const csv=[keys.join(","),...data.map(x=>keys.map(k=>'"'+String(x[k as keyof typeof x]??"").replace(/"/g,'""')+'"').join(","))].join("\r\n");const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=(purchase?"purchase-orders":"sales-orders")+".csv";a.click();URL.revokeObjectURL(url);}
  useEffect(()=>{void loadAll();},[tenantId,module]);
  async function loadAll(){
   setLoading(true);setNotice("");
   const [p,pa,u,pu,vc,w,br,h,emp,rt]=await Promise.all([
-   db.from("products").select("id,name,sku,barcode,is_active,cost_price,sale_price,purchase_tax_rate,sales_tax_rate").eq("tenant_id",tenantId).eq("is_active",true).order("name").limit(1000),
-   db.from("parties").select("id,name,party_code").eq("tenant_id",tenantId).in("party_type",purchase?["supplier","both"]:["customer","both"]).eq("status","active").order("name").limit(1000),
+   fetchAllRowsResult<any>((from,to)=>db.from("products").select("id,name,sku,barcode,is_active,cost_price,sale_price,purchase_tax_rate,sales_tax_rate").eq("tenant_id",tenantId).eq("is_active",true).order("name").order("id",{ascending:true}).range(from,to)),
+   fetchAllRowsResult<any>((from,to)=>db.from("parties").select("id,name,party_code").eq("tenant_id",tenantId).in("party_type",purchase?["supplier","both"]:["customer","both"]).eq("status","active").order("name").order("id",{ascending:true}).range(from,to)),
    db.from("units_of_measure").select("id,name,symbol").eq("tenant_id",tenantId).order("name"),
    db.from("product_units").select("id,product_id,unit_id,conversion_to_base,is_purchase_unit,is_sales_unit").eq("tenant_id",tenantId),
     db.from("vendor_product_catalog").select("supplier_id,product_id,purchase_cost,is_preferred").eq("tenant_id",tenantId),
    db.from("warehouses").select("id,name,branch_id").eq("tenant_id",tenantId).eq("is_active",true).order("name"),
    db.from("branches").select("id,name,code,is_default,is_active").eq("tenant_id",tenantId).eq("is_active",true).order("name"),
-   db.from(table).select("id,"+(purchase?"po_number":"order_number")+",order_date,status,grand_total,branch_id"+(purchase?"":",booker_employee_id,route_id,delivery_man_employee_id")).eq("tenant_id",tenantId).order("created_at",{ascending:false}).limit(200),
+   fetchAllRowsResult<any>((from,to)=>db.from(table).select("id,"+(purchase?"po_number":"order_number")+",order_date,status,grand_total,branch_id"+(purchase?"":",booker_employee_id,route_id,delivery_man_employee_id")).eq("tenant_id",tenantId).order("created_at",{ascending:false}).order("id",{ascending:true}).range(from,to)),
    db.from("employees").select("id,full_name,job_title").eq("tenant_id",tenantId).eq("employment_status","active").order("full_name"),
    db.from("sales_routes").select("id,name,route_code").eq("tenant_id",tenantId).eq("is_active",true).order("name")
   ]);

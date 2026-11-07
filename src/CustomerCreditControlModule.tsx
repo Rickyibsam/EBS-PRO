@@ -1,3 +1,4 @@
+import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import { useEffect, useMemo, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {useModuleAction} from "./lib/modulePermissionContext";
@@ -12,8 +13,8 @@ export default function CustomerCreditControlModule({db,tenantId,currentRole}:{d
  async function load(){
   setLoading(true);setNotice("");
   const [p,i,pa,c]=await Promise.all([
-   db.from("parties").select("id,party_code,name,phone,credit_limit,opening_balance,payment_terms_days").eq("tenant_id",tenantId).in("party_type",["customer","both"]).order("name").limit(5000),
-   db.from("sales_invoices").select("id,customer_id,invoice_number,invoice_date,due_date,grand_total").eq("tenant_id",tenantId).eq("status","posted").order("invoice_date",{ascending:false}).limit(10000),
+   fetchAllRowsResult<any>((from,to)=>db.from("parties").select("id,party_code,name,phone,credit_limit,opening_balance,payment_terms_days").eq("tenant_id",tenantId).in("party_type",["customer","both"]).order("name").order("id",{ascending:true}).range(from,to)),
+   fetchAllRowsResult<any>((from,to)=>db.from("sales_invoices").select("id,customer_id,invoice_number,invoice_date,due_date,grand_total").eq("tenant_id",tenantId).eq("status","posted").order("invoice_date",{ascending:false}).order("id",{ascending:true}).range(from,to)),
    db.from("payments").select("sales_invoice_id,amount,payment_type").eq("tenant_id",tenantId).not("sales_invoice_id","is",null),
    db.from("sales_credit_notes").select("sales_invoice_id,grand_total").eq("tenant_id",tenantId).eq("status","posted")
   ]);

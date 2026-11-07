@@ -1,3 +1,4 @@
+import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {useModuleAction} from "./lib/modulePermissionContext";
@@ -33,10 +34,10 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
   async function load() {
     setLoading(true); setNotice("");
     if (isProducts) {
-      const [productResult,categoryResult,unitResult] = await Promise.all([db.from("products").select("id,sku,name,brand,barcode,category_id,base_unit_id,description,purchase_tax_rate,sales_tax_rate,reorder_level,is_active,min_stock,cost_price,sale_price,track_expiry,track_batch").eq("tenant_id", tenantId).order("name").limit(250),db.from("product_categories").select("id,name").eq("tenant_id",tenantId).eq("is_active",true).order("name"),db.from("units_of_measure").select("id,name,symbol").eq("tenant_id",tenantId)]);
+      const [productResult,categoryResult,unitResult] = await Promise.all([fetchAllRowsResult<any>((from,to)=>db.from("products").select("id,sku,name,brand,barcode,category_id,base_unit_id,description,purchase_tax_rate,sales_tax_rate,reorder_level,is_active,min_stock,cost_price,sale_price,track_expiry,track_batch").eq("tenant_id", tenantId).order("name").order("id",{ascending:true}).range(from,to)),db.from("product_categories").select("id,name").eq("tenant_id",tenantId).eq("is_active",true).order("name"),db.from("units_of_measure").select("id,name,symbol").eq("tenant_id",tenantId)]);
       if (productResult.error||categoryResult.error||unitResult.error) setNotice(productResult.error?.message||categoryResult.error?.message||unitResult.error?.message||"Product master could not be loaded."); else {setProducts((productResult.data ?? []) as Product[]);setCategories(categoryResult.data??[]);setUnitCache(unitResult.data??[]);}
     } else if (isParties) {
-      const { data, error } = await db.from("parties").select("id,party_code,party_type,name,contact_person,phone,email,address,tax_number,payment_terms_days,city,credit_limit,opening_balance,status").eq("tenant_id", tenantId).in("party_type", partyType === "supplier" ? ["supplier","both"] : ["customer","both"]).order("name").limit(250);
+      const { data, error } = await fetchAllRowsResult<any>((from,to)=>db.from("parties").select("id,party_code,party_type,name,contact_person,phone,email,address,tax_number,payment_terms_days,city,credit_limit,opening_balance,status").eq("tenant_id", tenantId).in("party_type", partyType === "supplier" ? ["supplier","both"] : ["customer","both"]).order("name").order("id",{ascending:true}).range(from,to));
       if (error) setNotice(error.message); else setParties((data ?? []) as Party[]);
     }
     setLoading(false);

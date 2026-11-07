@@ -1,3 +1,4 @@
+import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import {useEffect,useState,type FormEvent} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 import {useModuleAction} from "./lib/modulePermissionContext";
@@ -19,15 +20,14 @@ export default function DeliveryChargeModule({db,tenantId,currentRole}:{db:Supab
   setLoading(true);setNotice("");
   const [r,d,o,p,ru,ch,ac,cm,co]=await Promise.all([
    db.from("sales_routes").select("id,route_code,name,area_description").eq("tenant_id",tenantId).eq("is_active",true).order("name"),
-   db.from("deliveries").select("id,delivery_number,sales_order_id,route_id,delivery_date,status,delivery_man_employee_id").eq("tenant_id",tenantId).order("delivery_date",{ascending:false}).limit(150),
+   fetchAllRowsResult<any>((from,to)=>db.from("deliveries").select("id,delivery_number,sales_order_id,route_id,delivery_date,status,delivery_man_employee_id").eq("tenant_id",tenantId).order("delivery_date",{ascending:false}).order("id",{ascending:true}).range(from,to)),
    db.from("sales_orders").select("id,order_number,customer_id,grand_total").eq("tenant_id",tenantId),
    db.from("parties").select("id,name").eq("tenant_id",tenantId).in("party_type",["customer","both"]),
    db.from("delivery_charge_rules").select("*").eq("tenant_id",tenantId).order("priority",{ascending:false}),
-   db.from("delivery_charges").select("*").eq("tenant_id",tenantId).order("created_at",{ascending:false}).limit(150),
+   fetchAllRowsResult<any>((from,to)=>db.from("delivery_charges").select("*").eq("tenant_id",tenantId).order("created_at",{ascending:false}).order("id",{ascending:true}).range(from,to)),
    db.from("chart_of_accounts").select("id,account_code,account_name,account_type,is_active").eq("tenant_id",tenantId).eq("is_active",true).order("account_code"),
    db.from("cash_flow_account_mappings").select("account_id,classification").eq("tenant_id",tenantId).eq("classification","cash_bank"),
-   db.from("delivery_charge_collections").select("*").eq("tenant_id",tenantId).order("collected_at",{ascending:false}).limit(200)
-  ]);
+   fetchAllRowsResult<any>((from,to)=>db.from("delivery_charge_collections").select("*").eq("tenant_id",tenantId).order("collected_at",{ascending:false}).order("id",{ascending:true}).range(from,to))]);
   const err=[r,d,o,p,ru,ch,ac,cm,co].find(x=>x.error);if(err)setNotice(err.error?.message||"Delivery charge records could not be loaded.");else{setRoutes(r.data||[]);setDeliveries(d.data||[]);setOrders(o.data||[]);setParties(p.data||[]);setRules(ru.data||[]);setCharges(ch.data||[]);setAccounts(ac.data||[]);setCashAccounts((cm.data||[]).map(x=>x.account_id));setCollections(co.data||[]);const map=await db.from("delivery_charge_account_mappings").select("*").eq("tenant_id",tenantId).maybeSingle();if(!map.error&&map.data)setMapping({revenue_account_id:map.data.revenue_account_id,cash_account_id:map.data.cash_account_id,bank_account_id:map.data.bank_account_id});}
   setLoading(false);
  }

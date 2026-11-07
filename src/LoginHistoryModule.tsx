@@ -1,9 +1,10 @@
+import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import {useEffect,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 type Row=Record<string,any>;
 export default function LoginHistoryModule({db,tenantId}:{db:SupabaseClient;tenantId:string}){
  const [rows,setRows]=useState<Row[]>([]),[loading,setLoading]=useState(true),[search,setSearch]=useState(""),[notice,setNotice]=useState("");
- async function load(){setLoading(true);const {data,error}=await db.from("login_history").select("id,user_id,email,login_at,event_type,user_agent").eq("tenant_id",tenantId).order("login_at",{ascending:false}).limit(300);if(error)setNotice(error.message);else{setRows(data||[]);setNotice("");}setLoading(false);}
+ async function load(){setLoading(true);const {data,error}=await fetchAllRowsResult<any>((from,to)=>db.from("login_history").select("id,user_id,email,login_at,event_type,user_agent").eq("tenant_id",tenantId).order("login_at",{ascending:false}).order("id",{ascending:true}).range(from,to));if(error)setNotice(error.message);else{setRows(data||[]);setNotice("");}setLoading(false);}
  useEffect(()=>{void load();},[tenantId]);
  const visible=rows.filter(x=>(String(x.email||"")+" "+String(x.user_id||"")+" "+String(x.user_agent||"")).toLowerCase().includes(search.toLowerCase()));
  function exportCsv(){const quote=(v:any)=>'"'+String(v??"").replaceAll('"','""')+'"';const csv=["Email,User ID,Login time,Event,Device",...visible.map(x=>[x.email,x.user_id,x.login_at,x.event_type,x.user_agent].map(quote).join(","))].join("\n");const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="ebs-pro-login-history.csv";a.click();URL.revokeObjectURL(url);}

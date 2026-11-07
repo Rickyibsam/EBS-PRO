@@ -1,3 +1,4 @@
+import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import {useEffect,useMemo,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 type Metric={label:string;value:string;detail:string;icon:string;tone:string};
@@ -43,7 +44,7 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
    db.from("chart_of_accounts").select("id,account_type").eq("tenant_id",tenantId),
    db.from("journal_lines").select("account_id,debit,credit,journal_entries!inner(entry_date,status)").eq("tenant_id",tenantId).eq("journal_entries.status","posted").eq("journal_entries.entry_date",today),
    db.from("sales_orders").select("id,order_number,status").eq("tenant_id",tenantId).in("status",["draft","submitted"]).limit(100),
-   db.from("sales_invoices").select("id,invoice_number,due_date,grand_total").eq("tenant_id",tenantId).eq("status","posted").lt("due_date",today).limit(1000),
+   fetchAllRowsResult<any>((from,to)=>db.from("sales_invoices").select("id,invoice_number,due_date,grand_total").eq("tenant_id",tenantId).eq("status","posted").lt("due_date",today).order("id",{ascending:true}).range(from,to)),
    db.from("sales_invoices").select("grand_total,invoice_date").eq("tenant_id",tenantId).eq("status","posted").gte("invoice_date",trendStart).lte("invoice_date",today),
    db.from("purchase_invoices").select("grand_total,invoice_date").eq("tenant_id",tenantId).eq("status","posted").gte("invoice_date",trendStart).lte("invoice_date",today),
    db.from("payments").select("amount,payment_type,payment_date").eq("tenant_id",tenantId).gte("payment_date",trendStart).lte("payment_date",today)

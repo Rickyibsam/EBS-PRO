@@ -1,3 +1,4 @@
+import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import {useEffect,useMemo,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 type TaxRow={id:string;number:string;date:string;party:string;tax:number;gross:number;kind:"Output"|"Input"|"Credit note"};
@@ -6,9 +7,9 @@ const today=new Date().toISOString().slice(0,10),monthStart=today.slice(0,8)+"01
 export default function TaxRegisterModule({db,tenantId}:{db:SupabaseClient;tenantId:string}){
  const [rows,setRows]=useState<TaxRow[]>([]),[loading,setLoading]=useState(true),[notice,setNotice]=useState(""),[from,setFrom]=useState(monthStart),[to,setTo]=useState(today),[kind,setKind]=useState("all");
  async function load(){setLoading(true);setNotice("");const [s,p,c,party]=await Promise.all([
-  db.from("sales_invoices").select("id,invoice_number,invoice_date,customer_id,tax_total,grand_total").eq("tenant_id",tenantId).eq("status","posted").gte("invoice_date",from).lte("invoice_date",to).order("invoice_date",{ascending:false}).limit(10000),
-  db.from("purchase_invoices").select("id,supplier_invoice_no,invoice_date,supplier_id,tax_amount,grand_total").eq("tenant_id",tenantId).eq("status","posted").gte("invoice_date",from).lte("invoice_date",to).order("invoice_date",{ascending:false}).limit(10000),
-  db.from("sales_credit_notes").select("id,credit_note_number,credit_note_date,customer_id,tax_total,grand_total").eq("tenant_id",tenantId).eq("status","posted").gte("credit_note_date",from).lte("credit_note_date",to).order("credit_note_date",{ascending:false}).limit(10000),
+  fetchAllRowsResult<any>((from,to)=>db.from("sales_invoices").select("id,invoice_number,invoice_date,customer_id,tax_total,grand_total").eq("tenant_id",tenantId).eq("status","posted").gte("invoice_date",from).lte("invoice_date",to).order("invoice_date",{ascending:false}).order("id",{ascending:true}).range(from,to)),
+  fetchAllRowsResult<any>((from,to)=>db.from("purchase_invoices").select("id,supplier_invoice_no,invoice_date,supplier_id,tax_amount,grand_total").eq("tenant_id",tenantId).eq("status","posted").gte("invoice_date",from).lte("invoice_date",to).order("invoice_date",{ascending:false}).order("id",{ascending:true}).range(from,to)),
+  fetchAllRowsResult<any>((from,to)=>db.from("sales_credit_notes").select("id,credit_note_number,credit_note_date,customer_id,tax_total,grand_total").eq("tenant_id",tenantId).eq("status","posted").gte("credit_note_date",from).lte("credit_note_date",to).order("credit_note_date",{ascending:false}).order("id",{ascending:true}).range(from,to)),
   db.from("parties").select("id,name").eq("tenant_id",tenantId)
  ]);const err=s.error||p.error||c.error||party.error;if(err)setNotice(err.message);else{const names=new Map((party.data||[]).map(x=>[x.id,x.name]));setRows([
   ...(s.data||[]).map(x=>({id:x.id,number:x.invoice_number,date:x.invoice_date,party:names.get(x.customer_id)||"Customer",tax:Number(x.tax_total||0),gross:Number(x.grand_total||0),kind:"Output" as const})),

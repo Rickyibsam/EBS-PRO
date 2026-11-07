@@ -1,3 +1,4 @@
+import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import {FormEvent,useEffect,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 import {useModuleAction} from "./lib/modulePermissionContext";
@@ -12,11 +13,11 @@ export default function PurchaseReturnsModule({db,tenantId,currentRole}:{db:Supa
  async function load(){
   setLoading(true);setNotice("");
   const [g,o,p,pr,n,l]=await Promise.all([
-   db.from("goods_receipts").select("id,grn_number,received_date,purchase_order_id,warehouse_id,status").eq("tenant_id",tenantId).eq("status","posted").order("received_date",{ascending:false}).limit(300),
+   fetchAllRowsResult<any>((from,to)=>db.from("goods_receipts").select("id,grn_number,received_date,purchase_order_id,warehouse_id,status").eq("tenant_id",tenantId).eq("status","posted").order("received_date",{ascending:false}).order("id",{ascending:true}).range(from,to)),
    db.from("purchase_orders").select("id,po_number,supplier_id").eq("tenant_id",tenantId),
    db.from("parties").select("id,name,party_code").eq("tenant_id",tenantId).in("party_type",["supplier","both"]).order("name"),
    db.from("products").select("id,name,sku").eq("tenant_id",tenantId),
-   db.from("purchase_debit_notes").select("id,goods_receipt_id,supplier_id,debit_note_number,note_date,reason,status,subtotal,warehouse_id").eq("tenant_id",tenantId).order("note_date",{ascending:false}).limit(300),
+   fetchAllRowsResult<any>((from,to)=>db.from("purchase_debit_notes").select("id,goods_receipt_id,supplier_id,debit_note_number,note_date,reason,status,subtotal,warehouse_id").eq("tenant_id",tenantId).order("note_date",{ascending:false}).order("id",{ascending:true}).range(from,to)),
    db.from("purchase_debit_note_lines").select("goods_receipt_line_id,quantity").eq("tenant_id",tenantId)
   ]);
   const err=g.error||o.error||p.error||pr.error||n.error||l.error;if(err)setNotice(err.message);else{setGrns(g.data??[]);setOrders(o.data??[]);setParties(p.data??[]);setProducts(pr.data??[]);setNotes(n.data??[]);setLines(l.data??[]);}

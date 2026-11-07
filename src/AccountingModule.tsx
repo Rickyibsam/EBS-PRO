@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {useModuleAction} from "./lib/modulePermissionContext";
-import {fetchAllRows} from "./lib/fetchAllRows";
+import {fetchAllRows,fetchAllRowsResult} from "./lib/fetchAllRows";
 
 type Row = Record<string, any>;
 type TrialRow = { account_id: string; account_code: string; account_name: string; account_type: string; total_debit: number; total_credit: number; balance: number };
@@ -51,7 +51,7 @@ export default function AccountingModule({ db, tenantId,currentRole }: { db: Sup
     setNotice("");
     const [a, j, t, br] = await Promise.all([
       db.from("chart_of_accounts").select("id,account_code,account_name,account_type,is_active").eq("tenant_id", tenantId).eq("is_active", true).order("account_code"),
-      db.from("journal_entries").select("id,journal_number,entry_date,narration,status,created_at,branch_id").eq("tenant_id", tenantId).order("entry_date", { ascending: false }).limit(300),
+      fetchAllRowsResult<any>((from,to)=>db.from("journal_entries").select("id,journal_number,entry_date,narration,status,created_at,branch_id").eq("tenant_id", tenantId).order("entry_date", { ascending: false }).order("id",{ascending:true}).range(from,to)),
       db.rpc("get_branch_trial_balance", { p_tenant_id: tenantId, p_as_of: trialDate, p_branch_id: trialBranchId||null }),
       db.from("branches").select("id,name,code").eq("tenant_id",tenantId).order("name")
     ]);

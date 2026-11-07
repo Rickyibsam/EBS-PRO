@@ -1,4 +1,4 @@
-export type PageResult<T> = { data: T[] | null; error: unknown | null };
+export type PageResult<T> = { data: T[] | null; error: any | null };
 
 export async function fetchAllRows<T>(
   fetchPage: (from: number, to: number) => PromiseLike<PageResult<T>>,
@@ -20,5 +20,17 @@ export async function fetchAllRows<T>(
     if (page.length < pageSize) {
       return rows;
     }
+  }
+}
+
+
+export async function fetchAllRowsResult<T>(
+  fetchPage: (from: number, to: number) => PromiseLike<PageResult<T>>,
+  pageSize = 500
+): Promise<PageResult<T>> {
+  try {
+    return { data: await fetchAllRows(fetchPage, pageSize), error: null };
+  } catch (error) {
+    return { data: null, error };
   }
 }

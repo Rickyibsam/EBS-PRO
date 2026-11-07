@@ -1,3 +1,4 @@
+import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import { FormEvent, useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {useModuleAction} from "./lib/modulePermissionContext";
@@ -29,11 +30,10 @@ export default function ReturnsModule({ db, tenantId, currentRole }: { db: Supab
     setLoading(true); setNotice("");
     try {
       const [i,o,c,n] = await Promise.all([
-        db.from("sales_invoices").select("id,invoice_number,invoice_date,customer_id,sales_order_id,grand_total,status").eq("tenant_id",tenantId).eq("status","posted").order("invoice_date",{ascending:false}).limit(500),
-        db.from("sales_orders").select("id,order_number,customer_id,order_date,status").eq("tenant_id",tenantId).order("order_date",{ascending:false}).limit(500),
+        fetchAllRowsResult<any>((from,to)=>db.from("sales_invoices").select("id,invoice_number,invoice_date,customer_id,sales_order_id,grand_total,status").eq("tenant_id",tenantId).eq("status","posted").order("invoice_date",{ascending:false}).order("id",{ascending:true}).range(from,to)),
+        fetchAllRowsResult<any>((from,to)=>db.from("sales_orders").select("id,order_number,customer_id,order_date,status").eq("tenant_id",tenantId).order("order_date",{ascending:false}).order("id",{ascending:true}).range(from,to)),
         db.from("parties").select("id,name,party_code").eq("tenant_id",tenantId).in("party_type",["customer","both"]).order("name"),
-        db.from("sales_credit_notes").select("id,credit_note_number,credit_note_date,sales_invoice_id,customer_id,reason,status,grand_total,created_at").eq("tenant_id",tenantId).order("created_at",{ascending:false}).limit(100)
-      ]);
+        fetchAllRowsResult<any>((from,to)=>db.from("sales_credit_notes").select("id,credit_note_number,credit_note_date,sales_invoice_id,customer_id,reason,status,grand_total,created_at").eq("tenant_id",tenantId).order("created_at",{ascending:false}).order("id",{ascending:true}).range(from,to))]);
       const err=i.error||o.error||c.error||n.error;if(err)throw err;
       setInvoices(i.data||[]);setSalesOrders(o.data||[]);setCustomers(c.data||[]);setNotes(n.data||[]);
     } catch(e) { setNotice(e instanceof Error?e.message:"Returns could not be loaded."); }

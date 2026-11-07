@@ -1,3 +1,4 @@
+import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import {useEffect,useMemo,useState,type FormEvent} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 import {useModuleAction} from "./lib/modulePermissionContext";
@@ -25,12 +26,12 @@ export default function HRModule({db,tenantId,currentRole}:{db:SupabaseClient;te
   const {data:{session}}=await db.auth.getSession();setCurrentUserId(session?.user.id||"");
   const [e,a,l,v,d,g,rp,ac,cm]=await Promise.all([
    db.from("employees").select("id,user_id,employee_code,full_name,job_title,department_id,designation_id,employment_status").eq("tenant_id",tenantId).eq("employment_status","active").order("full_name"),
-   db.from("employee_attendance").select("*").eq("tenant_id",tenantId).order("attendance_date",{ascending:false}).limit(200),
-   db.from("employee_leaves").select("*").eq("tenant_id",tenantId).order("created_at",{ascending:false}).limit(100),
-   db.from("employee_advances").select("*").eq("tenant_id",tenantId).order("issue_date",{ascending:false}).limit(100),
+   fetchAllRowsResult<any>((from,to)=>db.from("employee_attendance").select("*").eq("tenant_id",tenantId).order("attendance_date",{ascending:false}).order("id",{ascending:true}).range(from,to)),
+   fetchAllRowsResult<any>((from,to)=>db.from("employee_leaves").select("*").eq("tenant_id",tenantId).order("created_at",{ascending:false}).order("id",{ascending:true}).range(from,to)),
+   fetchAllRowsResult<any>((from,to)=>db.from("employee_advances").select("*").eq("tenant_id",tenantId).order("issue_date",{ascending:false}).order("id",{ascending:true}).range(from,to)),
    db.from("departments").select("*").eq("tenant_id",tenantId).order("name"),
    db.from("designations").select("*").eq("tenant_id",tenantId).order("name"),
-   db.from("employee_advance_repayments").select("*").eq("tenant_id",tenantId).order("repayment_date",{ascending:false}).limit(200),
+   fetchAllRowsResult<any>((from,to)=>db.from("employee_advance_repayments").select("*").eq("tenant_id",tenantId).order("repayment_date",{ascending:false}).order("id",{ascending:true}).range(from,to)),
    db.from("chart_of_accounts").select("id,account_code,account_name,account_type").eq("tenant_id",tenantId).eq("is_active",true).order("account_code"),
    db.from("cash_flow_account_mappings").select("account_id").eq("tenant_id",tenantId).eq("classification","cash_bank")
   ]);

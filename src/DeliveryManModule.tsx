@@ -1,3 +1,4 @@
+import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import {FormEvent,useEffect,useState,useRef} from "react";
 import type {PointerEvent as ReactPointerEvent} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
@@ -22,7 +23,7 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
    const {data:emp,error:empError}=await db.from("employees").select("id,full_name,employee_code").eq("tenant_id",tenantId).eq("user_id",user.user.id).maybeSingle();
    if(empError)throw empError;if(!emp)throw new Error("Your login is not linked to an active deliveryman employee record. Ask the administrator to link your staff account.");
    setEmployee(emp);
-   const {data:d,error:dError}=await db.from("deliveries").select("id,delivery_number,sales_order_id,delivery_date,status,route_id,vehicle_number").eq("tenant_id",tenantId).eq("delivery_man_employee_id",emp.id).order("delivery_date",{ascending:false}).limit(100);
+   const {data:d,error:dError}=await fetchAllRowsResult<any>((from,to)=>db.from("deliveries").select("id,delivery_number,sales_order_id,delivery_date,status,route_id,vehicle_number").eq("tenant_id",tenantId).eq("delivery_man_employee_id",emp.id).order("delivery_date",{ascending:false}).order("id",{ascending:true}).range(from,to));
    if(dError)throw dError;const deliveryRows=d??[];setDeliveries(deliveryRows);
    const ids=deliveryRows.map(x=>x.sales_order_id),deliveryIds=deliveryRows.map(x=>x.id);
    if(ids.length){

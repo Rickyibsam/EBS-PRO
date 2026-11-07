@@ -1,3 +1,4 @@
+import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {useModuleAction} from "./lib/modulePermissionContext";
@@ -19,9 +20,8 @@ export default function ChequeRegisterModule({db,tenantId,currentRole}:{db:Supab
  async function load(){
   setLoading(true);setNotice("");
   const [c,p]=await Promise.all([
-   db.from("cheque_register").select("id,party_id,direction,cheque_number,bank_name,cheque_date,due_date,amount,status,cleared_date,notes,created_at").eq("tenant_id",tenantId).order("due_date",{ascending:false}).limit(1000),
-   db.from("parties").select("id,name,party_type").eq("tenant_id",tenantId).order("name").limit(1000)
-  ]);
+   fetchAllRowsResult<any>((from,to)=>db.from("cheque_register").select("id,party_id,direction,cheque_number,bank_name,cheque_date,due_date,amount,status,cleared_date,notes,created_at").eq("tenant_id",tenantId).order("due_date",{ascending:false}).order("id",{ascending:true}).range(from,to)),
+   fetchAllRowsResult<any>((from,to)=>db.from("parties").select("id,name,party_type").eq("tenant_id",tenantId).order("name").order("id",{ascending:true}).range(from,to))]);
   if(c.error||p.error)setNotice(c.error?.message||p.error?.message||"Cheque register could not load.");
   else {setRows((c.data||[]) as Cheque[]);setParties((p.data||[]) as Party[]);}
   setLoading(false);
