@@ -627,7 +627,7 @@ begin
   where tenant_id=v_tenant_a and user_id=v_booker_user;
   insert into public.tenant_user_module_permissions(
     tenant_id,user_id,module_key,can_view,can_create,can_update,can_delete
-  ) values(v_tenant_a,v_booker_user,'administration_security',true,true,false,false);
+  ) values(v_tenant_a,v_booker_user,'administration_security',true,false,false,false);
   insert into public.tenant_user_module_permissions(
     tenant_id,user_id,module_key,can_view,can_create,can_update,can_delete
   ) values(v_tenant_a,v_booker_user,'reports_analytics',false,false,false,false);
