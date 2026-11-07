@@ -83,7 +83,9 @@ The following database smoke workflows were run as authenticated owner/staff con
 - Security: per-user module denial/grant enforcement, owner-managed permission row access, personal notification inbox access, cross-company customer-record read/write isolation, direct custom-denial checks on app settings/fixed assets/budgets/budget lines, and restrictive guards for all 308 module/action policy commands.
 - Client offline storage: all Booker and deliveryman IndexedDB unit tests passed.
 
-The latest GitHub Actions run completed successfully: **55/55 tests passed**, and the TypeScript/Vite production build passed. The latest main commit `5458767d38ae05f90e783456af03a9be1e37a483` is live on Render. The latest code also includes browser-supported BarcodeDetector format detection.
+The latest GitHub Actions run completed successfully: **58/58 tests passed**, and the TypeScript/Vite production build passed. Main commit `dc1e19d7d50920f21786f36dfe0b9791720a5987` contains the commission-clawback payroll fix and is deploying to Render. The latest code also includes browser-supported BarcodeDetector format detection.
+
+The commission clawback regression workflow now verifies partial recovery capped by available net salary, zero-net payroll posting, duplicate retry prevention, carry-forward into a later payroll, and the resulting payroll GL totals. The payroll posting function omits zero-value journal lines and rejects zero-gross runs. The expanded rollback-only database smoke test passed against the hosted EBS-PRO database; its fixture transaction was rolled back.
 
 ## Remaining verification limits
 
