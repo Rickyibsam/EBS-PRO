@@ -26,8 +26,9 @@ test("invitation branch must be active and belong to the requested tenant", () =
   assert.match(source, /\.eq\("tenant_id", tenantId\)\.eq\("id", branchId\)\.eq\("is_active", true\)/);
 });
 
-test("duplicate employee codes and existing tenant memberships are rejected", () => {
-  assert.match(source, /duplicateCode/);
+test("employee code is database-generated and existing tenant memberships are still rejected", () => {
+  assert.match(source, /employee_code: ""/);
+  assert.doesNotMatch(source, /duplicateCode/);
   assert.match(source, /existingMembership/);
   assert.match(source, /already connected to this company/);
 });
