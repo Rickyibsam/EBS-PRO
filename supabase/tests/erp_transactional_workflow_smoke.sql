@@ -838,7 +838,7 @@ begin
   end if;
   delete from public.products where tenant_id=v_tenant_b and id=v_cleanroom_product;
   delete from public.units_of_measure where tenant_id=v_tenant_b and id=v_cleanroom_unit;
-  delete from public.warehouses where tenant_id=v_tenant_b and id=v_cleanroom_warehouse;
+  delete from public.warehouses where tenant_id=v_tenant_b and branch_id=v_branch_b;
   delete from public.branches where tenant_id=v_tenant_b and id=v_branch_b;
   if exists(select 1 from public.branches where tenant_id=v_tenant_b and id=v_branch_b)
      or exists(select 1 from public.warehouses where tenant_id=v_tenant_b and id=v_cleanroom_warehouse)
