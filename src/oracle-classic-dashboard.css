@@ -122,3 +122,122 @@
  .landscape-nav-row .landscape-nav-group{min-width:0}
  .landscape-nav-row .landscape-nav-trigger{width:100%;justify-content:flex-start}
 }
+
+/* Classic Oracle grey-and-white palette — flat, restrained enterprise UI. */
+.ai-dashboard{
+  --oracle-navy:#4b5560;
+  --oracle-blue:#356b91;
+  --oracle-gold:#858d95;
+  color:#303840;
+  background:#edf0f2;
+}
+.ai-dashboard .dashboard-hero{
+  border:1px solid #c5cbd1;
+  border-left:4px solid #7b858e;
+  border-radius:2px;
+  background:linear-gradient(180deg,#ffffff 0%,#f1f3f5 100%);
+  box-shadow:0 1px 2px rgba(30,40,50,.08);
+}
+.ai-dashboard .dashboard-hero:before{display:none}
+.ai-dashboard .hero-eyebrow{color:#68727b}
+.ai-dashboard .hero-eyebrow i{background:#7f8992}
+.ai-dashboard .dashboard-hero h1{color:#343c43}
+.ai-dashboard .dashboard-hero p{color:#66717b}
+.ai-dashboard .hero-meta{color:#68737d}
+.ai-dashboard .hero-meta span:nth-child(2){color:#4d5963}
+.ai-dashboard .hero-mark{border-color:#cbd1d6;background:#f7f8f9}
+.ai-dashboard .hero-mark-inner{border-color:#c7cdd2;background:#e7eaed;color:#59636c}
+.ai-dashboard .hero-mark-inner span{background:#d8dde1;border-color:#b9c1c8}
+.ai-dashboard .hero-mark small{color:#68727b}
+.ai-dashboard .section-kicker{color:#737d86}
+.ai-dashboard .dashboard-section-head{border-bottom-color:#cbd1d6}
+.ai-dashboard .dashboard-section-head h2,
+.ai-dashboard .dashboard-chart-title h3,
+.ai-dashboard .pulse-heading h3,
+.ai-dashboard .focus-card h3{color:#39434c}
+.ai-dashboard .dashboard-section-head p,
+.ai-dashboard .pulse-card>p,
+.ai-dashboard .focus-card p{color:#6c7780}
+.ai-dashboard .dashboard-refresh{
+  border-color:#c3c9ce;
+  background:linear-gradient(#fff,#eceff1);
+  color:#46515a;
+}
+.ai-dashboard .dashboard-refresh:hover{border-color:#9ea7af;background:#f8f9fa;color:#2f3941}
+.ai-dashboard .ai-metric,
+.ai-dashboard .dashboard-chart-card,
+.ai-dashboard .dashboard-finance-strip>div,
+.ai-dashboard .pulse-card,
+.ai-dashboard .focus-card,
+.ai-dashboard .recent-activity-list{
+  border-color:#cbd1d6;
+  border-radius:2px;
+  background:#fff;
+  box-shadow:0 1px 2px rgba(30,40,50,.06);
+}
+.ai-dashboard .ai-metric:before{background:#8a949d}
+.ai-dashboard .ai-metric:hover{border-color:#aab2b9;box-shadow:0 2px 4px rgba(30,40,50,.09)}
+.ai-dashboard .metric-icon,
+.ai-dashboard .metric-icon.mint,
+.ai-dashboard .metric-icon.violet,
+.ai-dashboard .metric-icon.amber,
+.ai-dashboard .metric-icon.blue{
+  border-color:#d4d9dd;
+  background:#f0f2f4;
+  color:#5b6670;
+}
+.ai-dashboard .metric-label{color:#65717b}
+.ai-dashboard .ai-metric strong,
+.ai-dashboard .dashboard-finance-strip strong{color:#303a43}
+.ai-dashboard .ai-metric small,
+.ai-dashboard .dashboard-finance-strip small,
+.ai-dashboard .dashboard-finance-strip span{color:#7a858e}
+.ai-dashboard .dashboard-chart-title small,
+.ai-dashboard .pulse-heading small,
+.ai-dashboard .focus-card>div>small{color:#79838b}
+.ai-dashboard .dashboard-legend span,
+.ai-dashboard .dashboard-bar-month>small{color:#707b84}
+.ai-dashboard .dashboard-bar-track{background:#eef0f2}
+.ai-dashboard .sales-bar{background:#6689a2}
+.ai-dashboard .purchase-bar{background:#9aa6ad}
+.ai-dashboard .receipt-bar{background:#8c9da9}
+.ai-dashboard .payment-bar{background:#b0b7bc}
+.ai-dashboard .dashboard-chart-empty{border-color:#d1d6da;background:#f7f8f9;color:#77818a}
+.ai-dashboard .pulse-card{border-top:3px solid #87929b}
+.ai-dashboard .pulse-spark{background:#eef1f3;color:#596873}
+.ai-dashboard .pulse-live{border-color:#d0d5d9;background:#f3f5f6;color:#59636c}
+.ai-dashboard .pulse-actions button,
+.ai-dashboard .focus-actions button{
+  border-color:#c5cbd0;
+  background:linear-gradient(#fff,#eef0f2);
+  color:#46535d;
+}
+.ai-dashboard .pulse-actions button:hover,
+.ai-dashboard .focus-actions button:hover{border-color:#a4adb4;background:#f8f9fa;color:#303a43}
+.ai-dashboard .launcher-card{
+  border-color:#cbd1d6!important;
+  border-radius:2px!important;
+  background:#fff!important;
+  box-shadow:0 1px 2px rgba(30,40,50,.06)!important;
+}
+.ai-dashboard .launcher-card:hover,
+.ai-dashboard .launcher-card.expanded{border-color:#aab2b9!important;box-shadow:0 2px 4px rgba(30,40,50,.09)!important}
+.ai-dashboard .launcher-toggle{background:linear-gradient(#fff,#f2f4f5)!important}
+.ai-dashboard .launcher-toggle .launcher-top>span{border-color:#d3d8dc;background:#eef1f3;color:#5b6670}
+.ai-dashboard .launcher-toggle strong{color:#39434c!important}
+.ai-dashboard .launcher-toggle>small,
+.ai-dashboard .launcher-links button{color:#69747d!important}
+.ai-dashboard .launcher-count{border-top-color:#e0e4e7;color:#7c858d!important}
+.ai-dashboard .launcher-links{background:#fff}
+.ai-dashboard .launcher-links button{border-top-color:#e7eaed}
+.ai-dashboard .launcher-links button:hover{color:#315f7e!important;background:#f3f5f6}
+.ai-dashboard .launcher-no-access{border-top-color:#e0e4e7;background:#f7f8f9;color:#737d86}
+.ai-dashboard .recent-activity-list>div{border-bottom-color:#e5e8eb}
+.ai-dashboard .recent-activity-list b,
+.ai-dashboard .notification-unread b{color:#39434c}
+.ai-dashboard .recent-activity-list>div>span:not(.activity-dot),
+.ai-dashboard .recent-activity-list time{color:#748089}
+.ai-dashboard .activity-dot{color:#8b959d}
+.ai-dashboard .notification-unread{background:#f2f4f5}
+.ai-dashboard .dashboard-disclaimer{color:#87919a}
+.ai-dashboard .dashboard-loading{border-color:#cbd1d6;background:#fff;color:#69747d}
