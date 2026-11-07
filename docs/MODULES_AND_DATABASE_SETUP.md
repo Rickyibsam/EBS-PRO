@@ -61,10 +61,10 @@ The application has 10 module groups. The navigation and module screens are pres
 
 ## Newly completed gaps and workflow fixes
 
-- **Custom permissions:** the owner can enable per-user overrides for 10 module groups with View/Create/Update/Delete actions. If no override exists, the user's existing role rules remain the default. Owner/admin role access remains protected. Database RLS enforces explicit grants and denials on 77 tenant-scoped business tables. Reports access grants read-only access to underlying report data without granting create/update/delete; budget tables are governed by Accounts & Finance permissions.
+- **Custom permissions:** the owner can enable per-user overrides for 10 module groups with View/Create/Update/Delete actions. If no override exists, the user's existing role rules remain the default. Owner/admin role access remains protected. Database RLS enforces explicit grants and denials across 77 tenant-scoped business tables and 308 module/action policy commands. A follow-up audit found zero module-grant policy commands without a matching restrictive guard. Twelve legacy `FOR ALL` policy tables now have separate restrictive SELECT/INSERT/UPDATE/DELETE guards, so permissive role policies cannot bypass an explicit user denial. Reports access grants read-only access to underlying report data without granting create/update/delete; budget and fixed-asset tables are governed by Accounts & Finance permissions.
 - **Barcode camera:** the Booker order form can use the phone camera on supported secure-context browsers that expose the BarcodeDetector API. Handheld keyboard-wedge scanners and manual SKU/barcode entry remain available as fallbacks.
 - **Persistent notifications:** operational alerts are saved per user and tenant with read/unread state, mark-read and mark-all-read actions. Repeated daily alerts update the existing notification instead of creating duplicates.
-- **Automated tests:** `npm test` runs 20 tests for permission resolution, barcode matching, Booker IndexedDB queues/snapshots and deliveryman IndexedDB queues/snapshots. GitHub Actions runs the tests before the TypeScript/Vite production build.
+- **Automated tests:** the current GitHub Actions run passes all 55 automated tests, followed by the TypeScript/Vite production build. The suite covers permission resolution, barcode matching, Booker/Delivery offline queues, workflow invariants, RLS policy coverage and transaction smoke-test assertions.
 - **Critical workflow defects found and fixed during transactional testing:**
   - The document-number allocator used obsolete column names and omitted the required branch key; it now uses the current branch-aware sequence schema.
   - Approved sales/purchase vouchers can now progress through controlled fulfilment/receipt status transitions without unlocking their business fields.
@@ -72,7 +72,7 @@ The application has 10 module groups. The navigation and module screens are pres
 
 ## Transactional verification completed
 
-The following database smoke workflows were run as authenticated owner/staff contexts inside explicit transactions and rolled back after assertions. No test business records were retained:
+The following database smoke workflows were run as authenticated owner/staff contexts inside explicit transactions and rolled back after assertions. The latest run, including the additional legacy `FOR ALL` RLS checks, completed successfully. No test business records were retained:
 
 - Sales: approved order → delivery allocation → dispatch → posted invoice → cash receipt → posted sales credit note and stock return.
 - Purchasing: draft PO → approval → GRN creation/posting → PO received status → supplier invoice posting → allocated supplier payment.
@@ -80,14 +80,14 @@ The following database smoke workflows were run as authenticated owner/staff con
 - Booker: offline order RPC sync and replay idempotency; GPS visit RPC sync and replay idempotency.
 - Deliveryman: batch-aware warehouse-to-van load → van dispatch/reservation → offline delivery visit sync → invoice creation and replay idempotency.
 - Backup: tenant backup export + no-op additive restore returned zero errors/skipped tables; a separate temporary-tenant restore inserted one missing row, and a second restore inserted zero duplicates. Both test runs were rolled back.
-- Security: per-user module denial/grant enforcement, owner-managed permission row access, personal notification inbox access, and a cross-company customer-record read/write isolation check.
+- Security: per-user module denial/grant enforcement, owner-managed permission row access, personal notification inbox access, cross-company customer-record read/write isolation, direct custom-denial checks on app settings/fixed assets/budgets/budget lines, and restrictive guards for all 308 module/action policy commands.
 - Client offline storage: all Booker and deliveryman IndexedDB unit tests passed.
 
-The latest GitHub Actions run completed successfully: **19/20 tests passed**, TypeScript checks passed and Vite production build passed. The latest code also includes browser-supported BarcodeDetector format detection. Render auto-deploys from `main`; confirm the newest deploy status before treating a just-pushed commit as live.
+The latest GitHub Actions run completed successfully: **55/55 tests passed**, and the TypeScript/Vite production build passed. The latest main commit `5458767d38ae05f90e783456af03a9be1e37a483` is live on Render. The latest code also includes browser-supported BarcodeDetector format detection.
 
 ## Remaining verification limits
 
-This is stronger coverage than a build-only check, but it is not a claim of complete production certification. Browser-level E2E coverage with real login sessions and user interfaces, physical mobile camera testing, signup/email confirmation, purchase returns, commission clawback, fixed-asset/budget edge cases, and exhaustive backup restore reconciliation are still outstanding. The current tenant has only a small sample dataset, so all business edge cases cannot be proven from its existing records.
+This is stronger coverage than a build-only check, but it is not a claim of complete production certification. Browser-level E2E coverage with real login sessions and user interfaces, physical mobile camera/offline testing, signup/email confirmation, commission clawback edge cases, and exhaustive backup/restore reconciliation in an isolated clean-room tenant are still outstanding. The current tenant has only a small sample dataset, so all business edge cases cannot be proven from its existing records.
 
 ## Current hosted database
 
