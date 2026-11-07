@@ -72,7 +72,7 @@ See [the module and database notes](docs/MODULES_AND_DATABASE_SETUP.md) for the 
 
 ## Verification status
 
-The latest CI run (7 November 2026) passed **77/77 automated tests**, the TypeScript/Vite production build, **10 production browser/mobile-emulation checks** (2 desktop-only skips), and `npm audit` reported **0 vulnerabilities**. The Playwright checks currently cover the public sign-in/signup/password-recovery screens, mobile viewport, and simulated GPS/camera permissions; they do not yet exercise every authenticated ERP screen.
+The latest CI run (7 November 2026) passed **79/79 automated tests**, the TypeScript/Vite production build, **10 production browser/mobile-emulation checks** (2 desktop-only skips), and `npm audit` reported **0 vulnerabilities**. The Playwright checks currently cover the public sign-in/signup/password-recovery screens, mobile viewport, and simulated GPS/camera permissions; they do not yet exercise every authenticated ERP screen.
 
 Rollback-only database workflow smoke tests cover sales order → delivery → invoice → receipt → credit note/stock return; purchase order → GRN → supplier invoice → payment and supplier debit note; payroll posting/payment and commission clawback; fixed-asset depreciation/disposal and budget controls; Booker and Delivery PWA idempotent offline synchronization; mandatory atomic POD signature; backup export/additive restore/idempotency; custom permissions; and tenant isolation. These fixture transactions were rolled back and did not leave test business records.
 
