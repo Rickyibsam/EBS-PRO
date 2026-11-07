@@ -103,7 +103,7 @@ test("HR workflow records attendance and approves leave", () => {
 
 test("custom per-user RLS denial blocks direct table UPDATE for a manager", () => {
   assert.ok(smoke.includes("set local role authenticated"));
-  assert.ok(smoke.includes("'administration_security',true,true,false,false"));
+  assert.ok(smoke.includes("'administration_security',true,false,false,false"));
   assert.ok(smoke.includes("direct RLS update bypassed custom per-user update denial"));
 });
 
@@ -143,4 +143,13 @@ test("report RPC enforces explicit custom view denial and rejects reversed dates
   assert.ok(smoke.includes("'reports_analytics',false,false,false,false"));
   assert.ok(smoke.includes("custom reports view denial was not enforced"));
   assert.ok(smoke.includes("invalid report date range was accepted"));
+});
+
+
+test("custom permission matrix enforces view and create/update/delete actions across ERP modules", () => {
+  assert.ok(smoke.includes("foreach v_module_key in array array["));
+  assert.ok(smoke.includes("'sales_customer','order_booking','inventory','purchase_supplier'"));
+  assert.ok(smoke.includes("'accounts_finance','distribution_delivery','administration_security'"));
+  assert.ok(smoke.includes("denied % action was granted for module %"));
+  assert.ok(smoke.includes("explicit reports view denial was ignored"));
 });
