@@ -1,3 +1,4 @@
+import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import {FormEvent,useEffect,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 import {useModuleAction} from "./lib/modulePermissionContext";
@@ -12,10 +13,10 @@ export default function PurchaseInvoiceModule({db,tenantId,currentRole}:{db:Supa
  async function load(){
   setLoading(true);setNotice("");
   const [g,o,p,i,pay,creditNotes]=await Promise.all([
-   db.from("goods_receipts").select("id,grn_number,received_date,purchase_order_id,status").eq("tenant_id",tenantId).eq("status","posted").order("received_date",{ascending:false}).limit(300),
+   fetchAllRowsResult<any>((from,to)=>db.from("goods_receipts").select("id,grn_number,received_date,purchase_order_id,status").eq("tenant_id",tenantId).eq("status","posted").order("received_date",{ascending:false}).order("id",{ascending:true}).range(from,to)),
    db.from("purchase_orders").select("id,po_number,supplier_id").eq("tenant_id",tenantId),
    db.from("parties").select("id,party_code,name").eq("tenant_id",tenantId).in("party_type",["supplier","both"]).order("name"),
-   db.from("purchase_invoices").select("id,goods_receipt_id,supplier_id,supplier_invoice_no,invoice_date,due_date,subtotal,tax_amount,grand_total,status,posted_at").eq("tenant_id",tenantId).order("invoice_date",{ascending:false}).limit(300),
+   fetchAllRowsResult<any>((from,to)=>db.from("purchase_invoices").select("id,goods_receipt_id,supplier_id,supplier_invoice_no,invoice_date,due_date,subtotal,tax_amount,grand_total,status,posted_at").eq("tenant_id",tenantId).order("invoice_date",{ascending:false}).order("id",{ascending:true}).range(from,to)),
    db.from("payments").select("purchase_invoice_id,amount").eq("tenant_id",tenantId).eq("payment_type","payment").not("purchase_invoice_id","is",null),
    db.from("purchase_debit_notes").select("goods_receipt_id,subtotal").eq("tenant_id",tenantId).eq("status","posted")
   ]);
