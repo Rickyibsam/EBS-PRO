@@ -235,7 +235,8 @@ test("delivered outcomes require an atomic customer signature and legacy RPC can
   assert.ok(atomicMigration.includes("A customer signature is required for delivered or short-delivered outcomes."));
   assert.ok(atomicMigration.includes("perform public.save_delivery_pod_signature(p_delivery_id, p_signature)"));
   assert.ok(legacyGuard.includes("A customer signature is required; use the signature-aware delivery workflow."));
-  assert.ok(smoke.includes("POD signature was not saved atomically with delivery posting"));
+  assert.ok(smoke.includes("POD signature or GPS coordinates were not saved atomically with delivery posting"));
+  assert.ok(smoke.includes("latitude=33.5651 and longitude=73.0169"));
   assert.ok(smoke.includes("delivered outcome was accepted without a customer signature"));
 });
 
@@ -253,7 +254,24 @@ test("delivered outcomes require an atomic customer signature and legacy RPC can
   assert.ok(atomicMigration.includes("A customer signature is required for delivered or short-delivered outcomes."));
   assert.ok(atomicMigration.includes("perform public.save_delivery_pod_signature(p_delivery_id, p_signature)"));
   assert.ok(legacyGuard.includes("A customer signature is required; use the signature-aware delivery workflow."));
-  assert.ok(smoke.includes("POD signature was not saved atomically with delivery posting"));
+  assert.ok(smoke.includes("POD signature or GPS coordinates were not saved atomically with delivery posting"));
+  assert.ok(smoke.includes("latitude=33.5651 and longitude=73.0169"));
   assert.ok(smoke.includes("delivered outcome was accepted without a customer signature"));
   assert.ok(smoke.includes("legacy delivery RPC bypassed POD signature requirement"));
+});
+
+
+test("delivery PWA captures GPS and persists it through offline retry and atomic POD", async () => {
+  const deliveryModule = await readFile(new URL("../src/DeliveryManModule.tsx", import.meta.url), "utf8");
+  const offlineQueue = await readFile(new URL("../src/deliveryOfflineQueue.ts", import.meta.url), "utf8");
+  const gpsMigration = await readFile(
+    new URL("../supabase/migrations/20261107103707_add_delivery_pod_gps_capture.sql", import.meta.url),
+    "utf8"
+  );
+  assert.ok(deliveryModule.includes("navigator.geolocation.getCurrentPosition"));
+  assert.ok(deliveryModule.includes("p_latitude:latitude,p_longitude:longitude"));
+  assert.ok(deliveryModule.includes("p_latitude:item.latitude??null,p_longitude:item.longitude??null"));
+  assert.ok(offlineQueue.includes("latitude?:number|null; longitude?:number|null;"));
+  assert.ok(gpsMigration.includes("GPS coordinates are outside valid ranges."));
+  assert.ok(gpsMigration.includes("private.attach_delivery_visit_gps_internal"));
 });

@@ -65,13 +65,15 @@ test("failed offline retries retain stable idempotency keys and delivery POD pro
  assert.equal(secondOrder.requestId,firstOrder.requestId);
 
  const signature=[{x:10,y:10,move:true},{x:20,y:20,move:false}];
- const delivery={id:"retry-delivery",idempotency_key:"stable-delivery-request",vehicle_number:"ABC",user_id:user,tenant_id:tenant,delivery_id:"delivery",delivery_man_employee_id:"employee",customer_id:"customer",visit_status:"delivered",shops_visited:1,line_quantities:[],notes:null,created_by:user,queued_at:"2026-11-06T00:00:00.000Z",proof_of_delivery_signature:signature};
+ const delivery={id:"retry-delivery",idempotency_key:"stable-delivery-request",vehicle_number:"ABC",user_id:user,tenant_id:tenant,delivery_id:"delivery",delivery_man_employee_id:"employee",customer_id:"customer",visit_status:"delivered",shops_visited:1,line_quantities:[],notes:null,created_by:user,queued_at:"2026-11-06T00:00:00.000Z",proof_of_delivery_signature:signature,latitude:33.5651,longitude:73.0169};
  await queueDeliveryVisit(delivery);
  const firstDelivery=(await getQueuedDeliveryVisits(tenant,user))[0];
  const secondDelivery=(await getQueuedDeliveryVisits(tenant,user))[0];
  assert.equal(firstDelivery.idempotency_key,"stable-delivery-request");
  assert.equal(secondDelivery.idempotency_key,firstDelivery.idempotency_key);
  assert.deepEqual(secondDelivery.proof_of_delivery_signature,signature);
+ assert.equal(secondDelivery.latitude,33.5651);
+ assert.equal(secondDelivery.longitude,73.0169);
  assert.equal((await getPendingBookerOrders(tenant,user)).length,1);
  assert.equal((await getQueuedDeliveryVisits(tenant,user)).length,1);
  await removePendingBookerOrder(order.id);
