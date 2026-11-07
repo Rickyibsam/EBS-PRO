@@ -121,7 +121,7 @@ export default function WorkspaceModule({ db, tenantId, module, currentRole }: {
     setSaving(false);
   }
 
-  if (!isProducts && !isParties) return <section className="module-empty"><h2>{module}</h2><p>Is module ka database-backed workflow aglay development phase mein add hoga. Existing data aur database structure ko preserve kiya ja raha hai.</p></section>;
+  if (!isProducts && !isParties) return <section className="module-empty"><h2>Unsupported master-data route</h2><p>WorkspaceModule handles only Products, Customers and Vendors. Other ERP modules must use their dedicated workflow component.</p></section>;
 
   return <section className="module-page">
     <div className="module-toolbar"><div><h2>{isProducts ? "Product Master" : partyType === "supplier" ? "Vendor Master" : "Customer Master"}</h2><p>{isProducts ? "Manage SKUs, brands, barcodes, and stock controls." : "Manage business contacts, credit limits, and opening balances."}</p></div>{canCreate&&<button className="primary-action" onClick={() => { setShowForm(!showForm); setNotice(""); }}>{showForm ? "Close form" : isProducts ? "+ Add product" : partyType === "supplier" ? "+ Add Vendor" : "+ Add customer"}</button>}</div>

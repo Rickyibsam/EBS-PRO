@@ -67,6 +67,7 @@ The application has 10 module groups. The navigation and module screens are pres
 - **Delivery POD integrity:** delivered/short-delivered outcomes require a valid customer signature (2–4,000 drawing points). The signature-aware RPC stores the proof in the same database transaction as delivery completion; the legacy five-argument RPC is blocked from posting delivered outcomes.
 - **Mobile network retry:** Booker and Delivery PWA queues now preserve request idempotency keys and retry after transient fetch/network failures even when the browser still reports itself online.
 - **Failed delivery protection:** not-available/refused visits zero their quantities in the UI and a database trigger rejects non-zero delivery/return quantities, preventing accidental stock, COGS or invoice posting.
+- **Navigation coverage:** all 44 navigation entries have an explicit route. WorkspaceModule is limited to Products, Customers and Vendors; office users opening Delivery Man App receive a handoff to Distribution and Team & Employees instead of an unfinished placeholder.
 - **Automated tests:** the current GitHub Actions run passes all 55 automated tests, followed by the TypeScript/Vite production build. The suite covers permission resolution, barcode matching, Booker/Delivery offline queues, workflow invariants, RLS policy coverage and transaction smoke-test assertions.
 - **Critical workflow defects found and fixed during transactional testing:**
   - The document-number allocator used obsolete column names and omitted the required branch key; it now uses the current branch-aware sequence schema.
@@ -86,7 +87,7 @@ The following database smoke workflows were run as authenticated owner/staff con
 - Security: per-user module denial/grant enforcement, owner-managed permission row access, personal notification inbox access, cross-company customer-record read/write isolation, direct custom-denial checks on app settings/fixed assets/budgets/budget lines, and restrictive guards for all 308 module/action policy commands.
 - Client offline storage: all Booker and deliveryman IndexedDB unit tests passed.
 
-The latest main-branch GitHub Actions run completed successfully: **71/71 automated tests passed**, the TypeScript/Vite production build passed, and 10 production browser/mobile-emulation tests passed (2 desktop-only skips). The current Render deployment is live.
+The latest main-branch GitHub Actions run completed successfully: **73/73 automated tests passed**, the TypeScript/Vite production build passed, and 10 production browser/mobile-emulation tests passed (2 desktop-only skips). The current Render deployment is live.
 
 The commission clawback regression workflow verifies partial recovery capped by available net salary, zero-net payroll posting, duplicate retry prevention, carry-forward into a later payroll, and payroll GL totals. The payroll posting function omits zero-value journal lines and rejects zero-gross runs. Purchase returns, fixed-asset depreciation/disposal, budget controls, and backup/restore dependency checks are also covered by rollback-only database scenarios.
 
