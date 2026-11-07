@@ -1,3 +1,4 @@
+import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import {useEffect,useMemo,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 type Metric={label:string;value:string;detail:string;icon:string;tone:string};
@@ -38,12 +39,12 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
    db.from("payments").select("amount,payment_type").eq("tenant_id",tenantId).eq("payment_date",today),
    db.from("deliveries").select("id",{count:"exact",head:true}).eq("tenant_id",tenantId).in("status",["pending","picked","dispatched"]),
    db.rpc("get_low_stock_alerts",{p_tenant_id:tenantId}),
-   db.from("audit_logs").select("id,action,entity_type,created_at",{count:"exact"}).eq("tenant_id",tenantId).gte("created_at",since).order("created_at",{ascending:false}).limit(6),
+   fetchAllRowsResult<any>((from,to)=>db.from("audit_logs").select("id,action,entity_type,created_at",{count:"exact"}).eq("tenant_id",tenantId).gte("created_at",since).order("created_at",{ascending:false}).order("id",{ascending:true}).range(from,to)),
    db.rpc("get_inventory_valuation",{p_tenant_id:tenantId}),
    db.from("chart_of_accounts").select("id,account_type").eq("tenant_id",tenantId),
    db.from("journal_lines").select("account_id,debit,credit,journal_entries!inner(entry_date,status)").eq("tenant_id",tenantId).eq("journal_entries.status","posted").eq("journal_entries.entry_date",today),
-   db.from("sales_orders").select("id,order_number,status").eq("tenant_id",tenantId).in("status",["draft","submitted"]).limit(100),
-   db.from("sales_invoices").select("id,invoice_number,due_date,grand_total").eq("tenant_id",tenantId).eq("status","posted").lt("due_date",today).limit(1000),
+   fetchAllRowsResult<any>((from,to)=>db.from("sales_orders").select("id,order_number,status").eq("tenant_id",tenantId).in("status",["draft","submitted"]).order("id",{ascending:true}).range(from,to)),
+   fetchAllRowsResult<any>((from,to)=>db.from("sales_invoices").select("id,invoice_number,due_date,grand_total").eq("tenant_id",tenantId).eq("status","posted").lt("due_date",today).order("id",{ascending:true}).range(from,to)),
    db.from("sales_invoices").select("grand_total,invoice_date").eq("tenant_id",tenantId).eq("status","posted").gte("invoice_date",trendStart).lte("invoice_date",today),
    db.from("purchase_invoices").select("grand_total,invoice_date").eq("tenant_id",tenantId).eq("status","posted").gte("invoice_date",trendStart).lte("invoice_date",today),
    db.from("payments").select("amount,payment_type,payment_date").eq("tenant_id",tenantId).gte("payment_date",trendStart).lte("payment_date",today)
@@ -93,7 +94,7 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
     if(upsertError)throw upsertError;
    }
    if(userId){
-    const {data:inbox,error:inboxError}=await db.from("user_notifications").select("id,title,body,module_key,severity,read_at,created_at").eq("tenant_id",tenantId).eq("user_id",userId).order("created_at",{ascending:false}).limit(30);
+    const {data:inbox,error:inboxError}=await fetchAllRowsResult<any>((from,to)=>db.from("user_notifications").select("id,title,body,module_key,severity,read_at,created_at").eq("tenant_id",tenantId).eq("user_id",userId).order("created_at",{ascending:false}).order("id",{ascending:true}).range(from,to));
     if(inboxError)throw inboxError;
     setNotifications((inbox||[]).map(item=>({id:item.id,title:item.title,detail:item.body,module:item.module_key,level:item.severity==="warning"?"warning":"info",read_at:item.read_at})));
    }
