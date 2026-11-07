@@ -651,6 +651,7 @@ begin
      or jsonb_array_length(v_restore_fixture_backup->'tables'->'branches')<1 then
     raise exception 'FAIL: isolated tenant backup did not include its branch fixture';
   end if;
+  delete from public.warehouses where tenant_id=v_tenant_b and branch_id=v_branch_b;
   delete from public.branches where tenant_id=v_tenant_b and id=v_branch_b;
   v_restore_fixture_result:=public.restore_tenant_backup(v_tenant_b,v_restore_fixture_backup);
   if coalesce((v_restore_fixture_result->>'success')::boolean,false) is not true
