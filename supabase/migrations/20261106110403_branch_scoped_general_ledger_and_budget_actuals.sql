@@ -1,3 +1,6 @@
+-- Restored from the hosted Supabase migration ledger.
+-- Original applied statements are preserved below.
+
 -- Add a branch dimension to the general ledger and infer it from source documents.
 -- Existing journal/business rows are not rewritten; historical unassigned entries remain explicitly unassigned.
 alter table public.journal_entries add column if not exists branch_id uuid references public.branches(id) on delete set null;

@@ -1,3 +1,6 @@
+-- Restored from the hosted Supabase migration ledger.
+-- Original applied statements are preserved below.
+
 -- Read-only cross-module reconciliation summary for the tenant's operational and financial chains.
 create or replace function public.get_erp_integration_reconciliation(p_tenant_id uuid)
 returns jsonb

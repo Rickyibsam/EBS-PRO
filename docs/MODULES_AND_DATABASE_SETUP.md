@@ -116,13 +116,13 @@ The hosted Supabase database currently has **82 public base tables**; all 82 hav
 
 The current hosted project has existing organization and sample/test records. Examples at the time of the latest audit include one organization, two tenant memberships, one employee, one sales order, one purchase order, one goods receipt and one journal entry. There were no posted sales invoices or deliveries at that time. This is a small test dataset, not evidence that all workflows have been exercised.
 
-## Important migration caution
+## Database migration history
 
-Do **not** run only `001_initial_erp_core.sql` against the already configured hosted database. That file is an older bootstrap artifact and is not the complete current schema. The hosted database has a much larger sequence of later migrations.
+The hosted Supabase migration ledger currently records **183 applied migrations**. The repository migration stream has been restored to the same 183 timestamped versions using the original SQL statements retained in `supabase_migrations.schema_migrations`. The recovery was performed as a GitHub source-history change only; it did **not** apply DDL, alter the hosted database, or touch business records.
 
-The hosted database currently records **182 applied migrations**, while the repository contains **65 SQL migration files**. A timestamp-level comparison finds **121 applied migration versions that are not present under the same version in the current repository file set**; two later repository migrations correspond to earlier applied versions, and the two untimestamped bootstrap files are not the current hosted schema. Therefore a clean-room rebuild is **not reproducible/certified yet**. This is a real development/release blocker: the full historical migration chain or a reviewed baseline schema snapshot must be restored to version control before creating a fresh production database. Do not reset or delete the existing project to try it.
+Two old non-timestamped bootstrap scripts are archived under `docs/legacy-sql/` for historical reference and are not part of the current migration stream. Two duplicate later-version copies of migrations already recorded under their original applied versions have been removed from the migration stream. A version-by-version count match is necessary for reproducibility, but a **clean-room replay has not been certified**; it still requires a separate disposable database/project rehearsal. Do not reset, delete or recreate the existing production project to attempt this.
 
-Apply future schema changes as versioned migrations, keep the matching SQL file in this repository, and explicitly grant only the API roles that need access. Never expose the service-role key in frontend code.
+Apply future schema changes as timestamped SQL migrations, commit each migration alongside its application changes, and explicitly grant only the API roles that need access. Never expose the service-role key in frontend code.
 
 ## Free-tier and operational constraints
 
