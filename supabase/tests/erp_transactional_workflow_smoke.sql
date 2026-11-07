@@ -71,6 +71,8 @@ declare
   v_budget_branch_supported boolean;
   v_backup jsonb;
   v_restore jsonb;
+  v_restore_fixture_backup jsonb;
+  v_restore_fixture_result jsonb;
   v_permission_rejected boolean := false;
   v_second_warehouse uuid := gen_random_uuid();
   v_stock_transfer uuid := gen_random_uuid();
@@ -639,6 +641,23 @@ begin
     raise exception 'FAIL: denied custom-permission update changed app settings';
   end if;
   perform set_config('request.jwt.claim.sub',v_user::text,true);
+
+
+  -- Additive restore into a same-tenant fixture with a deliberately missing row.
+  insert into public.tenant_memberships(tenant_id,user_id,role,is_active)
+  values(v_tenant_b,v_user,'owner',true);
+  v_restore_fixture_backup:=public.export_tenant_backup(v_tenant_b);
+  if jsonb_typeof(v_restore_fixture_backup->'tables'->'branches')<>'array'
+     or jsonb_array_length(v_restore_fixture_backup->'tables'->'branches')<1 then
+    raise exception 'FAIL: isolated tenant backup did not include its branch fixture';
+  end if;
+  delete from public.branches where tenant_id=v_tenant_b and id=v_branch_b;
+  v_restore_fixture_result:=public.restore_tenant_backup(v_tenant_b,v_restore_fixture_backup);
+  if coalesce((v_restore_fixture_result->>'success')::boolean,false) is not true
+     or coalesce((v_restore_fixture_result->>'imported_rows')::integer,0)<1
+     or not exists(select 1 from public.branches where tenant_id=v_tenant_b and id=v_branch_b) then
+    raise exception 'FAIL: additive restore did not recover a missing branch row: %',v_restore_fixture_result;
+  end if;
 
   -- Balanced journal must post and preserve double-entry equality.
   insert into public.journal_entries(id,tenant_id,journal_number,entry_date,narration,status,created_by)
