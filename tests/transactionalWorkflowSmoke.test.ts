@@ -55,6 +55,15 @@ test("payroll workflow posts accrual, pays once, and rejects invalid calculation
   assert.ok(smoke.includes("invalid payroll arithmetic was not safely rejected"));
 });
 
+test("commission clawback caps deductions, retries idempotently, carries balances forward and posts to payroll GL", () => {
+  assert.ok(smoke.includes("public.apply_commission_return_adjustments(v_clawback_run_one)"));
+  assert.ok(smoke.includes("public.apply_commission_return_adjustments(v_clawback_run_two)"));
+  assert.ok(smoke.includes("partial commission clawback did not cap recovery"));
+  assert.ok(smoke.includes("commission clawback retry applied a duplicate adjustment"));
+  assert.ok(smoke.includes("outstanding clawback did not carry forward"));
+  assert.ok(smoke.includes("recovered commission clawback did not reconcile to payroll GL"));
+});
+
 test("fixed asset workflow posts depreciation once and disposes with a balanced GL journal", () => {
   assert.ok(smoke.includes("public.post_asset_monthly_depreciation("));
   assert.ok(smoke.includes("v_depreciation_retry"));
