@@ -318,6 +318,8 @@ begin
   values(v_van_route,v_tenant_a,v_branch_a,'TX-VAN-ROUTE','Smoke Test Van Route');
   insert into public.route_assignments(tenant_id,route_id,employee_id,assigned_from)
   values(v_tenant_a,v_van_route,v_employee,current_date);
+  insert into public.route_customers(tenant_id,route_id,customer_id)
+  values(v_tenant_a,v_van_route,v_customer);
   perform set_config('request.jwt.claim.sub',v_booker_user::text,true);
   v_van_order:=public.create_order_booker_order(
     v_tenant_a,v_van_route,v_customer,v_van_order_request,current_date+1,'Smoke test van delivery',
