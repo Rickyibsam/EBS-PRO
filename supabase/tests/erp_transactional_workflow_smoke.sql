@@ -387,6 +387,29 @@ begin
          and latitude=33.5651 and longitude=73.0169) then
     raise exception 'FAIL: POD signature or GPS coordinates were not saved atomically with delivery posting';
   end if;
+  v_rejected:=false;
+  begin
+    perform public.record_van_delivery_visit(
+      v_van_delivery,'short_delivered',
+      jsonb_build_array(jsonb_build_object(
+        'delivery_line_id',v_van_line,'delivered_quantity_base',2,
+        'market_return_quantity_base',1,'return_batch_number',null,'return_expiry_date',null
+      )),
+      'Invalid GPS bounds test',
+      'TX-VAN-VISIT-0001',
+      jsonb_build_array(
+        jsonb_build_object('x',0.1,'y',0.2,'move',true),
+        jsonb_build_object('x',0.3,'y',0.4,'move',false)
+      ),
+      91,73.0169
+    );
+  exception when sqlstate '22023' then
+    v_rejected:=true;
+  end;
+  if not v_rejected then
+    raise exception 'FAIL: out-of-range delivery GPS coordinates were accepted';
+  end if;
+
   v_van_visit_retry:=public.record_van_delivery_visit(
     v_van_delivery,'short_delivered',
     jsonb_build_array(jsonb_build_object(
