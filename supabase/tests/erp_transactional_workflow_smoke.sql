@@ -373,16 +373,19 @@ begin
     jsonb_build_array(
       jsonb_build_object('x',0.1,'y',0.2,'move',true),
       jsonb_build_object('x',0.3,'y',0.4,'move',false)
-    )
+    ),
+    33.5651,73.0169
   );
   if coalesce((v_van_visit_result->>'success')::boolean,false) is not true
      or coalesce((v_van_visit_result->>'sold_quantity')::numeric,0)<>1
      or coalesce((v_van_visit_result->>'returned_quantity')::numeric,0)<>1 then
     raise exception 'FAIL: partial van delivery and market return did not reconcile: %',v_van_visit_result;
   end if;
-  if (select proof_of_delivery_signature from public.delivery_shop_visits
-      where tenant_id=v_tenant_a and delivery_id=v_van_delivery) is null then
-    raise exception 'FAIL: POD signature was not saved atomically with delivery posting';
+  if not exists(select 1 from public.delivery_shop_visits
+       where tenant_id=v_tenant_a and delivery_id=v_van_delivery
+         and proof_of_delivery_signature is not null
+         and latitude=33.5651 and longitude=73.0169) then
+    raise exception 'FAIL: POD signature or GPS coordinates were not saved atomically with delivery posting';
   end if;
   v_van_visit_retry:=public.record_van_delivery_visit(
     v_van_delivery,'short_delivered',
@@ -395,7 +398,8 @@ begin
     jsonb_build_array(
       jsonb_build_object('x',0.1,'y',0.2,'move',true),
       jsonb_build_object('x',0.3,'y',0.4,'move',false)
-    )
+    ),
+    33.5651,73.0169
   );
   if coalesce((v_van_visit_retry->>'replayed')::boolean,false) is not true then
     raise exception 'FAIL: van delivery visit retry was not idempotent';
