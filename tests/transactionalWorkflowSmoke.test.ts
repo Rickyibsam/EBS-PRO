@@ -64,6 +64,18 @@ test("commission clawback caps deductions, retries idempotently, carries balance
   assert.ok(smoke.includes("recovered commission clawback did not reconcile to payroll GL"));
 });
 
+test("zero-net payroll omits zero-value journal lines while preserving double-entry totals", async () => {
+  const migration = await readFile(
+    new URL("../supabase/migrations/20261107060457_fix_zero_net_payroll_journal_lines.sql", import.meta.url),
+    "utf8"
+  );
+  assert.ok(migration.includes("if v_net>0 then"));
+  assert.ok(migration.includes("if v_ded>0 then"));
+  assert.ok(migration.includes("if v_gross<=0 then"));
+  assert.ok(smoke.includes("gross_total=100 and deductions_total=100 and net_total=0"));
+  assert.ok(smoke.includes("gross_total=200 and deductions_total=60 and net_total=140"));
+});
+
 test("fixed asset workflow posts depreciation once and disposes with a balanced GL journal", () => {
   assert.ok(smoke.includes("public.post_asset_monthly_depreciation("));
   assert.ok(smoke.includes("v_depreciation_retry"));
