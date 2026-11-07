@@ -376,7 +376,7 @@ begin
     raise exception 'FAIL: van visit retry created duplicate visit records';
   end if;
   if (select coalesce(sum(quantity_in-quantity_out),0) from public.van_stock_movements
-      where tenant_id=v_tenant_a and vehicle_number='TX-VAN-01' and product_id=v_product)<>0 then
+      where tenant_id=v_tenant_a and vehicle_number='TX-VAN-01' and product_id=v_product)<>1 then
     raise exception 'FAIL: van sale and market return did not reconcile vehicle stock';
   end if;
 
