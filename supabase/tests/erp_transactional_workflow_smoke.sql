@@ -72,6 +72,16 @@ declare
   v_backup jsonb;
   v_restore jsonb;
   v_permission_rejected boolean := false;
+  v_second_warehouse uuid := gen_random_uuid();
+  v_stock_transfer uuid := gen_random_uuid();
+  v_stock_transfer_line uuid := gen_random_uuid();
+  v_stock_transfer_result jsonb;
+  v_stock_take uuid;
+  v_stock_take_result jsonb;
+  v_attendance_result jsonb;
+  v_leave_id uuid := gen_random_uuid();
+  v_leave_result jsonb;
+  v_signature_result jsonb;
 begin
   select user_id into v_user
   from public.tenant_memberships
@@ -391,6 +401,104 @@ begin
      or coalesce((v_restore->>'imported_rows')::integer,-1)<>0
      or v_restore->>'mode'<>'additive_only_no_overwrite_no_delete' then
     raise exception 'FAIL: same-tenant backup restore was not complete and idempotent: %',v_restore;
+  end if;
+
+
+  -- Stock transfer: move one available unit between warehouses atomically.
+  insert into public.warehouses(id,tenant_id,branch_id,name,code)
+  values(v_second_warehouse,v_tenant_a,v_branch_a,'Smoke Test Transfer Warehouse','TX-WH-2');
+  insert into public.stock_transfers(
+    id,tenant_id,transfer_number,from_warehouse_id,to_warehouse_id,
+    transfer_date,status,created_by
+  ) values(
+    v_stock_transfer,v_tenant_a,'TX-ST-001',v_warehouse,v_second_warehouse,
+    current_date,'draft',v_user
+  );
+  insert into public.stock_transfer_lines(
+    id,tenant_id,stock_transfer_id,product_id,quantity_base,unit_cost
+  ) values(v_stock_transfer_line,v_tenant_a,v_stock_transfer,v_product,1,0);
+  v_stock_transfer_result:=public.post_stock_transfer(v_stock_transfer);
+  if coalesce((v_stock_transfer_result->>'success')::boolean,false) is not true
+     or v_stock_transfer_result->>'status'<>'posted' then
+    raise exception 'FAIL: stock transfer did not post: %',v_stock_transfer_result;
+  end if;
+  if (select coalesce(sum(quantity_in-quantity_out),0) from public.stock_movements
+      where tenant_id=v_tenant_a and warehouse_id=v_warehouse and product_id=v_product)<>1
+     or (select coalesce(sum(quantity_in-quantity_out),0) from public.stock_movements
+      where tenant_id=v_tenant_a and warehouse_id=v_second_warehouse and product_id=v_product)<>1 then
+    raise exception 'FAIL: stock transfer did not preserve source/destination balances';
+  end if;
+
+  -- Physical stock count: verify snapshot concurrency guard and variance posting.
+  v_stock_take:=public.create_stock_take(
+    v_tenant_a,v_warehouse,current_date,
+    jsonb_build_array(jsonb_build_object(
+      'product_id',v_product,'counted_quantity',0,'expected_quantity',1
+    )),
+    'Rollback-only stock take acceptance test'
+  );
+  v_stock_take_result:=public.post_stock_take(v_stock_take);
+  if coalesce((v_stock_take_result->>'success')::boolean,false) is not true
+     or coalesce((v_stock_take_result->>'adjusted_lines')::integer,-1)<>1 then
+    raise exception 'FAIL: physical stock variance did not post: %',v_stock_take_result;
+  end if;
+  if not exists(select 1 from public.stock_movements
+    where tenant_id=v_tenant_a and reference_type='stock_take'
+      and reference_id=v_stock_take and quantity_out=1) then
+    raise exception 'FAIL: physical stock count did not create the variance movement';
+  end if;
+  v_rejected:=false;
+  begin
+    perform public.post_stock_take(v_stock_take);
+  exception when others then
+    v_rejected:=true;
+  end;
+  if not v_rejected then raise exception 'FAIL: posted stock take was posted twice'; end if;
+
+  -- Delivery POD: attach a customer signature only after the outcome is saved.
+  insert into public.delivery_shop_visits(
+    tenant_id,delivery_id,delivery_man_employee_id,customer_id,
+    visit_status,shops_visited,line_quantities,created_by
+  )
+  select v_tenant_a,v_delivery_id,v_employee,v_customer,'delivered',1,'[]'::jsonb,v_user
+  on conflict(tenant_id,delivery_id) do update
+    set visit_status='delivered',line_quantities='[]'::jsonb;
+  v_signature_result:=public.save_delivery_pod_signature(
+    v_delivery_id,
+    jsonb_build_array(
+      jsonb_build_object('x',0.1,'y',0.2),
+      jsonb_build_object('x',0.3,'y',0.4)
+    )
+  );
+  if coalesce((v_signature_result->>'success')::boolean,false) is not true
+     or (select proof_of_delivery_signature from public.delivery_shop_visits
+         where tenant_id=v_tenant_a and delivery_id=v_delivery_id) is null then
+    raise exception 'FAIL: delivery POD signature was not persisted';
+  end if;
+
+  -- HR: attendance upsert and manager-approved leave decision.
+  v_attendance_result:=public.record_employee_attendance(
+    v_tenant_a,v_employee,current_date,'present',
+    (current_date::text||' 09:00:00+05')::timestamptz,
+    (current_date::text||' 17:00:00+05')::timestamptz,
+    'Rollback-only attendance acceptance test'
+  );
+  if coalesce((v_attendance_result->>'success')::boolean,false) is not true
+     or not exists(select 1 from public.employee_attendance
+       where tenant_id=v_tenant_a and employee_id=v_employee
+         and attendance_date=current_date and status='present') then
+    raise exception 'FAIL: employee attendance was not recorded';
+  end if;
+  insert into public.employee_leaves(
+    id,tenant_id,employee_id,leave_type,start_date,end_date,total_days,reason,created_by
+  ) values(
+    v_leave_id,v_tenant_a,v_employee,'annual',current_date+1,current_date+2,2,
+    'Rollback-only leave acceptance test',v_user
+  );
+  v_leave_result:=public.decide_employee_leave(v_leave_id,'approved');
+  if coalesce((v_leave_result->>'success')::boolean,false) is not true
+     or (select status from public.employee_leaves where id=v_leave_id)<>'approved' then
+    raise exception 'FAIL: employee leave approval was not recorded';
   end if;
 
   -- Balanced journal must post and preserve double-entry equality.
