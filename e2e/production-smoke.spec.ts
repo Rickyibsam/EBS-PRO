@@ -20,6 +20,40 @@ test("signup form exposes required fields and strong-password guidance", async (
   await expect(page.getByText(/12\+ characters, uppercase and lowercase/i)).toBeVisible();
 });
 
+test("signup handles a confirmation-required Auth response", async ({ page }) => {
+  await page.route("**/auth/v1/signup*", async route => {
+    if (route.request().method() === "OPTIONS") {
+      await route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-methods": "POST, OPTIONS", "access-control-allow-headers": "*" } });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      headers: { "access-control-allow-origin": "*" },
+      body: JSON.stringify({
+        id: "11111111-1111-4111-8111-111111111111",
+        aud: "authenticated",
+        role: "authenticated",
+        email: "browser-smoke@example.invalid",
+        email_confirmed_at: null,
+        confirmation_sent_at: new Date().toISOString(),
+        app_metadata: { provider: "email", providers: ["email"] },
+        user_metadata: { full_name: "Browser Smoke Test" },
+        identities: [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+    });
+  });
+  await page.goto("/");
+  await page.getByText("Create account", { exact: true }).click();
+  await page.getByLabel("Full name").fill("Browser Smoke Test");
+  await page.getByLabel("Email address").fill("browser-smoke@example.invalid");
+  await page.getByLabel("Password").fill("StrongSmokePass!2026");
+  await page.getByRole("button", { name: /Create account/ }).click();
+  await expect(page.getByText(/Account created\. Check your inbox and confirm your email address/i)).toBeVisible();
+});
+
 test("forgot-password request returns a clear confirmation without exposing account existence", async ({ page }) => {
   await page.route("**/auth/v1/recover*", async route => {
     if (route.request().method() === "OPTIONS") {
