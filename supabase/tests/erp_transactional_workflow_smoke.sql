@@ -82,6 +82,7 @@ declare
   v_leave_id uuid := gen_random_uuid();
   v_leave_result jsonb;
   v_signature_result jsonb;
+  v_rls_rows integer := -1;
 begin
   select user_id into v_user
   from public.tenant_memberships
@@ -500,6 +501,31 @@ begin
      or (select status from public.employee_leaves where id=v_leave_id)<>'approved' then
     raise exception 'FAIL: employee leave approval was not recorded';
   end if;
+
+
+  -- Custom per-user permission must restrict direct table writes, not just RPC/UI actions.
+  update public.tenant_memberships
+  set role='manager'
+  where tenant_id=v_tenant_a and user_id=v_booker_user;
+  insert into public.tenant_user_module_permissions(
+    tenant_id,user_id,module_key,can_view,can_create,can_update,can_delete
+  ) values(v_tenant_a,v_booker_user,'administration_security',true,true,false,false);
+  insert into public.app_settings(tenant_id,settings)
+  values(v_tenant_a,'{"permission_test":"original"}'::jsonb);
+  perform set_config('request.jwt.claim.sub',v_booker_user::text,true);
+  execute 'set local role authenticated';
+  update public.app_settings
+  set settings='{"permission_test":"should_not_change"}'::jsonb
+  where tenant_id=v_tenant_a;
+  get diagnostics v_rls_rows = row_count;
+  execute 'reset role';
+  if v_rls_rows<>0 then
+    raise exception 'FAIL: direct RLS update bypassed custom per-user update denial';
+  end if;
+  if (select settings->>'permission_test' from public.app_settings where tenant_id=v_tenant_a)<>'original' then
+    raise exception 'FAIL: denied custom-permission update changed app settings';
+  end if;
+  perform set_config('request.jwt.claim.sub',v_user::text,true);
 
   -- Balanced journal must post and preserve double-entry equality.
   insert into public.journal_entries(id,tenant_id,journal_number,entry_date,narration,status,created_by)
