@@ -123,3 +123,6 @@ The remaining verification limits are listed in **Remaining verification limits*
 ## Browser and mobile-emulation verification
 
 The CI workflow now runs Playwright against the deployed EBS PRO production URL after unit tests and the production build. It checks the public sign-in page, signup form requirements, password-recovery UI response, mobile viewport layout, and Chromium GPS/camera permission APIs using a simulated device. The simulated camera/GPS checks are browser automation only; they do not certify a physical Android/iOS handset, real camera hardware, background suspension, network transitions, or field-worker end-to-end sync. Those still require a real device and a test tenant.
+
+
+The rollback-only database smoke test now exercises a clean isolated tenant fixture containing a branch, warehouse, unit of measure and product. It exports that tenant's backup, removes the dependency graph inside the test transaction, restores it additively, verifies all four records and their foreign-key relationships, then repeats restore to confirm idempotency. The entire test transaction is rolled back; it does not delete or alter live business data.
