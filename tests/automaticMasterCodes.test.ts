@@ -3,15 +3,15 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const migration = await readFile(
-  new URL("../supabase/migrations/20261107070000_auto_generate_master_entry_codes.sql", import.meta.url),
+  new URL("../supabase/migrations/20261107064125_auto_generate_master_entry_codes.sql", import.meta.url),
   "utf8"
 );
 const extension = await readFile(
-  new URL("../supabase/migrations/20261107071000_auto_generate_additional_master_codes.sql", import.meta.url),
+  new URL("../supabase/migrations/20261107064206_auto_generate_additional_master_codes.sql", import.meta.url),
   "utf8"
 );
 const securityMigration = await readFile(
-  new URL("../supabase/migrations/20261107071500_deny_client_access_to_master_code_sequences.sql", import.meta.url),
+  new URL("../supabase/migrations/20261107064324_deny_client_access_to_master_code_sequences.sql", import.meta.url),
   "utf8"
 );
 const integration = await readFile(
