@@ -157,7 +157,7 @@ test("custom permission matrix enforces view and create/update/delete actions ac
 
 test("legacy FOR ALL policies receive restrictive per-action custom permission guards", async () => {
   const migration = await readFile(
-    new URL("../supabase/migrations/20261107060000_guard_legacy_all_command_rls_policies.sql", import.meta.url),
+    new URL("../supabase/migrations/20261107054702_guard_legacy_all_command_rls_policies.sql", import.meta.url),
     "utf8"
   );
   for (const table of [
