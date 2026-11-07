@@ -477,6 +477,25 @@ begin
     raise exception 'FAIL: delivered outcome was accepted without a customer signature';
   end if;
 
+  -- The legacy five-argument RPC cannot bypass the POD signature requirement.
+  v_rejected:=false;
+  begin
+    perform public.record_van_delivery_visit(
+      v_failed_delivery,'delivered',
+      jsonb_build_array(jsonb_build_object(
+        'delivery_line_id',v_failed_line,'delivered_quantity_base',0,
+        'market_return_quantity_base',0,'return_batch_number',null,'return_expiry_date',null
+      )),
+      'Legacy RPC without POD signature',
+      'TX-VAN-LEGACY-POD-0001'
+    );
+  exception when check_violation then
+    v_rejected:=true;
+  end;
+  if not v_rejected then
+    raise exception 'FAIL: legacy delivery RPC bypassed POD signature requirement';
+  end if;
+
   -- Payroll accrual -> GL -> salary payment -> idempotent payment retry.
   insert into public.payroll_runs(id,tenant_id,run_number,period_start,period_end,pay_date,status,created_by)
   values(v_payroll_run,v_tenant_a,'TX-PAY-001',current_date-30,current_date-1,current_date,'draft',v_user);
