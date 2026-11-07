@@ -369,12 +369,20 @@ begin
       'market_return_quantity_base',1,'return_batch_number',null,'return_expiry_date',null
     )),
     'One unit sold, one unit returned to van',
-    'TX-VAN-VISIT-0001'
+    'TX-VAN-VISIT-0001',
+    jsonb_build_array(
+      jsonb_build_object('x',0.1,'y',0.2,'move',true),
+      jsonb_build_object('x',0.3,'y',0.4,'move',false)
+    )
   );
   if coalesce((v_van_visit_result->>'success')::boolean,false) is not true
      or coalesce((v_van_visit_result->>'sold_quantity')::numeric,0)<>1
      or coalesce((v_van_visit_result->>'returned_quantity')::numeric,0)<>1 then
     raise exception 'FAIL: partial van delivery and market return did not reconcile: %',v_van_visit_result;
+  end if;
+  if (select proof_of_delivery_signature from public.delivery_shop_visits
+      where tenant_id=v_tenant_a and delivery_id=v_van_delivery) is null then
+    raise exception 'FAIL: POD signature was not saved atomically with delivery posting';
   end if;
   v_van_visit_retry:=public.record_van_delivery_visit(
     v_van_delivery,'short_delivered',
@@ -383,7 +391,11 @@ begin
       'market_return_quantity_base',1,'return_batch_number',null,'return_expiry_date',null
     )),
     'Retry of the same van visit',
-    'TX-VAN-VISIT-0001'
+    'TX-VAN-VISIT-0001',
+    jsonb_build_array(
+      jsonb_build_object('x',0.1,'y',0.2,'move',true),
+      jsonb_build_object('x',0.3,'y',0.4,'move',false)
+    )
   );
   if coalesce((v_van_visit_retry->>'replayed')::boolean,false) is not true then
     raise exception 'FAIL: van delivery visit retry was not idempotent';
@@ -443,6 +455,45 @@ begin
   end;
   if not v_rejected then
     raise exception 'FAIL: not-available visit accepted delivered quantity';
+  end if;
+
+  -- The signature-aware RPC must reject delivered outcomes without customer proof.
+  v_rejected:=false;
+  begin
+    perform public.record_van_delivery_visit(
+      v_failed_delivery,'delivered',
+      jsonb_build_array(jsonb_build_object(
+        'delivery_line_id',v_failed_line,'delivered_quantity_base',0,
+        'market_return_quantity_base',0,'return_batch_number',null,'return_expiry_date',null
+      )),
+      'Missing POD signature test',
+      'TX-VAN-MISSING-POD-0001',
+      '[]'::jsonb
+    );
+  exception when check_violation then
+    v_rejected:=true;
+  end;
+  if not v_rejected then
+    raise exception 'FAIL: delivered outcome was accepted without a customer signature';
+  end if;
+
+  -- The legacy five-argument RPC cannot bypass the POD signature requirement.
+  v_rejected:=false;
+  begin
+    perform public.record_van_delivery_visit(
+      v_failed_delivery,'delivered',
+      jsonb_build_array(jsonb_build_object(
+        'delivery_line_id',v_failed_line,'delivered_quantity_base',0,
+        'market_return_quantity_base',0,'return_batch_number',null,'return_expiry_date',null
+      )),
+      'Legacy RPC without POD signature',
+      'TX-VAN-LEGACY-POD-0001'
+    );
+  exception when check_violation then
+    v_rejected:=true;
+  end;
+  if not v_rejected then
+    raise exception 'FAIL: legacy delivery RPC bypassed POD signature requirement';
   end if;
 
   -- Payroll accrual -> GL -> salary payment -> idempotent payment retry.

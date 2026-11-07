@@ -41,7 +41,7 @@ The application has 10 module groups. The navigation and module screens are pres
 
 7. **Distribution & Delivery**
    - Route, area, driver and vehicle assignment; delivery challans and dispatch.
-   - Delivered/partial/failed outcomes, proof-of-delivery signature, shop visits and return quantities.
+   - Delivered/partial/failed outcomes, shop visits and return quantities. Delivered and short-delivered outcomes require a customer signature; the signature is committed atomically with the van delivery, stock and invoice workflow.
    - Van stock ledger, warehouse load/unload, reservations and delivery charges.
 
 8. **HR & Payroll**
@@ -64,6 +64,9 @@ The application has 10 module groups. The navigation and module screens are pres
 - **Custom permissions:** the owner can enable per-user overrides for 10 module groups with View/Create/Update/Delete actions. If no override exists, the user's existing role rules remain the default. Owner/admin role access remains protected. Database RLS enforces explicit grants and denials across 77 tenant-scoped business tables and 308 module/action policy commands. A follow-up audit found zero module-grant policy commands without a matching restrictive guard. Twelve legacy `FOR ALL` policy tables now have separate restrictive SELECT/INSERT/UPDATE/DELETE guards, so permissive role policies cannot bypass an explicit user denial. Reports access grants read-only access to underlying report data without granting create/update/delete; budget and fixed-asset tables are governed by Accounts & Finance permissions.
 - **Barcode camera:** the Booker order form can use the phone camera on supported secure-context browsers that expose the BarcodeDetector API. Handheld keyboard-wedge scanners and manual SKU/barcode entry remain available as fallbacks.
 - **Persistent notifications:** operational alerts are saved per user and tenant with read/unread state, mark-read and mark-all-read actions. Repeated daily alerts update the existing notification instead of creating duplicates.
+- **Delivery POD integrity:** delivered/short-delivered outcomes require a valid customer signature (2–4,000 drawing points). The signature-aware RPC stores the proof in the same database transaction as delivery completion; the legacy five-argument RPC is blocked from posting delivered outcomes.
+- **Mobile network retry:** Booker and Delivery PWA queues now preserve request idempotency keys and retry after transient fetch/network failures even when the browser still reports itself online.
+- **Failed delivery protection:** not-available/refused visits zero their quantities in the UI and a database trigger rejects non-zero delivery/return quantities, preventing accidental stock, COGS or invoice posting.
 - **Automated tests:** the current GitHub Actions run passes all 55 automated tests, followed by the TypeScript/Vite production build. The suite covers permission resolution, barcode matching, Booker/Delivery offline queues, workflow invariants, RLS policy coverage and transaction smoke-test assertions.
 - **Critical workflow defects found and fixed during transactional testing:**
   - The document-number allocator used obsolete column names and omitted the required branch key; it now uses the current branch-aware sequence schema.
