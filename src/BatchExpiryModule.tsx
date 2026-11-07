@@ -8,8 +8,8 @@ export default function BatchExpiryModule({db,tenantId}:{db:SupabaseClient;tenan
   try{
    const [movementRows,productRows,warehouseRows]=await Promise.all([
     (async()=>{const rows:Row[]=[];for(let from=0;;from+=500){const {data,error}=await db.from("stock_movements").select("id,product_id,warehouse_id,batch_number,expiry_date,movement_at,quantity_in,quantity_out,unit_cost").eq("tenant_id",tenantId).order("movement_at",{ascending:true}).order("id",{ascending:true}).range(from,from+499);if(error)throw error;const page=(data||[]) as Row[];rows.push(...page);if(page.length<500)break;}return rows;})(),
-    (async()=>{const rows:any[]=[];for(let from=0;;from+=500){const {data,error}=await db.from("products").select("id,sku,name,track_batch,track_expiry").eq("tenant_id",tenantId).order("id",{ascending:true}).range(from,from+499);if(error)throw error;const page=(data||[]) as Row[];rows.push(...page);if(page.length<500)break;}return rows;})(),
-    (async()=>{const rows:any[]=[];for(let from=0;;from+=500){const {data,error}=await db.from("warehouses").select("id,name").eq("tenant_id",tenantId).order("id",{ascending:true}).range(from,from+499);if(error)throw error;const page=(data||[]) as Row[];rows.push(...page);if(page.length<500)break;}return rows;})()
+    (async()=>{const rows:any[]=[];for(let from=0;;from+=500){const {data,error}=await db.from("products").select("id,sku,name,track_batch,track_expiry").eq("tenant_id",tenantId).order("id",{ascending:true}).range(from,from+499);if(error)throw error;const page=data||[];rows.push(...page);if(page.length<500)break;}return rows;})(),
+    (async()=>{const rows:any[]=[];for(let from=0;;from+=500){const {data,error}=await db.from("warehouses").select("id,name").eq("tenant_id",tenantId).order("id",{ascending:true}).range(from,from+499);if(error)throw error;const page=data||[];rows.push(...page);if(page.length<500)break;}return rows;})()
    ]);
    setMoves(movementRows as Row[]);setProducts(productRows);setWarehouses(warehouseRows);
   }catch(e){setNotice(e instanceof Error?e.message:"Batch and expiry records could not be loaded.");}
