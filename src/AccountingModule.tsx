@@ -32,6 +32,7 @@ export default function AccountingModule({ db, tenantId,currentRole }: { db: Sup
   const [notice, setNotice] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [trialDate, setTrialDate] = useState(new Date().toISOString().slice(0, 10));
+  const [trialBranchId,setTrialBranchId]=useState("");
   const [narration, setNarration] = useState("");
   const [debitAccount, setDebitAccount] = useState("");
   const [creditAccount, setCreditAccount] = useState("");
@@ -50,7 +51,7 @@ export default function AccountingModule({ db, tenantId,currentRole }: { db: Sup
     const [a, j, t, br] = await Promise.all([
       db.from("chart_of_accounts").select("id,account_code,account_name,account_type,is_active").eq("tenant_id", tenantId).eq("is_active", true).order("account_code"),
       db.from("journal_entries").select("id,journal_number,entry_date,narration,status,created_at,branch_id").eq("tenant_id", tenantId).order("entry_date", { ascending: false }).limit(300),
-      db.rpc("get_trial_balance", { p_tenant_id: tenantId, p_as_of: trialDate }),
+      db.rpc("get_branch_trial_balance", { p_tenant_id: tenantId, p_as_of: trialDate, p_branch_id: trialBranchId||null }),
       db.from("branches").select("id,name,branch_code").eq("tenant_id",tenantId).order("name")
     ]);
     const err = a.error || j.error || t.error || br.error;
@@ -64,7 +65,7 @@ export default function AccountingModule({ db, tenantId,currentRole }: { db: Sup
     setLoading(false);
   }
 
-  useEffect(() => { void load(); }, [tenantId, trialDate]);
+  useEffect(() => { void load(); }, [tenantId, trialDate, trialBranchId]);
   useEffect(()=>{if(tab==="ledger")void loadLedger();if(tab==="cash")void loadCashBook();},[tab,tenantId,ledgerType]);
 
   async function loadLedger(){
@@ -214,7 +215,7 @@ export default function AccountingModule({ db, tenantId,currentRole }: { db: Sup
         {!accounts.length && <tr><td colSpan={4} className="table-empty">No chart accounts configured.</td></tr>}
       </tbody></table></div>}
     </> : tab === "trial" ? <>
-      <div className="module-toolbar"><div><h3>Trial balance & financial position</h3><p>Posted journal entries only; draft journals are excluded.</p></div><label>As of date<input type="date" value={trialDate} onChange={e => setTrialDate(e.target.value)} /></label></div>
+      <div className="module-toolbar"><div><h3>Trial balance & financial position</h3><p>Posted journal entries only; draft journals are excluded. Company-wide includes unassigned journal entries.</p></div><div className="form-grid"><label>Branch<select value={trialBranchId} onChange={e=>setTrialBranchId(e.target.value)}><option value="">All branches (company-wide)</option>{branches.map(b=><option key={b.id} value={b.id}>{b.branch_code} · {b.name}</option>)}</select></label><label>As of date<input type="date" value={trialDate} onChange={e => setTrialDate(e.target.value)} /></label></div></div>
       {loading ? <div className="table-empty">Calculating posted account balances…</div> : <>
         <div className="stats report-stats">
           <article><small>Total debits</small><strong>{money(debitTotal)}</strong><span>Posted journal lines</span></article>
