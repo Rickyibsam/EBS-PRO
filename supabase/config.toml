@@ -21,9 +21,6 @@ enabled = true
 [studio]
 enabled = false
 
-[inbucket]
-enabled = false
-
 [storage]
 enabled = true
 file_size_limit = "50MiB"
