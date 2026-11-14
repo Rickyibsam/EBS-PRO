@@ -1,0 +1,35 @@
+name: EBS PRO isolated database replay
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-clean-replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start disposable local Supabase stack
+        run: supabase start
+
+      - name: Replay complete migration history on disposable PostgreSQL
+        run: supabase db reset --local
+
+      - name: Verify Booker database security contract
+        run: supabase test db supabase/tests/ci_security_contract.test.sql
+
+      - name: Stop disposable Supabase stack
+        if: always()
+        run: supabase stop --no-backup
