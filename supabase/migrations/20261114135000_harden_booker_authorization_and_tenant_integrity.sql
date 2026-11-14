@@ -364,7 +364,8 @@ BEGIN
     RETURN v_order_id;
   END IF;
 
-  IF jsonb_typeof(p_lines) <> 'array'
+  IF p_lines IS NULL
+     OR jsonb_typeof(p_lines) IS DISTINCT FROM 'array'
      OR jsonb_array_length(p_lines) = 0
      OR jsonb_array_length(p_lines) > 100 THEN
     RAISE EXCEPTION 'Order must contain between 1 and 100 lines.';
