@@ -34,7 +34,7 @@ select ok(
   'product_prices has restrictive Booker SELECT guard'
 );
 select ok(
-  exists(select 1 from pg_policy p join pg_class c on c.oid=p.relnamespace
+  exists(select 1 from pg_policy p join pg_class c on c.oid=p.polrelid
          join pg_namespace n on n.oid=c.relnamespace
          where n.nspname='public' and c.relname='product_units'
            and p.polname='product_units_booker_direct_select_block'
