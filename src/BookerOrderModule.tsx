@@ -2,7 +2,7 @@ import {findProductByBarcodeOrSku} from "./lib/erpAccess";
 import {isTransientNetworkError} from "./lib/network";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {enqueueBookerOrder,getPendingBookerOrders,removePendingBookerOrder,cacheBookerSnapshot,getBookerSnapshot,enqueueBookerVisit,getPendingBookerVisits,removePendingBookerVisit} from "./bookerOfflineQueue";
+import {enqueueBookerOrder,getPendingBookerOrders,removePendingBookerOrder,cacheBookerSnapshot,getBookerSnapshot,enqueueBookerVisit,getPendingBookerVisits,removePendingBookerVisit,saveBookerDraft,getBookerDraft,clearBookerOfflineUserData} from "./bookerOfflineQueue";
 
 type Row = Record<string, any>;
 type CartLine = { product_id: string; unit_id: string; quantity: string; is_free:boolean };
@@ -94,6 +94,11 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       if (authError) throw authError;
       if (!auth.user) throw new Error("Please sign in again.");
       setAuthUserId(auth.user.id);
+      const savedDraft = await getBookerDraft(tenantId, auth.user.id);
+      const draftData = savedDraft?.data || {};
+      if (Array.isArray(draftData.cart)) setCart(draftData.cart as CartLine[]);
+      if (typeof draftData.notes === "string") setNotes(draftData.notes);
+      if (typeof draftData.deliveryDate === "string") setDeliveryDate(draftData.deliveryDate);
       const [emp, u, recent] = await Promise.all([
         db.from("employees").select("id,employee_code,full_name,branch_id").eq("tenant_id", tenantId).eq("user_id", auth.user.id).eq("employment_status", "active").maybeSingle(),
         db.from("units_of_measure").select("id,name,symbol").eq("tenant_id", tenantId).order("name"),
@@ -127,8 +132,13 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       const routeResult = await db.from("sales_routes").select("id,route_code,name,area_description").eq("tenant_id", tenantId).in("id", assignments.map(x => x.route_id)).eq("is_active", true).order("name");
       if (routeResult.error) throw routeResult.error;
       setRoutes(routeResult.data || []);
-      const effectiveRouteId=routeId||routeResult.data?.[0]?.id||"";
-      if (!routeId && routeResult.data?.[0]) setRouteId(routeResult.data[0].id);
+      const savedRouteId = String(draftData.routeId || "");
+      const effectiveRouteId = routeResult.data?.some(r => r.id === savedRouteId)
+        ? savedRouteId
+        : routeResult.data?.some(r => r.id === routeId) ? routeId : routeResult.data?.[0]?.id || "";
+      setRouteId(effectiveRouteId);
+      const savedCustomerId = String(draftData.customerId || "");
+      setCustomerId(savedCustomerId);
       await cacheBookerSnapshot(tenantId,auth.user.id,{employee:emp.data,products:visibleProducts,productUnits:visibleProductUnits,units:u.data||[],orders:recent.data||[],routes:routeResult.data||[],routeId:effectiveRouteId,prices:defaultPrices,listId:defaultPriceListId});
     } catch (e) {
       if(!navigator.onLine||isTransientNetworkError(e)){
@@ -140,6 +150,24 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
   }
 
   useEffect(() => { void load(); }, [tenantId]);
+
+  useEffect(() => {
+    if (loading || !authUserId) return;
+    void saveBookerDraft(tenantId, authUserId, {
+      routeId, customerId, cart, deliveryDate, notes
+    }).catch(() => {});
+  }, [loading, tenantId, authUserId, routeId, customerId, cart, deliveryDate, notes]);
+
+  useEffect(() => {
+    const { data: { subscription } } = db.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT" && authUserId) {
+        void clearBookerOfflineUserData(tenantId, authUserId);
+      } else if (session?.user.id && authUserId && session.user.id !== authUserId) {
+        void clearBookerOfflineUserData(tenantId, authUserId);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [db, tenantId, authUserId]);
 
   async function createRouteCustomer(e:FormEvent){
     e.preventDefault();
@@ -200,7 +228,12 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       if (!ids.length) { if (!cancelled) { setCustomers([]); setCustomerId(""); } return; }
       const { data, error: partyError } = await db.from("parties").select("id,party_code,name,phone,credit_limit").eq("tenant_id", tenantId).in("id", ids).eq("status", "active").order("name");
       if (partyError) { if (!cancelled) setNotice(partyError.message); return; }
-      if (!cancelled) { setCustomers(data || []); setCustomerId(""); setPrices([]); setListId(""); await cacheBookerSnapshot(tenantId,authUserId,{customers:data||[],routeId,customerId:"",prices:[],listId:""}); }
+      if (!cancelled) {
+        setCustomers(data || []);
+        setCustomerId(current => current && (data || []).some(customer => customer.id === current) ? current : "");
+        setPrices([]); setListId("");
+        await cacheBookerSnapshot(tenantId,authUserId,{customers:data||[],routeId,prices:[],listId:""});
+      }
     }
     void loadCustomers();
     return () => { cancelled = true; };
