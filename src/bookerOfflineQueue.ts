@@ -6,7 +6,7 @@ export type OfflineBookerOrder = {
 };
 const DB_NAME="ebs-pro-offline";const STORE="booker-orders";const VISITS="booker-visits";const DRAFTS="booker-drafts";
 function openDb():Promise<IDBDatabase>{
- return new Promise((resolve,reject)=>{const request=indexedDB.open(DB_NAME,2);request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE,{keyPath:"id"});if(!db.objectStoreNames.contains(VISITS))db.createObjectStore(VISITS,{keyPath:"id"});if(!db.objectStoreNames.contains(DRAFTS))db.createObjectStore(DRAFTS,{keyPath:"id"});};request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error||new Error("Offline storage could not be opened."));});
+ return new Promise((resolve,reject)=>{const request=indexedDB.open(DB_NAME,3);request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE,{keyPath:"id"});if(!db.objectStoreNames.contains(VISITS))db.createObjectStore(VISITS,{keyPath:"id"});if(!db.objectStoreNames.contains(DRAFTS))db.createObjectStore(DRAFTS,{keyPath:"id"});};request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error||new Error("Offline storage could not be opened."));});
 }
 export async function enqueueBookerOrder(order:OfflineBookerOrder):Promise<void>{
  const db=await openDb();await new Promise<void>((resolve,reject)=>{const tx=db.transaction(STORE,"readwrite");tx.objectStore(STORE).put(order);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error||new Error("Offline order could not be saved."));tx.onabort=()=>reject(tx.error||new Error("Offline order save was cancelled."));});db.close();
