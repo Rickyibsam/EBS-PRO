@@ -72,18 +72,25 @@ export async function clearBookerOfflineUserData(tenantId:string,userId:string):
  if(!tenantId||!userId)return;
  const db=await openDb();
  await new Promise<void>((resolve,reject)=>{
-  const tx=db.transaction([STORE,VISITS,DRAFTS],"readwrite");
-  for(const name of [STORE,VISITS,DRAFTS]){
-   const store=tx.objectStore(name),request=store.getAll();
-   request.onsuccess=()=>{
-    for(const row of request.result as Array<{id:string;tenantId?:string;userId?:string}>){
-     if(row.tenantId===tenantId&&row.userId===userId)store.delete(row.id);
-    }
-   };
-   request.onerror=()=>{try{tx.abort();}catch{}};
-  }
-  tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error||new Error("Offline Booker data could not be cleared."));
-  tx.onabort=()=>reject(tx.error||new Error("Offline Booker data cleanup was cancelled."));
+  // Keep queued orders and visits: deleting an unsynchronized transaction on logout
+  // would cause business-data loss. Clear only cached catalogue/customer snapshots and drafts.
+  const tx=db.transaction([STORE,DRAFTS],"readwrite");
+  const snapshotStore=tx.objectStore(STORE),snapshotRequest=snapshotStore.getAll();
+  snapshotRequest.onsuccess=()=>{
+   for(const row of snapshotRequest.result as Array<{id:string;kind?:string;tenantId?:string;userId?:string}>){
+    if(row.kind==="snapshot"&&row.tenantId===tenantId&&row.userId===userId)snapshotStore.delete(row.id);
+   }
+  };
+  snapshotRequest.onerror=()=>{try{tx.abort();}catch{}};
+  const draftStore=tx.objectStore(DRAFTS),draftRequest=draftStore.getAll();
+  draftRequest.onsuccess=()=>{
+   for(const row of draftRequest.result as Array<{id:string;tenantId?:string;userId?:string}>){
+    if(row.tenantId===tenantId&&row.userId===userId)draftStore.delete(row.id);
+   }
+  };
+  draftRequest.onerror=()=>{try{tx.abort();}catch{}};
+  tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error||new Error("Offline Booker cache could not be cleared."));
+  tx.onabort=()=>reject(tx.error||new Error("Offline Booker cache cleanup was cancelled."));
  });
  db.close();
 }
