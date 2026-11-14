@@ -168,7 +168,7 @@ CREATE POLICY products_booker_direct_select_block ON public.products
 AS RESTRICTIVE FOR SELECT TO authenticated
 USING (
   NOT private.has_tenant_role_internal(tenant_id, ARRAY['order_booker']::text[])
-  OR private.has_tenant_role_internal(tenant_id, ARRAY['owner','admin','manager','purchase','sales']::text[])
+  OR private.has_tenant_role_internal(tenant_id, ARRAY['owner','admin','manager','purchase','sales','warehouse','cashier','viewer']::text[])
 );
 
 DROP POLICY IF EXISTS product_prices_booker_direct_select_block ON public.product_prices;
@@ -176,7 +176,7 @@ CREATE POLICY product_prices_booker_direct_select_block ON public.product_prices
 AS RESTRICTIVE FOR SELECT TO authenticated
 USING (
   NOT private.has_tenant_role_internal(tenant_id, ARRAY['order_booker']::text[])
-  OR private.has_tenant_role_internal(tenant_id, ARRAY['owner','admin','manager','purchase','sales']::text[])
+  OR private.has_tenant_role_internal(tenant_id, ARRAY['owner','admin','manager','purchase','sales','warehouse','cashier','viewer']::text[])
 );
 
 DROP POLICY IF EXISTS product_units_booker_direct_select_block ON public.product_units;
@@ -184,7 +184,7 @@ CREATE POLICY product_units_booker_direct_select_block ON public.product_units
 AS RESTRICTIVE FOR SELECT TO authenticated
 USING (
   NOT private.has_tenant_role_internal(tenant_id, ARRAY['order_booker']::text[])
-  OR private.has_tenant_role_internal(tenant_id, ARRAY['owner','admin','manager','purchase','sales']::text[])
+  OR private.has_tenant_role_internal(tenant_id, ARRAY['owner','admin','manager','purchase','sales','warehouse','cashier','viewer']::text[])
 );
 
 CREATE OR REPLACE FUNCTION public.get_booker_catalog(
