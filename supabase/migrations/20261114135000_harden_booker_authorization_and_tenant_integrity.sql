@@ -202,6 +202,7 @@ RETURNS TABLE (
   conversion_to_base numeric,
   unit_name text,
   unit_symbol text,
+  price_list_id uuid,
   price numeric,
   min_quantity numeric
 )
@@ -255,7 +256,6 @@ BEGIN
         AND cpl.customer_id = p_customer_id
         AND (pl.valid_from IS NULL OR pl.valid_from <= current_date)
         AND (pl.valid_to IS NULL OR pl.valid_to >= current_date)
-      LIMIT 1
       UNION ALL
       SELECT pl.id, 2 AS priority
       FROM public.price_lists pl
@@ -281,7 +281,7 @@ BEGIN
   SELECT
     p.id, p.sku, p.barcode, p.name, p.brand, p.sales_tax_rate,
     pu.unit_id, pu.conversion_to_base, u.name, u.symbol,
-    pp.price, pp.min_quantity
+    spl.price_list_id, pp.price, pp.min_quantity
   FROM public.products p
   JOIN public.product_units pu
     ON pu.tenant_id = p.tenant_id
