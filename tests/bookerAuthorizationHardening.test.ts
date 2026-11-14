@@ -37,6 +37,8 @@ test("order submission enforces product visibility, branch stock and denies unap
   assert.ok(migration.includes("private.booker_product_allowed(p_tenant_id, v_employee_id, v_product_id)"));
   assert.ok(migration.includes("Insufficient available stock for product"));
   assert.ok(migration.includes("Free items require an approved promotion"));
+  assert.ok(migration.includes("p_lines IS NULL"));
+  assert.ok(migration.includes("jsonb_typeof(p_lines) IS DISTINCT FROM 'array'"));
 });
 
 test("tenant expense account foreign key and Booker GPS range constraints are composite and validated", () => {
