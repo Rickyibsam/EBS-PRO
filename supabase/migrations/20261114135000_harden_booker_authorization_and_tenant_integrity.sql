@@ -428,6 +428,7 @@ BEGIN
         AND cpl.customer_id = p_customer_id
         AND (pl.valid_from IS NULL OR pl.valid_from <= current_date)
         AND (pl.valid_to IS NULL OR pl.valid_to >= current_date)
+      ORDER BY cpl.price_list_id
       LIMIT 1
     ),
     (
