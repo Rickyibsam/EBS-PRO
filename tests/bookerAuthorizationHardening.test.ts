@@ -31,6 +31,8 @@ test("Booker direct table reads are blocked for pure Booker role", () => {
   }
   assert.ok(migration.includes("AS RESTRICTIVE FOR SELECT TO authenticated"));
   assert.ok(migration.includes("REVOKE ALL ON FUNCTION public.get_booker_stock_balances(uuid)"));
+  assert.ok(migration.includes("ARRAY['owner','admin','manager','purchase','sales','warehouse']::text[]"));
+  assert.doesNotMatch(migration, /ARRAY\['owner','admin','manager','purchase','sales','warehouse','cashier','viewer'\]::text\[\]/);
 });
 
 test("order submission enforces product visibility, branch stock and denies unapproved free items", () => {
@@ -39,6 +41,12 @@ test("order submission enforces product visibility, branch stock and denies unap
   assert.ok(migration.includes("Free items require an approved promotion"));
   assert.ok(migration.includes("p_lines IS NULL"));
   assert.ok(migration.includes("jsonb_typeof(p_lines) IS DISTINCT FROM 'array'"));
+});
+
+test("catalogue and order submission select the same customer/default price list deterministically", () => {
+  assert.ok(migration.includes("ORDER BY priority, selection_created_at DESC NULLS LAST, price_list_id"));
+  assert.ok(migration.includes("ORDER BY pl.created_at DESC, pl.id"));
+  assert.ok(migration.includes("ORDER BY cpl.price_list_id"));
 });
 
 test("tenant expense account foreign key and Booker GPS range constraints are composite and validated", () => {
