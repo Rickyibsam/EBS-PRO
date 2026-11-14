@@ -74,6 +74,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
   const [pendingVisitCount,setPendingVisitCount]=useState(0);
   const [syncing,setSyncing]=useState(false);
   const syncLock=useRef(false);
+  const draftRestored=useRef(false);
 
   const money = (n: number) => "PKR " + Number(n || 0).toLocaleString("en-PK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const activeRoute = routes.find(x => x.id === routeId);
@@ -94,7 +95,8 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       if (authError) throw authError;
       if (!auth.user) throw new Error("Please sign in again.");
       setAuthUserId(auth.user.id);
-      const savedDraft = await getBookerDraft(tenantId, auth.user.id);
+      const savedDraft = draftRestored.current ? null : await getBookerDraft(tenantId, auth.user.id);
+      draftRestored.current = true;
       const draftData = savedDraft?.data || {};
       if (Array.isArray(draftData.cart)) setCart(draftData.cart as CartLine[]);
       if (typeof draftData.notes === "string") setNotes(draftData.notes);
@@ -331,7 +333,9 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
           await enqueueBookerOrder(queuedOrder);setPendingCount(n=>n+1);setNotice("Connection dropped. Order saved on this device and will sync automatically.");
         }
       }
-      setCart([{ product_id: "", unit_id: "", quantity: "1", is_free:false }]); setNotes(""); setDeliveryDate(""); setRequestId(crypto.randomUUID());
+      const emptyCart:CartLine[]=[{ product_id: "", unit_id: "", quantity: "1", is_free:false }];
+      setCart(emptyCart); setNotes(""); setDeliveryDate(""); setRequestId(crypto.randomUUID());
+      await saveBookerDraft(tenantId,offlineUserId,{routeId,customerId,cart:emptyCart,notes:"",deliveryDate:""});
       if(navigator.onLine)await load();
     } catch (e) { setNotice(e instanceof Error ? e.message : "Order could not be submitted."); }
     setSaving(false);
