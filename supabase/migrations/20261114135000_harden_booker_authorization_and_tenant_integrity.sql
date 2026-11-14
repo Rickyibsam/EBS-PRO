@@ -61,14 +61,36 @@ BEGIN
       ))
     );
 
-  -- Preserve the existing configuration convention: when no allow-rules exist,
-  -- all otherwise-active products are eligible unless an explicit matching rule denies one.
+  -- With no matching rule, preserve the legacy default:
+  -- any configured allow-rule makes the catalogue allow-list based;
+  -- otherwise products remain visible except those with an explicit matching deny-rule.
   IF v_priority IS NULL THEN
-    RETURN NOT EXISTS (
+    IF EXISTS (
       SELECT 1 FROM public.booker_product_visibility r
       WHERE r.tenant_id = p_tenant_id
         AND r.employee_id = p_employee_id
         AND r.is_allowed = true
+    ) THEN
+      RETURN false;
+    END IF;
+
+    RETURN NOT EXISTS (
+      SELECT 1
+      FROM public.booker_product_visibility r
+      JOIN public.products p ON p.id = p_product_id AND p.tenant_id = p_tenant_id
+      WHERE r.tenant_id = p_tenant_id
+        AND r.employee_id = p_employee_id
+        AND r.is_allowed = false
+        AND (
+          r.product_id = p_product_id
+          OR (r.brand IS NOT NULL AND lower(r.brand) = lower(coalesce(p.brand, '')))
+          OR (r.vendor_id IS NOT NULL AND EXISTS (
+            SELECT 1 FROM public.vendor_product_catalog vpc
+            WHERE vpc.tenant_id = p_tenant_id
+              AND vpc.product_id = p_product_id
+              AND vpc.supplier_id = r.vendor_id
+          ))
+        )
     );
   END IF;
 
