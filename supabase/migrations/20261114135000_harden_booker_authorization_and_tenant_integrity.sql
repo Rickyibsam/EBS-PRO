@@ -168,7 +168,7 @@ CREATE POLICY products_booker_direct_select_block ON public.products
 AS RESTRICTIVE FOR SELECT TO authenticated
 USING (
   NOT private.has_tenant_role_internal(tenant_id, ARRAY['order_booker']::text[])
-  OR private.has_tenant_role_internal(tenant_id, ARRAY['owner','admin','manager','purchase','sales','warehouse','cashier','viewer']::text[])
+  OR private.has_tenant_role_internal(tenant_id, ARRAY['owner','admin','manager','purchase','sales','warehouse']::text[])
 );
 
 DROP POLICY IF EXISTS product_prices_booker_direct_select_block ON public.product_prices;
@@ -176,7 +176,7 @@ CREATE POLICY product_prices_booker_direct_select_block ON public.product_prices
 AS RESTRICTIVE FOR SELECT TO authenticated
 USING (
   NOT private.has_tenant_role_internal(tenant_id, ARRAY['order_booker']::text[])
-  OR private.has_tenant_role_internal(tenant_id, ARRAY['owner','admin','manager','purchase','sales','warehouse','cashier','viewer']::text[])
+  OR private.has_tenant_role_internal(tenant_id, ARRAY['owner','admin','manager','purchase','sales','warehouse']::text[])
 );
 
 DROP POLICY IF EXISTS product_units_booker_direct_select_block ON public.product_units;
@@ -184,7 +184,7 @@ CREATE POLICY product_units_booker_direct_select_block ON public.product_units
 AS RESTRICTIVE FOR SELECT TO authenticated
 USING (
   NOT private.has_tenant_role_internal(tenant_id, ARRAY['order_booker']::text[])
-  OR private.has_tenant_role_internal(tenant_id, ARRAY['owner','admin','manager','purchase','sales','warehouse','cashier','viewer']::text[])
+  OR private.has_tenant_role_internal(tenant_id, ARRAY['owner','admin','manager','purchase','sales','warehouse']::text[])
 );
 
 CREATE OR REPLACE FUNCTION public.get_booker_catalog(
@@ -247,7 +247,7 @@ BEGIN
   WITH selected_price_list AS (
     SELECT choice.price_list_id
     FROM (
-      SELECT cpl.price_list_id, 1 AS priority
+      SELECT cpl.price_list_id, 1 AS priority, NULL::timestamptz AS selection_created_at
       FROM public.customer_price_lists cpl
       JOIN public.price_lists pl
         ON pl.id = cpl.price_list_id AND pl.tenant_id = cpl.tenant_id
@@ -257,7 +257,7 @@ BEGIN
         AND (pl.valid_from IS NULL OR pl.valid_from <= current_date)
         AND (pl.valid_to IS NULL OR pl.valid_to >= current_date)
       UNION ALL
-      SELECT pl.id, 2 AS priority
+      SELECT pl.id, 2 AS priority, pl.created_at AS selection_created_at
       FROM public.price_lists pl
       WHERE pl.tenant_id = p_tenant_id
         AND pl.is_default = true
@@ -274,7 +274,7 @@ BEGIN
             AND (assigned_pl.valid_from IS NULL OR assigned_pl.valid_from <= current_date)
             AND (assigned_pl.valid_to IS NULL OR assigned_pl.valid_to >= current_date)
         )
-      ORDER BY priority, price_list_id
+      ORDER BY priority, selection_created_at DESC NULLS LAST, price_list_id
       LIMIT 1
     ) choice
   )
@@ -439,7 +439,7 @@ BEGIN
         AND pl.is_default = true
         AND (pl.valid_from IS NULL OR pl.valid_from <= current_date)
         AND (pl.valid_to IS NULL OR pl.valid_to >= current_date)
-      ORDER BY pl.created_at DESC
+      ORDER BY pl.created_at DESC, pl.id
       LIMIT 1
     )
   ) INTO v_price_list_id;
@@ -602,8 +602,8 @@ REVOKE ALL ON FUNCTION public.create_order_booker_order(uuid,uuid,uuid,uuid,date
 GRANT EXECUTE ON FUNCTION public.create_order_booker_order(uuid,uuid,uuid,uuid,date,text,jsonb) TO authenticated;
 
 -- Composite tenant/account reference: an expense cannot point at another tenant's COA row.
-CREATE UNIQUE INDEX IF NOT EXISTS chart_of_accounts_tenant_id_id_uidx
-  ON public.chart_of_accounts (tenant_id, id);
+-- The preceding tenant-FK migration already creates the unique (tenant_id,id)
+-- index for chart_of_accounts; reuse it instead of creating a duplicate index.
 
 ALTER TABLE public.expenses
   DROP CONSTRAINT IF EXISTS expenses_expense_account_id_fkey;
