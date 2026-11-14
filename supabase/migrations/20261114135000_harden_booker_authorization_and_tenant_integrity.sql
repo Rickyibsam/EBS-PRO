@@ -306,6 +306,11 @@ $$;
 REVOKE ALL ON FUNCTION public.get_booker_catalog(uuid,uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_booker_catalog(uuid,uuid) TO authenticated;
 
+-- The legacy stock RPC exposed tenant-wide product balances; the Booker client now
+-- receives only server-filtered catalog rows through get_booker_catalog().
+REVOKE ALL ON FUNCTION public.get_booker_stock_balances(uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION private.get_booker_stock_balances_internal(uuid) FROM PUBLIC, anon, authenticated;
+
 -- Enforce the same product visibility, stock and free-item rules at submission time.
 CREATE OR REPLACE FUNCTION public.create_order_booker_order(
   p_tenant_id uuid,
