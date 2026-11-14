@@ -3,7 +3,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
  enqueueBookerOrder,getPendingBookerOrders,removePendingBookerOrder,
- cacheBookerSnapshot,getBookerSnapshot,enqueueBookerVisit,getPendingBookerVisits,removePendingBookerVisit
+ cacheBookerSnapshot,getBookerSnapshot,enqueueBookerVisit,getPendingBookerVisits,removePendingBookerVisit,
+ saveBookerDraft,getBookerDraft,clearBookerOfflineUserData
 } from "../src/bookerOfflineQueue";
 import {
  queueDeliveryVisit,getQueuedDeliveryVisits,removeQueuedDeliveryVisit,
@@ -78,4 +79,16 @@ test("failed offline retries retain stable idempotency keys and delivery POD pro
  assert.equal((await getQueuedDeliveryVisits(tenant,user)).length,1);
  await removePendingBookerOrder(order.id);
  await removeQueuedDeliveryVisit(delivery.id);
+});
+
+test("Booker drafts persist per user and logout cleanup does not clear another user's queue",async()=>{
+ const tenant="tenant-booker-draft",user="user-booker-draft",other="user-booker-other";
+ await saveBookerDraft(tenant,user,{routeId:"route-a",customerId:"customer-a",cart:[{product_id:"p",unit_id:"u",quantity:"3",is_free:false}]});
+ await enqueueBookerOrder({id:"draft-user-order",kind:"order",tenantId:tenant,userId:user,routeId:"route-a",customerId:"customer-a",requestId:"draft-request",requiredDeliveryDate:null,notes:null,lines:[{product_id:"p",unit_id:"u",quantity:3}],createdAt:new Date().toISOString()});
+ await enqueueBookerOrder({id:"other-user-order",kind:"order",tenantId:tenant,userId:other,routeId:"route-b",customerId:"customer-b",requestId:"other-request",requiredDeliveryDate:null,notes:null,lines:[{product_id:"p2",unit_id:"u2",quantity:1}],createdAt:new Date().toISOString()});
+ assert.equal((await getBookerDraft(tenant,user))?.data.customerId,"customer-a");
+ await clearBookerOfflineUserData(tenant,user);
+ assert.equal(await getBookerDraft(tenant,user),null);
+ assert.equal((await getPendingBookerOrders(tenant,user)).length,0);
+ assert.equal((await getPendingBookerOrders(tenant,other)).length,1);
 });
