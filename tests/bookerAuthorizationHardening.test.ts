@@ -19,9 +19,10 @@ test("restricted Booker catalogue omits product cost and sale-cost fields", () =
   assert.ok(returnsBlock.includes("price_list_id"));
   assert.doesNotMatch(returnsBlock, /cost_price|purchase_cost|sale_price/i);
   assert.ok(migration.includes("private.booker_product_allowed"));
-  const allowFunction = migration.match(/CREATE OR REPLACE FUNCTION private\\.booker_product_allowed\\([\\s\\S]*?END;\\s*\\$\\$;/)?.[0] || "";
+  const allowFunction = migration.match(/CREATE OR REPLACE FUNCTION private\.booker_product_allowed\([\s\S]*?END;\s*\$\$;/)?.[0] || "";
   assert.ok(allowFunction.includes("AND r.is_allowed = false"));
-  assert.ok(allowFunction.includes("r.supplier_id = r.vendor_id"));
+  assert.ok(allowFunction.includes("vpc.supplier_id = r.vendor_id"));
+  assert.ok(allowFunction.includes("IF EXISTS ("));
   assert.ok(allowFunction.includes("RETURN false;"));
 });
 
