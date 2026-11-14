@@ -330,7 +330,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
           <label>Sales unit<select required value={line.unit_id} onChange={e => updateLine(i,"unit_id",e.target.value)}><option value="">Select unit</option>{options.map(x => <option key={x.unit_id} value={x.unit_id}>{units.find(u => u.id === x.unit_id)?.symbol || units.find(u => u.id === x.unit_id)?.name || x.unit_id} (×{x.conversion_to_base})</option>)}</select></label>
           <label>Quantity<input required type="number" min="0.001" step="0.001" value={line.quantity} onChange={e => updateLine(i,"quantity",e.target.value)}/></label>
           <label>Unit price<input readOnly value={line.is_free?"FREE ITEM":price == null ? "Price unavailable" : money(Number(price))}/></label>
-          <label>Line total<input readOnly value={line.is_free?money(0):price == null ? "—" : money(Number(price)*Number(line.quantity))}/></label><label><span>Free item (FOC)</span><input type="checkbox" checked={line.is_free} onChange={e=>setCart(old=>old.map((x,n)=>n===i?{...x,is_free:e.target.checked}:x))}/></label>
+          <label>Line total<input readOnly value={line.is_free?money(0):price == null ? "—" : money(Number(price)*Number(line.quantity))}/></label><label><span>Free item (FOC)</span><input type="checkbox" checked={false} disabled title="Free items require an approved promotion and cannot be submitted through Booker yet."/></label>
           <button type="button" onClick={() => setCart(old => old.length === 1 ? [{product_id:"",unit_id:"",quantity:"1",is_free:false}] : old.filter((_,n)=>n!==i))}>Remove line</button>
         </div>;
       })}
