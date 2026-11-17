@@ -1,31 +1,29 @@
 -- Create the van stock movement ledger before migrations that add idempotency
--- and define transfer/delivery RPCs. This table was referenced by those
--- migrations but was missing from the checked-in migration history.
+-- and define transfer/delivery RPCs. The live schema was previously created
+-- outside the checked-in migration history; keep this migration compatible
+-- with that existing table shape.
 create table if not exists public.van_stock_movements (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.organizations(id) on delete cascade,
   vehicle_number text not null,
   employee_id uuid,
   product_id uuid not null,
-  movement_type text not null check (movement_type in ('load','unload','sale','return')),
-  reference_type text not null,
+  movement_type text not null check (movement_type in ('load','sale','return','unload','adjustment')),
+  reference_type text,
   reference_id uuid,
-  quantity_in numeric(18,4) not null default 0 check (quantity_in >= 0),
-  quantity_out numeric(18,4) not null default 0 check (quantity_out >= 0),
-  unit_cost numeric(18,4) not null default 0 check (unit_cost >= 0),
+  quantity_in numeric not null default 0 check (quantity_in >= 0),
+  quantity_out numeric not null default 0 check (quantity_out >= 0),
+  unit_cost numeric not null default 0,
   batch_number text,
   expiry_date date,
-  idempotency_key text,
+  movement_at timestamptz not null default now(),
   notes text,
   created_by uuid references auth.users(id),
-  movement_at timestamptz not null default now(),
-  created_at timestamptz not null default now(),
-  foreign key (product_id, tenant_id)
-    references public.products(id, tenant_id),
-  foreign key (employee_id, tenant_id)
-    references public.employees(id, tenant_id),
-  check ((quantity_in > 0 and quantity_out = 0) or
-         (quantity_out > 0 and quantity_in = 0))
+  idempotency_key text,
+  foreign key (tenant_id, product_id)
+    references public.products(tenant_id, id),
+  foreign key (tenant_id, employee_id)
+    references public.employees(tenant_id, id)
 );
 
 create index if not exists van_stock_movements_tenant_vehicle_product_idx
