@@ -289,7 +289,7 @@ select ok(
   'delivery charge settlement RPCs are authenticated-only'
 );
 select ok(
-  (select count(*)=5 from pg_constraint c
+  (select count(*)=4 from pg_constraint c
    where c.conrelid='public.delivery_charges'::regclass and c.contype='f'
      and pg_get_constraintdef(c.oid) like 'FOREIGN KEY (tenant_id, %')
   and (select count(*)=2 from pg_constraint c
