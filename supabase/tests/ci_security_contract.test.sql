@@ -1,6 +1,6 @@
 begin;
 
-select plan(63);
+select plan(64);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -474,6 +474,15 @@ select ok(
    from pg_proc p
    where p.oid='public.dispatch_delivery(uuid,jsonb)'::regprocedure),
   'warehouse dispatch excludes missing expiry and batch metadata when product tracking requires it'
+);
+
+
+select ok(
+  exists(select 1 from pg_trigger t where t.tgrelid='public.products'::regclass and not t.tgisinternal and t.tgname='guard_product_tracking_enablement')
+  and (select p.prosecdef and position('positive stock has no expiry date' in lower(p.prosrc))>0
+        and position('positive stock has no batch number' in lower(p.prosrc))>0
+       from pg_proc p where p.oid='private.guard_product_tracking_enablement()'::regprocedure),
+  'product tracking cannot be enabled while positive legacy stock lacks required metadata'
 );
 
 select * from finish();
