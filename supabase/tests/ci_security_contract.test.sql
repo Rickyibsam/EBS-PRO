@@ -1,6 +1,6 @@
 begin;
 
-select plan(50);
+select plan(53);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -353,6 +353,30 @@ select ok(
    where n.nspname='public' and c.relname in ('stock_takes','stock_take_lines')
      and p.polname in ('module_override_guard_select','module_override_grant_select','module_override_guard_update','module_override_grant_update')),
   'stock take headers and lines enforce custom inventory view/update permissions'
+);
+
+
+select ok(
+  (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
+   where n.nspname='public' and c.relname='booker_product_visibility'),
+  'Booker product visibility rules have RLS enabled'
+);
+select ok(
+  exists(select 1 from pg_policy p join pg_class c on c.oid=p.polrelid join pg_namespace n on n.oid=c.relnamespace
+         where n.nspname='public' and c.relname='booker_product_visibility' and p.polname='booker_visibility_read')
+  and exists(select 1 from pg_policy p join pg_class c on c.oid=p.polrelid join pg_namespace n on n.oid=c.relnamespace
+         where n.nspname='public' and c.relname='booker_product_visibility' and p.polname='booker_visibility_write')
+  and exists(select 1 from pg_policy p join pg_class c on c.oid=p.polrelid join pg_namespace n on n.oid=c.relnamespace
+         where n.nspname='public' and c.relname='booker_product_visibility' and p.polname='module_override_guard_select')
+  and exists(select 1 from pg_policy p join pg_class c on c.oid=p.polrelid join pg_namespace n on n.oid=c.relnamespace
+         where n.nspname='public' and c.relname='booker_product_visibility' and p.polname='module_override_grant_select'),
+  'Booker visibility rules have role and custom order-booking access policies'
+);
+select ok(
+  (select count(*)=3 from pg_constraint c
+   where c.conrelid='public.booker_product_visibility'::regclass and c.contype='f'
+     and pg_get_constraintdef(c.oid) like 'FOREIGN KEY (tenant_id, %'),
+  'Booker visibility rules enforce same-tenant employee, vendor and product references'
 );
 
 select * from finish();
