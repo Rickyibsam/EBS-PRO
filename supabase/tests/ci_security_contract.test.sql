@@ -1,6 +1,6 @@
 begin;
 
-select plan(27);
+select plan(29);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -167,6 +167,18 @@ select ok(
 select ok(
   not has_function_privilege('anon','public.restore_draft_voucher_revision(uuid)','EXECUTE'),
   'anonymous users cannot execute voucher header restore RPC'
+);
+
+
+select ok(
+  has_function_privilege('authenticated','private.has_tenant_role_internal(uuid,text[])','EXECUTE')
+  and has_function_privilege('authenticated','private.is_tenant_member_internal(uuid)','EXECUTE'),
+  'authenticated RLS sessions can use private tenant membership helpers'
+);
+select ok(
+  not has_function_privilege('anon','private.has_tenant_role_internal(uuid,text[])','EXECUTE')
+  and not has_function_privilege('anon','private.is_tenant_member_internal(uuid)','EXECUTE'),
+  'anonymous role cannot execute private tenant membership helpers'
 );
 
 select * from finish();
