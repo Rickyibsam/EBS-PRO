@@ -21,6 +21,10 @@ A multi-tenant wholesale and distribution ERP built with React, TypeScript, Vite
 9. **Reports & Analytics** — date/customer/product/brand/booker/area sales, supplier purchases, stock, profitability, outstanding/recovery, CSV and print/PDF.
 10. **Administration & Security** — tenant onboarding, companies/branches/warehouses, staff invitations, roles, owner-managed per-user module/action permissions, audit/login history, company settings, voucher revision history and tenant backup/restore.
 
+## Platform support portal
+
+A separate protected platform staff workspace is available at `/?portal=super-admin`. It includes the cross-company directory, customer support tickets and conversation history. See [the platform portal setup and security guide](docs/PLATFORM_ADMIN_SUPPORT_PORTAL.md). The first Super Admin is intentionally provisioned manually by the project owner; no customer account is automatically elevated.
+
 ## Local development
 
 Requirements: Node.js and npm.
