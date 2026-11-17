@@ -1,6 +1,6 @@
 begin;
 
-select plan(54);
+select plan(57);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -387,6 +387,35 @@ select ok(
        from pg_proc p join pg_namespace n on n.oid=p.pronamespace
        where n.nspname='public' and p.proname='validate_booker_visibility_tenant'),
   'Booker visibility writes validate same-tenant employee, vendor and product ownership'
+);
+
+
+select ok(
+  (select count(*)=2 and bool_and(c.relrowsecurity)
+   from pg_class c join pg_namespace n on n.oid=c.relnamespace
+   where n.nspname='public' and c.relname in ('departments','designations')),
+  'HR departments and designations both exist with RLS enabled'
+);
+select ok(
+  exists(select 1 from pg_policy p join pg_class c on c.oid=p.polrelid join pg_namespace n on n.oid=c.relnamespace
+         where n.nspname='public' and c.relname='departments' and p.polname='departments_select')
+  and exists(select 1 from pg_policy p join pg_class c on c.oid=p.polrelid join pg_namespace n on n.oid=c.relnamespace
+         where n.nspname='public' and c.relname='departments' and p.polname='departments_write')
+  and exists(select 1 from pg_policy p join pg_class c on c.oid=p.polrelid join pg_namespace n on n.oid=c.relnamespace
+         where n.nspname='public' and c.relname='designations' and p.polname='designations_select')
+  and exists(select 1 from pg_policy p join pg_class c on c.oid=p.polrelid join pg_namespace n on n.oid=c.relnamespace
+         where n.nspname='public' and c.relname='designations' and p.polname='designations_write'),
+  'HR department and designation access is tenant-role scoped'
+);
+select ok(
+  (select count(*)=1 from pg_constraint c
+   where c.conrelid='public.designations'::regclass and c.contype='f'
+     and pg_get_constraintdef(c.oid) like 'FOREIGN KEY (tenant_id, department_id)%')
+  and (select count(*)=2 from pg_constraint c
+   where c.conrelid='public.employees'::regclass and c.contype='f'
+     and pg_get_constraintdef(c.oid) like 'FOREIGN KEY (tenant_id, %'
+     and pg_get_constraintdef(c.oid) like '%departments%' or pg_get_constraintdef(c.oid) like '%designations%'),
+  'employee department/designation and designation department links are tenant-safe'
 );
 
 select * from finish();
