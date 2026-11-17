@@ -1,3 +1,38 @@
+-- Restore the payroll incentive accrual ledger before the atomic import RPC.
+create table if not exists public.payroll_incentive_accruals (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.organizations(id) on delete cascade,
+  payroll_run_id uuid not null references public.payroll_runs(id) on delete cascade,
+  payroll_line_id uuid not null references public.payroll_lines(id) on delete cascade,
+  employee_id uuid not null references public.employees(id),
+  sales_target_id uuid not null references public.sales_targets(id),
+  earned_amount numeric not null check (earned_amount >= 0),
+  calculated_at timestamptz not null default now(),
+  constraint payroll_incentive_accruals_tenant_run_target_key
+    unique (tenant_id,payroll_run_id,sales_target_id)
+);
+
+create index if not exists payroll_incentive_accruals_run_idx
+  on public.payroll_incentive_accruals(tenant_id,payroll_run_id,employee_id);
+create index if not exists payroll_incentive_accruals_employee_idx
+  on public.payroll_incentive_accruals(employee_id);
+create index if not exists payroll_incentive_accruals_target_idx
+  on public.payroll_incentive_accruals(sales_target_id);
+create index if not exists payroll_incentive_accruals_line_idx
+  on public.payroll_incentive_accruals(payroll_line_id);
+create index if not exists payroll_incentive_accruals_run_fk_idx
+  on public.payroll_incentive_accruals(payroll_run_id);
+
+alter table public.payroll_incentive_accruals enable row level security;
+drop policy if exists payroll_incentive_accruals_tenant_access on public.payroll_incentive_accruals;
+create policy payroll_incentive_accruals_tenant_access on public.payroll_incentive_accruals
+  for all to authenticated
+  using (private.has_tenant_role_internal(tenant_id,array['owner','admin','manager','accounts']::text[]))
+  with check (private.has_tenant_role_internal(tenant_id,array['owner','admin','manager','accounts']::text[]));
+
+grant all on table public.payroll_incentive_accruals to authenticated;
+revoke all on table public.payroll_incentive_accruals from anon;
+
 -- Keep employee incentive import and payroll recalculation in one database transaction.
 create or replace function public.import_employee_incentives_to_payroll(
   p_payroll_run_id uuid,
