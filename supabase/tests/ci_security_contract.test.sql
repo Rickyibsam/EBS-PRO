@@ -1,6 +1,6 @@
 begin;
 
-select plan(49);
+select plan(50);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -344,6 +344,15 @@ select ok(
        from pg_proc p join pg_namespace n on n.oid=p.pronamespace
        where n.nspname='public' and p.proname='get_erp_report_summary'),
   'date-filtered ERP report RPC is authenticated-only and honors custom report permissions'
+);
+
+
+select ok(
+  (select count(*)=8 from pg_policy p join pg_class c on c.oid=p.polrelid
+   join pg_namespace n on n.oid=c.relnamespace
+   where n.nspname='public' and c.relname in ('stock_takes','stock_take_lines')
+     and p.polname in ('module_override_guard_select','module_override_grant_select','module_override_guard_update','module_override_grant_update')),
+  'stock take headers and lines enforce custom inventory view/update permissions'
 );
 
 select * from finish();
