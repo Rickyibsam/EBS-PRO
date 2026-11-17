@@ -50,8 +50,9 @@ select ok(
   'anonymous role cannot execute Booker catalogue RPC'
 );
 select ok(
-  not has_function_privilege('authenticated','public.get_booker_stock_balances(uuid)','EXECUTE'),
-  'authenticated cannot execute legacy tenant-wide stock RPC'
+  to_regprocedure('public.get_booker_stock_balances(uuid)') is null
+  or not has_function_privilege('authenticated','public.get_booker_stock_balances(uuid)','EXECUTE'),
+  'legacy tenant-wide stock RPC is absent or not executable by authenticated users'
 );
 select ok(
   not has_function_privilege('authenticated','private.booker_product_allowed(uuid,uuid,uuid)','EXECUTE'),
