@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const migration = await readFile(
-  new URL("../supabase/migrations/20261114135000_harden_booker_authorization_and_tenant_integrity.sql", import.meta.url),
+  new URL("../supabase/migrations/20261117083825_harden_booker_authorization_and_tenant_integrity.sql", import.meta.url),
   "utf8"
 );
 const moduleSource = await readFile(new URL("../src/BookerOrderModule.tsx", import.meta.url), "utf8");
