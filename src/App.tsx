@@ -39,6 +39,7 @@ const SupportCenterModule = lazy(() => import("./SupportCenterModule"));
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
+const PUBLIC_APP_URL = "https://ebs-pro.onrender.com";
 const db = url && key ? createClient(url, key) : null;
 
 type Organization = { id: string; name: string; city: string | null; currency: string };
@@ -144,7 +145,7 @@ export default function App() {
     try {
       if(recoveryMode){const {error}=await db.auth.updateUser({password});if(error)throw error;await db.auth.signOut();setRecoveryMode(false);setPassword("");setNotice("Password updated successfully. Sign in with your new password.");return;}
       if(mode==="signup"){
-        const {data,error}=await db.auth.signUp({email,password,options:{data:{full_name:fullName},emailRedirectTo:window.location.origin}});
+        const {data,error}=await db.auth.signUp({email,password,options:{data:{full_name:fullName},emailRedirectTo:PUBLIC_APP_URL}});
         if(error)throw error;
         if(!data.session)setNotice("Account created. Check your inbox and confirm your email address before signing in.");
         else setSession(data.session);
@@ -160,7 +161,7 @@ export default function App() {
     if(!db)return;
     if(!email.trim()){setNotice("Enter your account email address first.");return;}
     setBusy(true);setNotice("");
-    try{const {error}=await db.auth.resetPasswordForEmail(email.trim(),{redirectTo:window.location.origin});if(error)throw error;setNotice("Password recovery email sent. Open the link in that email on this device to set a new password.");}
+    try{const {error}=await db.auth.resetPasswordForEmail(email.trim(),{redirectTo:`${PUBLIC_APP_URL}/?portal=super-admin`});if(error)throw error;setNotice("Password recovery email sent. Open the link in that email on this device to set a new password.");}
     catch(err){setNotice(err instanceof Error?err.message:"Password recovery email could not be sent.");}
     finally{setBusy(false);}
   }
