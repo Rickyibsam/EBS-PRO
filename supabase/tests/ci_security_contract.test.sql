@@ -1,6 +1,6 @@
 begin;
 
-select plan(30);
+select plan(31);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -187,6 +187,16 @@ select ok(
    from pg_proc p join pg_namespace n on n.oid=p.pronamespace
    where n.nspname='private' and p.proname in ('has_tenant_role_internal','is_tenant_member_internal')),
   'private tenant helpers are SECURITY DEFINER with a fixed safe search_path'
+);
+
+
+select ok(
+  (select position('current_setting(''app.ebs_backup_restore''' in p.prosrc)>0
+          and position('public.has_tenant_role' in p.prosrc)>0
+          and position('if not v_restore' in p.prosrc)>0
+   from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+   where n.nspname='public' and p.proname='enforce_stock_batch_expiry_rules'),
+  'batch/expiry validation bypass is limited to authorized backup restore sessions'
 );
 
 select * from finish();
