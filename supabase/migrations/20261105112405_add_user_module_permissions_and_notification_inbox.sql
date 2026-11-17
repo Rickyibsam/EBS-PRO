@@ -73,6 +73,30 @@ create policy booker_visibility_write on public.booker_product_visibility
   using (private.has_tenant_role_internal(tenant_id,array['owner','admin','manager','sales']::text[]))
   with check (private.has_tenant_role_internal(tenant_id,array['owner','admin','manager','sales']::text[]));
 
+create or replace function public.validate_booker_visibility_tenant()
+returns trigger
+language plpgsql
+set search_path=''
+as $function$
+begin
+ if not exists(select 1 from public.employees e where e.id=new.employee_id and e.tenant_id=new.tenant_id) then
+  raise exception 'Booker employee must belong to the same company';
+ end if;
+ if new.vendor_id is not null and not exists(select 1 from public.parties p where p.id=new.vendor_id and p.tenant_id=new.tenant_id and p.party_type in ('supplier','both')) then
+  raise exception 'Vendor must belong to the same company and be a Vendor';
+ end if;
+ if new.product_id is not null and not exists(select 1 from public.products p where p.id=new.product_id and p.tenant_id=new.tenant_id) then
+  raise exception 'Product must belong to the same company';
+ end if;
+ return new;
+end;
+$function$;
+
+drop trigger if exists booker_visibility_tenant_guard on public.booker_product_visibility;
+create trigger booker_visibility_tenant_guard
+before insert or update on public.booker_product_visibility
+for each row execute function public.validate_booker_visibility_tenant();
+
 grant all on table public.booker_product_visibility to authenticated;
 revoke all on table public.booker_product_visibility from anon;
 
