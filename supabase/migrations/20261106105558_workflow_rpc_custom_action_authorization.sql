@@ -146,6 +146,24 @@ begin
 end
 $policy$;
 
+do $mapping_grants$
+begin
+  create policy module_override_grant_select on public.employee_advance_account_mappings
+    as permissive for select to authenticated
+    using (private.module_permission_grant_internal(tenant_id,'accounts_finance','view'));
+  create policy module_override_grant_insert on public.employee_advance_account_mappings
+    as permissive for insert to authenticated
+    with check (private.module_permission_grant_internal(tenant_id,'accounts_finance','create'));
+  create policy module_override_grant_update on public.employee_advance_account_mappings
+    as permissive for update to authenticated
+    using (private.module_permission_grant_internal(tenant_id,'accounts_finance','update'))
+    with check (private.module_permission_grant_internal(tenant_id,'accounts_finance','update'));
+  create policy module_override_grant_delete on public.employee_advance_account_mappings
+    as permissive for delete to authenticated
+    using (private.module_permission_grant_internal(tenant_id,'accounts_finance','delete'));
+end
+$mapping_grants$;
+
 create or replace function private.create_employee_advance_internal(
   p_tenant_id uuid,p_employee_id uuid,p_amount numeric,p_issue_date date,p_notes text default null
 )
