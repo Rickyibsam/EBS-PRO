@@ -7,7 +7,7 @@ create table if not exists public.van_stock_movements (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.organizations(id) on delete cascade,
   vehicle_number text not null,
-  employee_id uuid,
+  employee_id uuid references public.employees(id),
   product_id uuid not null references public.products(id),
   movement_type text not null check (
     movement_type in ('load','sale','return','unload','adjustment')
@@ -23,7 +23,7 @@ create table if not exists public.van_stock_movements (
   notes text,
   created_by uuid references auth.users(id),
   idempotency_key text,
-  constraint van_stock_movements_one_direction_check
+  constraint van_stock_movements_check
     check ((quantity_in = 0) <> (quantity_out = 0))
 );
 
