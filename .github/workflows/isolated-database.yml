@@ -1,19 +1,23 @@
 name: EBS PRO isolated database replay
 
 on:
-  push:
-    branches: [security/booker-authorization-hardening]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: isolated-database-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   postgres-clean-replay:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      - name: Check out feature branch
+      - name: Check out pull request source
         uses: actions/checkout@v4
 
       - name: Set up Supabase CLI
