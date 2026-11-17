@@ -124,6 +124,26 @@ create table if not exists public.designations (
   constraint designations_tenant_id_name_key unique (tenant_id,name)
 );
 
+alter table public.employees
+  add column if not exists department_id uuid,
+  add column if not exists designation_id uuid;
+
+do $employee_hr_fk$
+begin
+  if not exists(select 1 from pg_constraint where conrelid='public.employees'::regclass and conname='employees_department_id_fkey') then
+    alter table public.employees add constraint employees_department_id_fkey
+      foreign key(department_id) references public.departments(id);
+  end if;
+  if not exists(select 1 from pg_constraint where conrelid='public.employees'::regclass and conname='employees_designation_id_fkey') then
+    alter table public.employees add constraint employees_designation_id_fkey
+      foreign key(designation_id) references public.designations(id);
+  end if;
+end
+$employee_hr_fk$;
+
+create index if not exists employees_department_id_idx on public.employees(department_id);
+create index if not exists employees_designation_id_idx on public.employees(designation_id);
+
 create index if not exists designations_department_idx on public.designations(department_id);
 
 alter table public.departments enable row level security;
