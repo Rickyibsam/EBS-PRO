@@ -14,4 +14,7 @@ test("warehouse FEFO dispatch blocks missing metadata when product tracking is e
   assert.ok(migration.includes("nullif(btrim(batch_number)"));
   assert.ok(migration.includes("expiry_date >= current_date"));
   assert.ok(migration.includes("for share"));
+  assert.ok(migration.includes("guard_product_tracking_enablement"));
+  assert.ok(migration.includes("positive stock has no expiry date"));
+  assert.ok(migration.includes("positive stock has no batch number"));
 });
