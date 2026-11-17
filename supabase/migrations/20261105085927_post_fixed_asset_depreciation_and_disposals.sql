@@ -1,3 +1,80 @@
+-- Restore the fixed-asset register tables that exist in the hosted schema but
+-- were missing their original CREATE TABLE statements from migration history.
+-- These definitions are idempotent and precede the depreciation indexes/RPC below.
+
+create table if not exists public.fixed_assets (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.organizations(id) on delete cascade,
+  asset_code text not null,
+  asset_name text not null,
+  category text,
+  acquisition_date date not null,
+  acquisition_cost numeric(14,2) not null check (acquisition_cost > 0),
+  salvage_value numeric(14,2) not null default 0
+    check (salvage_value >= 0 and salvage_value <= acquisition_cost),
+  useful_life_months integer not null check (useful_life_months > 0),
+  depreciation_method text not null default 'straight_line'
+    check (depreciation_method = 'straight_line'),
+  status text not null default 'active'
+    check (status in ('active','disposed','fully_depreciated')),
+  disposal_date date,
+  disposal_amount numeric(14,2),
+  notes text,
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now(),
+  branch_id uuid references public.branches(id) on delete set null,
+  constraint fixed_assets_tenant_asset_code_key unique (tenant_id,asset_code)
+);
+
+create table if not exists public.asset_depreciation_entries (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.organizations(id) on delete cascade,
+  asset_id uuid not null references public.fixed_assets(id),
+  period_start date not null,
+  period_end date not null,
+  depreciation_amount numeric(14,2) not null check (depreciation_amount >= 0),
+  journal_entry_id uuid references public.journal_entries(id),
+  posted boolean not null default false,
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now(),
+  constraint asset_depreciation_entries_period_check check (period_end >= period_start),
+  constraint asset_depreciation_entries_period_unique
+    unique (tenant_id,asset_id,period_start,period_end)
+);
+
+create index if not exists fixed_assets_branch_id_idx
+  on public.fixed_assets(branch_id) where branch_id is not null;
+create index if not exists fixed_assets_created_by_idx
+  on public.fixed_assets(created_by);
+create index if not exists fixed_assets_tenant_branch_idx
+  on public.fixed_assets(tenant_id,branch_id);
+create index if not exists fixed_assets_tenant_status_idx
+  on public.fixed_assets(tenant_id,status);
+create index if not exists asset_depreciation_entries_asset_idx
+  on public.asset_depreciation_entries(asset_id);
+create index if not exists asset_depreciation_entries_created_by_idx
+  on public.asset_depreciation_entries(created_by);
+create index if not exists asset_depreciation_entries_journal_idx
+  on public.asset_depreciation_entries(journal_entry_id);
+create index if not exists asset_depreciation_tenant_period_idx
+  on public.asset_depreciation_entries(tenant_id,period_end);
+
+alter table public.fixed_assets enable row level security;
+drop policy if exists fixed_assets_tenant_access on public.fixed_assets;
+create policy fixed_assets_tenant_access on public.fixed_assets
+  for all to authenticated
+  using (public.has_tenant_role(tenant_id,array['owner','admin','manager','accounts','warehouse']::text[]))
+  with check (public.has_tenant_role(tenant_id,array['owner','admin','manager','accounts','warehouse']::text[]));
+grant select,insert,update,delete on public.fixed_assets to authenticated;
+
+alter table public.asset_depreciation_entries enable row level security;
+drop policy if exists asset_depreciation_entries_tenant_access on public.asset_depreciation_entries;
+create policy asset_depreciation_entries_tenant_access on public.asset_depreciation_entries
+  for all to authenticated
+  using (public.has_tenant_role(tenant_id,array['owner','admin','manager','accounts','warehouse']::text[]))
+  with check (public.has_tenant_role(tenant_id,array['owner','admin','manager','accounts','warehouse']::text[]));
+grant select,insert,update,delete on public.asset_depreciation_entries to authenticated;
+
 -- Restored from the hosted Supabase migration ledger.
 -- Original applied statements are preserved below.
 

@@ -1,3 +1,176 @@
+-- Internal authorization helpers referenced by the RLS policies below.
+-- Their original definitions were missing from the migration history.
+create schema if not exists private;
+revoke all on schema private from public,anon;
+
+create or replace function private.has_tenant_role_internal(p_tenant_id uuid,p_roles text[])
+returns boolean
+language sql stable security definer
+set search_path=pg_catalog,public,auth
+as $function$
+  select exists (
+    select 1 from public.tenant_memberships m
+    where m.tenant_id=p_tenant_id and m.user_id=(select auth.uid())
+      and m.is_active and m.role=any(p_roles)
+  );
+$function$;
+
+create or replace function private.is_tenant_member_internal(p_tenant_id uuid)
+returns boolean
+language sql stable security definer
+set search_path=pg_catalog,public,auth
+as $function$
+  select exists (
+    select 1 from public.tenant_memberships m
+    where m.tenant_id=p_tenant_id and m.user_id=(select auth.uid()) and m.is_active
+  );
+$function$;
+
+revoke all on function private.has_tenant_role_internal(uuid,text[]) from public,anon;
+revoke all on function private.is_tenant_member_internal(uuid) from public,anon;
+grant execute on function private.has_tenant_role_internal(uuid,text[]) to authenticated;
+grant execute on function private.is_tenant_member_internal(uuid) to authenticated;
+
+-- Restore Booker product visibility rules before the dynamic module-policy sweep.
+create table if not exists public.booker_product_visibility (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.organizations(id) on delete cascade,
+  employee_id uuid not null references public.employees(id) on delete cascade,
+  vendor_id uuid references public.parties(id) on delete cascade,
+  brand text,
+  product_id uuid references public.products(id) on delete cascade,
+  is_allowed boolean not null default true,
+  require_stock boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint booker_product_visibility_scope_check
+    check (vendor_id is not null or nullif(trim(brand),'') is not null or product_id is not null)
+);
+
+create index if not exists booker_product_visibility_employee_idx
+  on public.booker_product_visibility(tenant_id,employee_id);
+create index if not exists booker_product_visibility_vendor_idx
+  on public.booker_product_visibility(tenant_id,vendor_id);
+
+alter table public.booker_product_visibility enable row level security;
+drop policy if exists booker_visibility_read on public.booker_product_visibility;
+create policy booker_visibility_read on public.booker_product_visibility
+  for select to authenticated
+  using (
+    private.has_tenant_role_internal(tenant_id,array['owner','admin','manager','sales']::text[])
+    or exists (
+      select 1 from public.employees e
+      where e.id=booker_product_visibility.employee_id
+        and e.tenant_id=booker_product_visibility.tenant_id
+        and e.user_id=(select auth.uid())
+        and e.employment_status='active'
+        and private.has_tenant_role_internal(e.tenant_id,array['order_booker']::text[])
+    )
+  );
+drop policy if exists booker_visibility_write on public.booker_product_visibility;
+create policy booker_visibility_write on public.booker_product_visibility
+  for all to authenticated
+  using (private.has_tenant_role_internal(tenant_id,array['owner','admin','manager','sales']::text[]))
+  with check (private.has_tenant_role_internal(tenant_id,array['owner','admin','manager','sales']::text[]));
+
+create or replace function public.validate_booker_visibility_tenant()
+returns trigger
+language plpgsql
+set search_path=''
+as $function$
+begin
+ if not exists(select 1 from public.employees e where e.id=new.employee_id and e.tenant_id=new.tenant_id) then
+  raise exception 'Booker employee must belong to the same company';
+ end if;
+ if new.vendor_id is not null and not exists(select 1 from public.parties p where p.id=new.vendor_id and p.tenant_id=new.tenant_id and p.party_type in ('supplier','both')) then
+  raise exception 'Vendor must belong to the same company and be a Vendor';
+ end if;
+ if new.product_id is not null and not exists(select 1 from public.products p where p.id=new.product_id and p.tenant_id=new.tenant_id) then
+  raise exception 'Product must belong to the same company';
+ end if;
+ return new;
+end;
+$function$;
+
+drop trigger if exists booker_visibility_tenant_guard on public.booker_product_visibility;
+create trigger booker_visibility_tenant_guard
+before insert or update on public.booker_product_visibility
+for each row execute function public.validate_booker_visibility_tenant();
+
+grant all on table public.booker_product_visibility to authenticated;
+revoke all on table public.booker_product_visibility from anon;
+
+-- Restore HR department/designation masters before the dynamic module-policy sweep.
+create table if not exists public.departments (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.organizations(id) on delete cascade,
+  code text not null,
+  name text not null,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  constraint departments_tenant_id_code_key unique (tenant_id,code),
+  constraint departments_tenant_id_name_key unique (tenant_id,name)
+);
+
+create table if not exists public.designations (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.organizations(id) on delete cascade,
+  department_id uuid references public.departments(id),
+  code text not null,
+  name text not null,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  constraint designations_tenant_id_code_key unique (tenant_id,code),
+  constraint designations_tenant_id_name_key unique (tenant_id,name)
+);
+
+alter table public.employees
+  add column if not exists department_id uuid,
+  add column if not exists designation_id uuid;
+
+do $employee_hr_fk$
+begin
+  if not exists(select 1 from pg_constraint where conrelid='public.employees'::regclass and conname='employees_department_id_fkey') then
+    alter table public.employees add constraint employees_department_id_fkey
+      foreign key(department_id) references public.departments(id);
+  end if;
+  if not exists(select 1 from pg_constraint where conrelid='public.employees'::regclass and conname='employees_designation_id_fkey') then
+    alter table public.employees add constraint employees_designation_id_fkey
+      foreign key(designation_id) references public.designations(id);
+  end if;
+end
+$employee_hr_fk$;
+
+create index if not exists employees_department_id_idx on public.employees(department_id);
+create index if not exists employees_designation_id_idx on public.employees(designation_id);
+
+create index if not exists designations_department_idx on public.designations(department_id);
+
+alter table public.departments enable row level security;
+drop policy if exists departments_select on public.departments;
+create policy departments_select on public.departments
+  for select to authenticated
+  using (private.has_tenant_role_internal(tenant_id,array['owner','admin','manager','accounts','sales','order_booker','delivery_man','warehouse']::text[]));
+drop policy if exists departments_write on public.departments;
+create policy departments_write on public.departments
+  for all to authenticated
+  using (private.has_tenant_role_internal(tenant_id,array['owner','admin','manager']::text[]))
+  with check (private.has_tenant_role_internal(tenant_id,array['owner','admin','manager']::text[]));
+
+alter table public.designations enable row level security;
+drop policy if exists designations_select on public.designations;
+create policy designations_select on public.designations
+  for select to authenticated
+  using (private.has_tenant_role_internal(tenant_id,array['owner','admin','manager','accounts','sales','order_booker','delivery_man','warehouse']::text[]));
+drop policy if exists designations_write on public.designations;
+create policy designations_write on public.designations
+  for all to authenticated
+  using (private.has_tenant_role_internal(tenant_id,array['owner','admin','manager']::text[]))
+  with check (private.has_tenant_role_internal(tenant_id,array['owner','admin','manager']::text[]));
+
+grant all on table public.departments,public.designations to authenticated;
+revoke all on table public.departments,public.designations from anon;
+
 -- Per-user module permission overrides and persistent notification inbox.
 -- Existing role policies remain the default. Explicit owner-set overrides can
 -- restrict or extend a member's access, while tenant membership is always checked.

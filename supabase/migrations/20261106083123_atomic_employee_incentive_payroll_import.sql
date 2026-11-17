@@ -1,3 +1,56 @@
+-- Restore the payroll incentive accrual ledger before the atomic import RPC.
+create table if not exists public.payroll_incentive_accruals (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.organizations(id) on delete cascade,
+  payroll_run_id uuid not null references public.payroll_runs(id) on delete cascade,
+  payroll_line_id uuid not null references public.payroll_lines(id) on delete cascade,
+  employee_id uuid not null references public.employees(id),
+  sales_target_id uuid not null references public.sales_targets(id),
+  earned_amount numeric not null check (earned_amount >= 0),
+  calculated_at timestamptz not null default now(),
+  constraint payroll_incentive_accruals_tenant_run_target_key
+    unique (tenant_id,payroll_run_id,sales_target_id)
+);
+
+create index if not exists payroll_incentive_accruals_run_idx
+  on public.payroll_incentive_accruals(tenant_id,payroll_run_id,employee_id);
+create index if not exists payroll_incentive_accruals_employee_idx
+  on public.payroll_incentive_accruals(employee_id);
+create index if not exists payroll_incentive_accruals_target_idx
+  on public.payroll_incentive_accruals(sales_target_id);
+create index if not exists payroll_incentive_accruals_line_idx
+  on public.payroll_incentive_accruals(payroll_line_id);
+create index if not exists payroll_incentive_accruals_run_fk_idx
+  on public.payroll_incentive_accruals(payroll_run_id);
+
+alter table public.payroll_incentive_accruals enable row level security;
+drop policy if exists payroll_incentive_accruals_tenant_access on public.payroll_incentive_accruals;
+create policy payroll_incentive_accruals_tenant_access on public.payroll_incentive_accruals
+  for all to authenticated
+  using (private.has_tenant_role_internal(tenant_id,array['owner','admin','manager','accounts']::text[]))
+  with check (private.has_tenant_role_internal(tenant_id,array['owner','admin','manager','accounts']::text[]));
+
+do $policy$
+declare v_action text;v_policy text;
+begin
+  foreach v_action in array array['select','insert','update','delete'] loop
+    v_policy:='module_override_grant_'||v_action;
+    if v_action='insert' then
+      execute format('create policy %I on public.payroll_incentive_accruals as permissive for insert to authenticated with check (private.module_permission_grant_internal(tenant_id,%L,%L))',v_policy,'hr_payroll','create');
+    elsif v_action='update' then
+      execute format('create policy %I on public.payroll_incentive_accruals as permissive for update to authenticated using (private.module_permission_grant_internal(tenant_id,%L,%L)) with check (private.module_permission_grant_internal(tenant_id,%L,%L))',v_policy,'hr_payroll','update','hr_payroll','update');
+    elsif v_action='delete' then
+      execute format('create policy %I on public.payroll_incentive_accruals as permissive for delete to authenticated using (private.module_permission_grant_internal(tenant_id,%L,%L))',v_policy,'hr_payroll','delete');
+    else
+      execute format('create policy %I on public.payroll_incentive_accruals as permissive for select to authenticated using (private.module_permission_grant_internal(tenant_id,%L,%L))',v_policy,'hr_payroll','view');
+    end if;
+  end loop;
+end
+$policy$;
+
+grant all on table public.payroll_incentive_accruals to authenticated;
+revoke all on table public.payroll_incentive_accruals from anon;
+
 -- Keep employee incentive import and payroll recalculation in one database transaction.
 create or replace function public.import_employee_incentives_to_payroll(
   p_payroll_run_id uuid,

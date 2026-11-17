@@ -3,8 +3,9 @@
 
 -- Standard, editable starter chart for this tenant. Existing account rows are never overwritten.
 insert into public.chart_of_accounts(tenant_id,account_code,account_name,account_type,is_control_account,is_active)
-select '2742d92f-04f5-4dea-a55e-62d1e8d6f795'::uuid,x.code,x.name,x.kind,true,true
-from (values
+select o.id,x.code,x.name,x.kind,true,true
+from public.organizations o
+cross join (values
  ('1000','Cash on Hand','asset'),
  ('1010','Bank Accounts','asset'),
  ('1100','Accounts Receivable','asset'),
@@ -17,7 +18,10 @@ from (values
  ('5000','Cost of Goods Sold','expense'),
  ('5100','Operating Expenses','expense')
 ) as x(code,name,kind)
-where not exists(select 1 from public.chart_of_accounts c where c.tenant_id='2742d92f-04f5-4dea-a55e-62d1e8d6f795'::uuid and c.account_code=x.code);
+where not exists(
+ select 1 from public.chart_of_accounts c
+ where c.tenant_id=o.id and c.account_code=x.code
+);
 
 create or replace function public.create_tenant(p_name text,p_slug text,p_city text default null,p_phone text default null)
 returns uuid

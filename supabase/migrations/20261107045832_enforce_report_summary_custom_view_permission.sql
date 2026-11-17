@@ -261,8 +261,7 @@ begin
 
   return v_result;
 end;
-$function$
-
+$function$;
 
 revoke all on function public.get_erp_report_summary(uuid,date,date) from public, anon;
 grant execute on function public.get_erp_report_summary(uuid,date,date) to authenticated;

@@ -1,3 +1,51 @@
+-- Restore budget headers and lines before the indexes below. The hosted schema
+-- contains these tables, but their original CREATE TABLE statements were absent
+-- from the checked-in migration history.
+
+create table if not exists public.budgets (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.organizations(id) on delete cascade,
+  budget_name text not null,
+  period_start date not null,
+  period_end date not null,
+  status text not null default 'draft' check (status in ('draft','approved','closed')),
+  created_by uuid references auth.users(id),
+  approved_by uuid references auth.users(id),
+  created_at timestamptz not null default now(),
+  constraint budgets_period_check check (period_end >= period_start)
+);
+
+create table if not exists public.budget_lines (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.organizations(id) on delete cascade,
+  budget_id uuid not null references public.budgets(id) on delete cascade,
+  account_id uuid not null references public.chart_of_accounts(id),
+  branch_id uuid references public.branches(id),
+  budget_amount numeric(14,2) not null check (budget_amount >= 0),
+  notes text,
+  constraint budget_lines_budget_account_branch_key
+    unique (tenant_id,budget_id,account_id,branch_id)
+);
+
+create index if not exists budgets_tenant_period_idx
+  on public.budgets(tenant_id,period_start,period_end);
+
+alter table public.budgets enable row level security;
+drop policy if exists budgets_tenant_access on public.budgets;
+create policy budgets_tenant_access on public.budgets
+  for all to authenticated
+  using (public.has_tenant_role(tenant_id,array['owner','admin','manager','accounts','warehouse']::text[]))
+  with check (public.has_tenant_role(tenant_id,array['owner','admin','manager','accounts','warehouse']::text[]));
+grant select,insert,update,delete on public.budgets to authenticated;
+
+alter table public.budget_lines enable row level security;
+drop policy if exists budget_lines_tenant_access on public.budget_lines;
+create policy budget_lines_tenant_access on public.budget_lines
+  for all to authenticated
+  using (public.has_tenant_role(tenant_id,array['owner','admin','manager','accounts','warehouse']::text[]))
+  with check (public.has_tenant_role(tenant_id,array['owner','admin','manager','accounts','warehouse']::text[]));
+grant select,insert,update,delete on public.budget_lines to authenticated;
+
 -- Restored from the hosted Supabase migration ledger.
 -- Original applied statements are preserved below.
 

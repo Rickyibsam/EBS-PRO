@@ -1,0 +1,45 @@
+name: EBS PRO isolated database replay
+
+on:
+  push:
+    branches: [security/booker-authorization-hardening]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: isolated-database-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgres-clean-replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: v2.stable
+
+      - name: Verify pinned Supabase CLI version
+        run: supabase --version
+
+      - name: Start disposable local Supabase stack
+        run: supabase start
+
+      - name: Replay complete migration history on disposable PostgreSQL
+        run: supabase db reset --local
+
+      - name: Verify database security contract
+        run: supabase test db supabase/tests/ci_security_contract.test.sql
+
+      - name: Verify authenticated Booker catalogue and RLS workflows
+        run: supabase test db supabase/tests/booker_role_access.test.sql
+
+      - name: Stop disposable Supabase stack
+        if: always()
+        run: supabase stop --no-backup
