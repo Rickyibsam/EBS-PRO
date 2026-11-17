@@ -1,6 +1,6 @@
 begin;
 
-select plan(32);
+select plan(35);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -205,6 +205,32 @@ select ok(
    from pg_proc p join pg_namespace n on n.oid=p.pronamespace
    where n.nspname='public' and p.proname='post_payroll_run'),
   'payroll posting RPC honors explicit HR/payroll update grants'
+);
+
+
+select ok(
+  (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
+   where n.nspname='public' and c.relname='sales_incentive_adjustments'),
+  'sales incentive adjustment ledger has RLS enabled'
+);
+select ok(
+  exists(select 1 from pg_policy p join pg_class c on c.oid=p.polrelid
+         join pg_namespace n on n.oid=c.relnamespace
+         where n.nspname='public' and c.relname='sales_incentive_adjustments'
+           and p.polname='sales_incentive_adjustments_select')
+  and exists(select 1 from pg_policy p join pg_class c on c.oid=p.polrelid
+         join pg_namespace n on n.oid=c.relnamespace
+         where n.nspname='public' and c.relname='sales_incentive_adjustments'
+           and p.polname='sales_incentive_adjustments_insert'),
+  'sales incentive adjustment ledger has tenant-scoped read/insert policies'
+);
+select ok(
+  has_function_privilege('authenticated','public.apply_commission_return_adjustments(uuid)','EXECUTE')
+  and not has_function_privilege('anon','public.apply_commission_return_adjustments(uuid)','EXECUTE')
+  and (select position('module_permission_grant_internal' in p.prosrc)>0
+       from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+       where n.nspname='public' and p.proname='apply_commission_return_adjustments'),
+  'commission clawback RPC is authenticated-only and honors HR/payroll custom update grants'
 );
 
 select * from finish();
