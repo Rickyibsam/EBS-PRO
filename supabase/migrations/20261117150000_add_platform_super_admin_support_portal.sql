@@ -162,3 +162,57 @@ COMMENT ON TABLE public.platform_support_tickets IS
   'Platform support cases linked to a customer tenant; access is limited to active platform staff.';
 COMMENT ON TABLE public.platform_support_messages IS
   'Internal support conversation history; access is limited to active platform staff.';
+
+-- Tenant members can create and read only their own company's support cases.
+CREATE POLICY platform_support_tickets_tenant_select
+  ON public.platform_support_tickets FOR SELECT TO authenticated
+  USING ((SELECT private.is_tenant_member_internal(tenant_id)));
+
+CREATE POLICY platform_support_tickets_tenant_insert
+  ON public.platform_support_tickets FOR INSERT TO authenticated
+  WITH CHECK (
+    (SELECT private.is_tenant_member_internal(tenant_id))
+    AND created_by = (SELECT auth.uid())
+  );
+
+CREATE POLICY platform_support_messages_tenant_select
+  ON public.platform_support_messages FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.platform_support_tickets st
+      WHERE st.id = ticket_id
+        AND private.is_tenant_member_internal(st.tenant_id)
+    )
+  );
+
+CREATE POLICY platform_support_messages_tenant_insert
+  ON public.platform_support_messages FOR INSERT TO authenticated
+  WITH CHECK (
+    sender_id = (SELECT auth.uid())
+    AND EXISTS (
+      SELECT 1 FROM public.platform_support_tickets st
+      WHERE st.id = ticket_id
+        AND private.is_tenant_member_internal(st.tenant_id)
+    )
+  );
+
+-- A conversation reply updates the ticket's activity timestamp without granting
+-- tenant users permission to update ticket status, priority or assignment.
+CREATE OR REPLACE FUNCTION private.touch_platform_support_ticket()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  UPDATE public.platform_support_tickets
+  SET updated_at = now()
+  WHERE id = NEW.ticket_id;
+  RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION private.touch_platform_support_ticket() FROM PUBLIC, anon, authenticated;
+CREATE TRIGGER platform_support_message_touch_ticket
+AFTER INSERT ON public.platform_support_messages
+FOR EACH ROW EXECUTE FUNCTION private.touch_platform_support_ticket();
