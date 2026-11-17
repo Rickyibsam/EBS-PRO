@@ -91,9 +91,7 @@ declare
 begin
  if auth.uid() is null then raise exception 'Authentication required.';end if;
  select * into v_run from public.payroll_runs where id=p_payroll_run_id for update;
- if not found or not public.has_tenant_role(v_run.tenant_id,array['owner','admin','manager','accounts']) then
-  raise exception 'You cannot adjust this payroll run.' using errcode='42501';
- end if;
+ if not found or not public.has_tenant_role(v_run.tenant_id,array['owner','admin','manager','accounts']) then raise exception 'You cannot adjust this payroll run.' using errcode='42501';end if;
  if v_run.status<>'draft' then raise exception 'Commission adjustments can only be applied to a draft payroll run.';end if;
  for v_accrual in
   select * from public.sales_incentive_accruals a
