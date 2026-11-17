@@ -109,7 +109,7 @@ This is stronger coverage than a build-only check, but it is not a claim of comp
 - A clean-room backup/restore rehearsal in a separate test tenant/project. The current database tests use isolated fixtures inside rollback-only transactions; no destructive restore has been run against production.
 - Performance/load acceptance with representative business data and concurrent users.
 
-The current production tenant contains only a small sample dataset, so its existing records cannot prove every real-world business edge case.
+The hosted database currently has 2 organizations, 3 tenant memberships, 2 branches, 1 employee, 1 sales order, 1 purchase order, 1 goods receipt and 1 journal entry; there are currently no posted sales invoices or deliveries. This remains a small sample dataset and cannot prove every real-world business edge case.
 
 ## Current hosted database
 
@@ -119,9 +119,9 @@ The current hosted project has existing organization and sample/test records. Ex
 
 ## Database migration history
 
-The hosted Supabase migration ledger currently records **184 applied migrations**. The repository migration stream has been restored to the same 184 timestamped versions using the original SQL statements retained in `supabase_migrations.schema_migrations`. The recovery was performed as a GitHub source-history change only; it did **not** apply DDL, alter the hosted database, or touch business records.
+The hosted Supabase migration ledger currently records **190 applied migrations**. The repository contains the 190 applied migration versions plus one compatibility bootstrap migration (`20261105084400_create_van_stock_movements.sql`) that reconstructs the van-stock ledger on a clean database because that table existed before the hosted migration ledger was fully recorded. The Booker hardening migration source filename is aligned with its applied hosted version `20261117083825`.
 
-Two old non-timestamped bootstrap scripts are archived under `docs/legacy-sql/` for historical reference and are not part of the current migration stream. Two duplicate later-version copies of migrations already recorded under their original applied versions have been removed from the migration stream. A version-by-version count match is necessary for reproducibility, but a **clean-room replay has not been certified**; it still requires a separate disposable database/project rehearsal. Do not reset, delete or recreate the existing production project to attempt this.
+Two old non-timestamped bootstrap scripts are archived under `docs/legacy-sql/` for historical reference and are not part of the timestamped migration stream. The compatibility bootstrap is intentionally idempotent (`CREATE TABLE IF NOT EXISTS`) and is required for a clean replay; it is not counted as an applied hosted migration. The PR CI disposable database replay is the verification gate for this source stream. Do not reset, delete or recreate the existing production project to attempt this.
 
 Apply future schema changes as timestamped SQL migrations, commit each migration alongside its application changes, and explicitly grant only the API roles that need access. Never expose the service-role key in frontend code.
 
