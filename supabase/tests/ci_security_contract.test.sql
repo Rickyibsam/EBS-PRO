@@ -249,7 +249,7 @@ select ok(
 
 
 select ok(
-  (select bool_and(c.relrowsecurity) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+  (select count(*)=3 and bool_and(c.relrowsecurity) from pg_class c join pg_namespace n on n.oid=c.relnamespace
    where n.nspname='public' and c.relname in ('employee_advances','employee_advance_repayments','employee_advance_account_mappings')),
   'employee advance and account mapping tables all have RLS enabled'
 );
@@ -277,7 +277,7 @@ select ok(
   'employee advances, repayments and account mappings enforce same-tenant foreign keys'
 );
 select ok(
-  (select bool_and(c.relrowsecurity) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+  (select count(*)=4 and bool_and(c.relrowsecurity) from pg_class c join pg_namespace n on n.oid=c.relnamespace
    where n.nspname='public' and c.relname in ('delivery_charge_rules','delivery_charges','delivery_charge_collections','delivery_charge_account_mappings')),
   'all delivery charge tables have RLS enabled'
 );
@@ -308,7 +308,7 @@ select ok(
 
 
 select ok(
-  (select bool_and(c.relrowsecurity) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+  (select count(*)=2 and bool_and(c.relrowsecurity) from pg_class c join pg_namespace n on n.oid=c.relnamespace
    where n.nspname='public' and c.relname in ('stock_takes','stock_take_lines')),
   'stock take headers and lines both have RLS enabled'
 );
