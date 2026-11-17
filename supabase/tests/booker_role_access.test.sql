@@ -1,5 +1,5 @@
 begin;
-select plan(12);
+select plan(14);
 
 insert into auth.users (
   id,aud,role,email,encrypted_password,email_confirmed_at,
@@ -84,6 +84,23 @@ values
 ('00000000-0000-0000-0000-000000000101','00000000-0000-0000-0000-000000000501','00000000-0000-0000-0000-000000000702',false,false),
 ('00000000-0000-0000-0000-000000000101','00000000-0000-0000-0000-000000000502','00000000-0000-0000-0000-000000000702',false,false);
 
+select is(
+  (select coalesce(sum(sm.quantity_in-sm.quantity_out),0)
+   from public.stock_movements sm
+   where sm.tenant_id='00000000-0000-0000-0000-000000000101'
+     and sm.warehouse_id='00000000-0000-0000-0000-000000000401'
+     and sm.product_id='00000000-0000-0000-0000-000000000701'),
+  10::numeric,'fixture creates positive stock in the assigned branch warehouse'
+);
+select ok(
+  private.booker_product_allowed(
+    '00000000-0000-0000-0000-000000000101',
+    '00000000-0000-0000-0000-000000000501',
+    '00000000-0000-0000-0000-000000000701'
+  ),
+  'server visibility helper accepts explicitly allowed in-stock product'
+);
+
 create temporary table booker_catalog_probe(user_key text not null,product_id uuid not null,price numeric) on commit drop;
 create temporary table booker_rls_probe(user_key text not null,table_name text not null,rows_seen bigint not null) on commit drop;
 grant insert,select on booker_catalog_probe to authenticated;
@@ -109,7 +126,7 @@ select is((select count(*) from booker_catalog_probe where user_key='booker_one'
   0::bigint,'allow-list mode hides products without a matching allow rule');
 select ok(position('cost_price' in lower(pg_get_function_result('public.get_booker_catalog(uuid,uuid)'::regprocedure)))=0,
   'restricted Booker catalogue result schema does not expose cost price');
-throws_ok(
+select throws_ok(
   $$select * from public.get_booker_catalog('00000000-0000-0000-0000-000000000102',null)$$,
   '42501','Order Booker authorization is required.','Booker cannot request another tenant catalogue'
 );
