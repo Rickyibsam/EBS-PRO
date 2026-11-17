@@ -437,7 +437,10 @@ select ok(
            and pg_get_constraintdef(c.oid) like 'UNIQUE (tenant_id, payroll_run_id, sales_target_id)%')
   and exists(select 1 from pg_policy p join pg_class c on c.oid=p.polrelid join pg_namespace n on n.oid=c.relnamespace
          where n.nspname='public' and c.relname='payroll_incentive_accruals'
-           and p.polname='module_override_guard_insert'),
+           and p.polname='module_override_guard_insert')
+  and exists(select 1 from pg_policy p join pg_class c on c.oid=p.polrelid join pg_namespace n on n.oid=c.relnamespace
+         where n.nspname='public' and c.relname='payroll_incentive_accruals'
+           and p.polname='module_override_grant_insert'),
   'payroll incentive accrual import is idempotent and custom-permission guarded'
 );
 
