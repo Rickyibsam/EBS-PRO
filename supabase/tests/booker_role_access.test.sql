@@ -1,5 +1,5 @@
 begin;
-select plan(15);
+select plan(14);
 
 insert into auth.users (
   id,aud,role,email,encrypted_password,email_confirmed_at,
@@ -72,7 +72,12 @@ values ('00000000-0000-0000-0000-000000000101','00000000-0000-0000-0000-00000000
 insert into public.stock_movements(
   tenant_id,warehouse_id,product_id,movement_type,quantity_in,quantity_out,unit_cost,created_by,notes
 ) values (
-  '00000000-0000-0000-0000-000000000101','00000000-0000-0000-0000-000000000401',
+  '00000000-0000-0000-0000-000000000101',
+  (select w.id from public.warehouses w
+   where w.tenant_id='00000000-0000-0000-0000-000000000101'
+     and w.branch_id='00000000-0000-0000-0000-000000000301'
+     and w.is_active=true
+   order by w.is_default desc,w.created_at limit 1),
   '00000000-0000-0000-0000-000000000701','purchase_receipt',10,0,25,
   '00000000-0000-0000-0000-000000000201','Booker security test stock'
 );
@@ -88,7 +93,13 @@ select is(
   (select coalesce(sum(sm.quantity_in-sm.quantity_out),0)
    from public.stock_movements sm
    where sm.tenant_id='00000000-0000-0000-0000-000000000101'
-     and sm.warehouse_id='00000000-0000-0000-0000-000000000401'
+     and sm.warehouse_id = (
+       select w.id from public.warehouses w
+       where w.tenant_id='00000000-0000-0000-0000-000000000101'
+         and w.branch_id='00000000-0000-0000-0000-000000000301'
+         and w.is_active=true
+       order by w.is_default desc,w.created_at limit 1
+     )
      and sm.product_id='00000000-0000-0000-0000-000000000701'),
   10::numeric,'fixture creates positive stock in the assigned branch warehouse'
 );
