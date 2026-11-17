@@ -1,6 +1,6 @@
 begin;
 
-select plan(10);
+select plan(18);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -56,6 +56,58 @@ select ok(
 select ok(
   not has_function_privilege('authenticated','private.booker_product_allowed(uuid,uuid,uuid)','EXECUTE'),
   'authenticated cannot execute private visibility helper'
+);
+
+
+select ok(
+  (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
+   where n.nspname='public' and c.relname='van_stock_movements'),
+  'van_stock_movements has RLS enabled'
+);
+select ok(
+  (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
+   where n.nspname='public' and c.relname='fixed_assets'),
+  'fixed_assets has RLS enabled'
+);
+select ok(
+  (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
+   where n.nspname='public' and c.relname='asset_depreciation_entries'),
+  'asset_depreciation_entries has RLS enabled'
+);
+select ok(
+  exists(select 1 from pg_policy p join pg_class c on c.oid=p.polrelid
+         join pg_namespace n on n.oid=c.relnamespace
+         where n.nspname='public' and c.relname='van_stock_movements'
+           and p.polname in ('van_stock_movements_read','van_stock_movements_insert')),
+  'van stock ledger has tenant-role access policies'
+);
+select ok(
+  exists(select 1 from pg_policy p join pg_class c on c.oid=p.polrelid
+         join pg_namespace n on n.oid=c.relnamespace
+         where n.nspname='public' and c.relname='fixed_assets'
+           and p.polname='fixed_assets_tenant_access'),
+  'fixed asset register has tenant-role access policy'
+);
+select ok(
+  exists(select 1 from pg_policy p join pg_class c on c.oid=p.polrelid
+         join pg_namespace n on n.oid=c.relnamespace
+         where n.nspname='public' and c.relname='asset_depreciation_entries'
+           and p.polname='asset_depreciation_entries_tenant_access'),
+  'asset depreciation ledger has tenant-role access policy'
+);
+select ok(
+  exists(select 1 from pg_constraint c
+         where c.conrelid='public.asset_depreciation_entries'::regclass
+           and c.contype='f'
+           and pg_get_constraintdef(c.oid) like 'FOREIGN KEY (tenant_id, asset_id)%'),
+  'asset depreciation rows enforce same-tenant asset references'
+);
+select ok(
+  exists(select 1 from pg_constraint c
+         where c.conrelid='public.fixed_assets'::regclass
+           and c.contype='f'
+           and pg_get_constraintdef(c.oid) like 'FOREIGN KEY (tenant_id, branch_id)%'),
+  'fixed assets enforce same-tenant branch references'
 );
 
 select * from finish();
