@@ -1,6 +1,6 @@
 begin;
 
-select plan(70);
+select plan(71);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -504,6 +504,13 @@ select ok(
    where n.nspname='public' and c.relname='platform_support_tickets' and p.polcmd='w'
      and p.polname='platform_support_tickets_staff_update'),
   'only platform staff can update ticket status and assignment'
+);
+select ok(
+  has_column_privilege('authenticated','public.platform_support_tickets','status','UPDATE')
+  and has_column_privilege('authenticated','public.platform_support_tickets','assigned_to','UPDATE')
+  and not has_column_privilege('authenticated','public.platform_support_tickets','tenant_id','UPDATE')
+  and not has_column_privilege('authenticated','public.platform_support_tickets','subject','UPDATE'),
+  'ticket updates are column-scoped so staff cannot rewrite tenant identity or issue details'
 );
 select ok(
   not has_table_privilege('authenticated','public.platform_support_tickets','DELETE')
