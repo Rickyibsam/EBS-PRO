@@ -13,7 +13,7 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
   });
 }
 
-const isPlatformPortal = window.location.pathname.replace(/\/$/, "") === "/super-admin";
+const isPlatformPortal = window.location.pathname.replace(/\/$/, "") === "/super-admin" || new URLSearchParams(window.location.search).get("portal") === "super-admin";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>{isPlatformPortal ? <SuperAdminPortal /> : <App />}</React.StrictMode>
