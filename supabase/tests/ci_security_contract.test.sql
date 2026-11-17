@@ -1,6 +1,6 @@
 begin;
 
-select plan(29);
+select plan(30);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -179,6 +179,14 @@ select ok(
   not has_function_privilege('anon','private.has_tenant_role_internal(uuid,text[])','EXECUTE')
   and not has_function_privilege('anon','private.is_tenant_member_internal(uuid)','EXECUTE'),
   'anonymous role cannot execute private tenant membership helpers'
+);
+
+
+select ok(
+  (select bool_and(p.prosecdef and coalesce(array_to_string(p.proconfig,','),'') like '%search_path=pg_catalog, public, auth%')
+   from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+   where n.nspname='private' and p.proname in ('has_tenant_role_internal','is_tenant_member_internal')),
+  'private tenant helpers are SECURITY DEFINER with a fixed safe search_path'
 );
 
 select * from finish();
