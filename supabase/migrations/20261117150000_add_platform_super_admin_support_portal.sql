@@ -47,12 +47,13 @@ ALTER TABLE public.platform_support_messages ENABLE ROW LEVEL SECURITY;
 
 REVOKE ALL ON TABLE public.platform_admins FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON TABLE public.platform_admins TO authenticated;
-REVOKE ALL ON TABLE public.platform_support_tickets FROM PUBLIC, anon;
-REVOKE ALL ON TABLE public.platform_support_messages FROM PUBLIC, anon;
+REVOKE ALL ON TABLE public.platform_support_tickets FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.platform_support_messages FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT ON TABLE public.platform_support_tickets TO authenticated;
 GRANT UPDATE (status, assigned_to, resolution, updated_at, resolved_at)
   ON TABLE public.platform_support_tickets TO authenticated;
 GRANT SELECT, INSERT ON TABLE public.platform_support_messages TO authenticated;
+REVOKE ALL ON SEQUENCE public.platform_support_messages_id_seq FROM PUBLIC, anon, authenticated;
 GRANT USAGE, SELECT ON SEQUENCE public.platform_support_messages_id_seq TO authenticated;
 
 CREATE POLICY platform_admins_read_self
