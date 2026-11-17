@@ -1,6 +1,6 @@
 begin;
 
-select plan(37);
+select plan(44);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -245,6 +245,65 @@ select ok(
          where c.conrelid='public.sales_incentive_adjustments'::regclass and c.contype='u'
            and pg_get_constraintdef(c.oid) like 'UNIQUE (tenant_id, sales_target_id, payroll_run_id)%'),
   'commission clawback ledger is idempotent per tenant, target and payroll run'
+);
+
+
+select ok(
+  (select bool_and(c.relrowsecurity) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+   where n.nspname='public' and c.relname in ('employee_advances','employee_advance_repayments','employee_advance_account_mappings')),
+  'employee advance and account mapping tables all have RLS enabled'
+);
+select ok(
+  has_function_privilege('authenticated','private.create_employee_advance_internal(uuid,uuid,numeric,date,text)','EXECUTE')
+  and has_function_privilege('authenticated','private.record_employee_advance_repayment_internal(uuid,numeric,date,text,text,text)','EXECUTE')
+  and has_function_privilege('authenticated','public.create_employee_advance(uuid,uuid,numeric,date,text)','EXECUTE')
+  and has_function_privilege('authenticated','public.record_employee_advance_repayment(uuid,numeric,date,text,text,text)','EXECUTE')
+  and not has_function_privilege('anon','private.create_employee_advance_internal(uuid,uuid,numeric,date,text)','EXECUTE')
+  and not has_function_privilege('anon','private.record_employee_advance_repayment_internal(uuid,numeric,date,text,text,text)','EXECUTE')
+  and not has_function_privilege('anon','public.create_employee_advance(uuid,uuid,numeric,date,text)','EXECUTE')
+  and not has_function_privilege('anon','public.record_employee_advance_repayment(uuid,numeric,date,text,text,text)','EXECUTE'),
+  'employee advance internal and public RPCs are authenticated-only'
+);
+select ok(
+  (select count(*)=2 from pg_constraint c
+   where c.conrelid='public.employee_advances'::regclass and c.contype='f'
+     and pg_get_constraintdef(c.oid) like 'FOREIGN KEY (tenant_id, %')
+  and (select count(*)=2 from pg_constraint c
+   where c.conrelid='public.employee_advance_repayments'::regclass and c.contype='f'
+     and pg_get_constraintdef(c.oid) like 'FOREIGN KEY (tenant_id, %')
+  and (select count(*)=3 from pg_constraint c
+   where c.conrelid='public.employee_advance_account_mappings'::regclass and c.contype='f'
+     and pg_get_constraintdef(c.oid) like 'FOREIGN KEY (tenant_id, %'),
+  'employee advances, repayments and account mappings enforce same-tenant foreign keys'
+);
+select ok(
+  (select bool_and(c.relrowsecurity) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+   where n.nspname='public' and c.relname in ('delivery_charge_rules','delivery_charges','delivery_charge_collections','delivery_charge_account_mappings')),
+  'all delivery charge tables have RLS enabled'
+);
+select ok(
+  has_function_privilege('authenticated','private.settle_delivery_charge_internal(uuid,numeric,text,text,boolean,text)','EXECUTE')
+  and has_function_privilege('authenticated','public.settle_delivery_charge(uuid,numeric,text,text,boolean,text)','EXECUTE')
+  and not has_function_privilege('anon','private.settle_delivery_charge_internal(uuid,numeric,text,text,boolean,text)','EXECUTE')
+  and not has_function_privilege('anon','public.settle_delivery_charge(uuid,numeric,text,text,boolean,text)','EXECUTE'),
+  'delivery charge settlement RPCs are authenticated-only'
+);
+select ok(
+  (select count(*)=5 from pg_constraint c
+   where c.conrelid='public.delivery_charges'::regclass and c.contype='f'
+     and pg_get_constraintdef(c.oid) like 'FOREIGN KEY (tenant_id, %')
+  and (select count(*)=2 from pg_constraint c
+   where c.conrelid='public.delivery_charge_collections'::regclass and c.contype='f'
+     and pg_get_constraintdef(c.oid) like 'FOREIGN KEY (tenant_id, %')
+  and (select count(*)=3 from pg_constraint c
+   where c.conrelid='public.delivery_charge_account_mappings'::regclass and c.contype='f'
+     and pg_get_constraintdef(c.oid) like 'FOREIGN KEY (tenant_id, %'),
+  'delivery charge records and account mappings enforce same-tenant foreign keys'
+);
+select ok(
+  exists(select 1 from pg_indexes where schemaname='public' and tablename='delivery_charge_collections'
+         and indexname='delivery_charge_collections_tenant_idempotency_uidx'),
+  'delivery charge collection retries have a tenant-scoped idempotency index'
 );
 
 select * from finish();
