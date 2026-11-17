@@ -111,7 +111,7 @@ LANGUAGE sql
 STABLE
 SECURITY INVOKER
 SET search_path = ''
-AS $
+AS $$
   SELECT pa.user_id, pa.role
   FROM public.platform_admins pa
   WHERE pa.user_id = (SELECT auth.uid())
