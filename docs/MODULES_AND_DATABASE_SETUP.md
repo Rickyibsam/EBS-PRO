@@ -113,7 +113,7 @@ The hosted database currently has 2 organizations, 3 tenant memberships, 2 branc
 
 ## Current hosted database
 
-The hosted Supabase database currently has **82 public base tables**; all 82 have RLS enabled and the audit found zero public base tables without RLS. Public RPC execution is not available to the anonymous role. New public functions, tables and sequences created by the postgres role now require explicit grants. Owner-managed per-user module/action overrides are enforced across **77 tenant-scoped business tables**. The permission configuration and personal notification inbox use separate ownership/user-scoped RLS policies.
+The hosted Supabase database currently has **83 public base tables**; all 83 have RLS enabled and the audit found zero public base tables without RLS. Public RPC execution is not available to the anonymous role. New public functions, tables and sequences created by the postgres role now require explicit grants. Owner-managed per-user module/action overrides are enforced across **77 tenant-scoped business tables**. The permission configuration and personal notification inbox use separate ownership/user-scoped RLS policies.
 
 The current hosted project has existing organization and sample/test records. Examples at the time of the latest audit include one organization, two tenant memberships, one employee, one sales order, one purchase order, one goods receipt and one journal entry. There were no posted sales invoices or deliveries at that time. This is a small test dataset, not evidence that all workflows have been exercised.
 
