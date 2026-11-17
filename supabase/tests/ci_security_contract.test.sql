@@ -1,6 +1,6 @@
 begin;
 
-select plan(62);
+select plan(63);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -462,6 +462,18 @@ select ok(
    where n.nspname='public' and c.relname in ('departments','designations')
      and p.polname in ('module_override_guard_update','module_override_grant_update','module_override_guard_select','module_override_grant_select')),
   'department and designation masters honor custom HR/payroll view/update permissions'
+);
+
+
+select ok(
+  (select not p.prosecdef
+      and position('v_product.track_expiry' in p.prosrc)>0
+      and position('expiry_date is not null' in p.prosrc)>0
+      and position('v_product.track_batch' in p.prosrc)>0
+      and position('nullif(btrim(batch_number)' in p.prosrc)>0
+   from pg_proc p
+   where p.oid='public.dispatch_delivery(uuid,jsonb)'::regprocedure),
+  'warehouse dispatch excludes missing expiry and batch metadata when product tracking requires it'
 );
 
 select * from finish();
