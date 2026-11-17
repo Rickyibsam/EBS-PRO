@@ -66,7 +66,7 @@ The project is intended to remain on free hosting/database tiers. Do not enable 
 
 ## Database and security notes
 
-- All 82 public base tables have RLS enabled. Public-schema RPC execution is restricted to signed-in users; future public functions/tables/sequences require explicit grants.
+- All 83 public base tables have RLS enabled. Public-schema RPC execution is restricted to signed-in users; future public functions/tables/sequences require explicit grants.
 - Owner-configured per-user module/action overrides are enforced by restrictive and permissive RLS policies on 77 tenant-scoped business tables. Permission administration and personal notifications use their own RLS rules.
 - Privileged staff invitations run through the authenticated `invite-tenant-member` Edge Function; its service-role key stays server-side.
 - Tenant backup is a manual JSON export and additive same-tenant restore. It is not a substitute for provider-managed point-in-time recovery and does not export Supabase Auth credentials or tenant memberships.
