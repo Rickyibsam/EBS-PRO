@@ -46,11 +46,16 @@ ALTER TABLE public.platform_support_tickets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.platform_support_messages ENABLE ROW LEVEL SECURITY;
 
 REVOKE ALL ON TABLE public.platform_admins FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON TABLE public.platform_admins TO authenticated;
 REVOKE ALL ON TABLE public.platform_support_tickets FROM PUBLIC, anon;
 REVOKE ALL ON TABLE public.platform_support_messages FROM PUBLIC, anon;
 GRANT SELECT, INSERT, UPDATE ON TABLE public.platform_support_tickets TO authenticated;
 GRANT SELECT, INSERT ON TABLE public.platform_support_messages TO authenticated;
 GRANT USAGE, SELECT ON SEQUENCE public.platform_support_messages_id_seq TO authenticated;
+
+CREATE POLICY platform_admins_read_self
+  ON public.platform_admins FOR SELECT TO authenticated
+  USING (user_id = (SELECT auth.uid()) AND is_active);
 
 CREATE OR REPLACE FUNCTION private.is_platform_staff_internal(p_roles text[])
 RETURNS boolean
@@ -104,9 +109,9 @@ CREATE OR REPLACE FUNCTION public.platform_admin_me()
 RETURNS TABLE (user_id uuid, role text)
 LANGUAGE sql
 STABLE
-SECURITY DEFINER
+SECURITY INVOKER
 SET search_path = ''
-AS $$
+AS $
   SELECT pa.user_id, pa.role
   FROM public.platform_admins pa
   WHERE pa.user_id = (SELECT auth.uid())
