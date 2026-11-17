@@ -5,7 +5,7 @@
 The platform staff workspace is served at:
 
 - Local: `http://localhost:5173/super-admin`
-- Hosted: `https://ebs-pro.onrender.com/super-admin`
+- Hosted: `https://ebs-pro.onrender.com/?portal=super-admin`
 
 It is a separate route from the tenant ERP. A normal company owner, manager, booker or delivery user cannot enter it. The portal checks the authenticated account against `public.platform_admins` through the server-side `platform_admin_me()` RPC.
 
