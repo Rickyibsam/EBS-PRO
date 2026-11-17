@@ -49,7 +49,6 @@ export default function SupportCenterModule({db,tenantId,userId}:{db:SupabaseCli
     try{
       const {data,error}=await db.from("platform_support_messages").insert({ticket_id:active.id,sender_id:userId,body:reply.trim()}).select("id,ticket_id,sender_id,body,created_at").single();
       if(error)throw error;setMessages(current=>[...current,data as Message]);setReply("");setNotice("Message sent to support.");
-      await db.from("platform_support_tickets").update({updated_at:new Date().toISOString()}).eq("id",active.id);
     }catch(error){setNotice(error instanceof Error?error.message:"Message could not be sent.");}
     finally{setBusy(false);}
   }
