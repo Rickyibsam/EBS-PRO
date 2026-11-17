@@ -2,6 +2,7 @@ import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import {FormEvent,useEffect,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 import {useModuleAction} from "./lib/modulePermissionContext";
+import {buildCsvWithBom} from "./lib/csvExport";
 type Row=Record<string,any>;
 export default function PayrollModule({db,tenantId,currentRole}:{db:SupabaseClient;tenantId:string;currentRole:string}){
  const [employees,setEmployees]=useState<Row[]>([]),[runs,setRuns]=useState<Row[]>([]),[lines,setLines]=useState<Row[]>([]);
@@ -87,7 +88,7 @@ export default function PayrollModule({db,tenantId,currentRole}:{db:SupabaseClie
   try{const {data,error}=await db.rpc("pay_payroll_line",{p_payroll_line_id:line.id,p_method:method.trim().toLowerCase(),p_reference:reference});if(error)throw error;if(data?.success!==true)throw new Error("Salary payment was not confirmed.");setNotice("Salary payment posted to cash/bank and payroll payable.");await loadLines(selected);}
   catch(err){setNotice(err instanceof Error?err.message:"Salary payment failed.");}finally{setSaving(false);}
  }
- function exportPayroll(){const data=lines.map(x=>({employee:x.employee,basic:x.basic_salary,allowances:x.allowances,overtime:x.overtime,incentive:x.sales_incentive||0,deductions:x.deductions,net:x.net_salary,payment:x.payment_status}));const keys=Object.keys(data[0]||{employee:"",basic:"",allowances:"",overtime:"",incentive:"",deductions:"",net:"",payment:""});const csv=[keys.join(","),...data.map(x=>keys.map(k=>'"'+String(x[k as keyof typeof x]??"").replace(/"/g,'""')+'"').join(","))].join("\\r\\n");const url=URL.createObjectURL(new Blob(["\\uFEFF"+csv],{type:"text/csv;charset=utf-8"}));const a=document.createElement("a");a.href=url;a.download="payroll-"+(runs.find(r=>r.id===selected)?.run_number||"register")+".csv";a.click();URL.revokeObjectURL(url);}
+ function exportPayroll(){const data=lines.map(x=>({employee:x.employee,basic:x.basic_salary,allowances:x.allowances,overtime:x.overtime,incentive:x.sales_incentive||0,deductions:x.deductions,net:x.net_salary,payment:x.payment_status}));const keys=Object.keys(data[0]||{employee:"",basic:"",allowances:"",overtime:"",incentive:"",deductions:"",net:"",payment:""});const csv=buildCsvWithBom(data,keys);const url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));const a=document.createElement("a");a.href=url;a.download="payroll-"+(runs.find(r=>r.id===selected)?.run_number||"register")+".csv";a.click();URL.revokeObjectURL(url);}
  const activeRun=runs.find(x=>x.id===selected);
  return <section className="module-page">
   <div className="module-toolbar"><div><h2>HR & Payroll</h2><p>Employee salary master, monthly payroll drafts, ledger posting and salary disbursement.</p></div><button onClick={()=>void load()}>↻ Refresh</button></div>
