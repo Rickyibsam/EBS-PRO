@@ -100,6 +100,57 @@ for each row execute function public.validate_booker_visibility_tenant();
 grant all on table public.booker_product_visibility to authenticated;
 revoke all on table public.booker_product_visibility from anon;
 
+-- Restore HR department/designation masters before the dynamic module-policy sweep.
+create table if not exists public.departments (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.organizations(id) on delete cascade,
+  code text not null,
+  name text not null,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  constraint departments_tenant_id_code_key unique (tenant_id,code),
+  constraint departments_tenant_id_name_key unique (tenant_id,name)
+);
+
+create table if not exists public.designations (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.organizations(id) on delete cascade,
+  department_id uuid references public.departments(id),
+  code text not null,
+  name text not null,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  constraint designations_tenant_id_code_key unique (tenant_id,code),
+  constraint designations_tenant_id_name_key unique (tenant_id,name)
+);
+
+create index if not exists designations_department_idx on public.designations(department_id);
+
+alter table public.departments enable row level security;
+drop policy if exists departments_select on public.departments;
+create policy departments_select on public.departments
+  for select to authenticated
+  using (private.has_tenant_role_internal(tenant_id,array['owner','admin','manager','accounts','sales','order_booker','delivery_man','warehouse']::text[]));
+drop policy if exists departments_write on public.departments;
+create policy departments_write on public.departments
+  for all to authenticated
+  using (private.has_tenant_role_internal(tenant_id,array['owner','admin','manager']::text[]))
+  with check (private.has_tenant_role_internal(tenant_id,array['owner','admin','manager']::text[]));
+
+alter table public.designations enable row level security;
+drop policy if exists designations_select on public.designations;
+create policy designations_select on public.designations
+  for select to authenticated
+  using (private.has_tenant_role_internal(tenant_id,array['owner','admin','manager','accounts','sales','order_booker','delivery_man','warehouse']::text[]));
+drop policy if exists designations_write on public.designations;
+create policy designations_write on public.designations
+  for all to authenticated
+  using (private.has_tenant_role_internal(tenant_id,array['owner','admin','manager']::text[]))
+  with check (private.has_tenant_role_internal(tenant_id,array['owner','admin','manager']::text[]));
+
+grant all on table public.departments,public.designations to authenticated;
+revoke all on table public.departments,public.designations from anon;
+
 -- Per-user module permission overrides and persistent notification inbox.
 -- Existing role policies remain the default. Explicit owner-set overrides can
 -- restrict or extend a member's access, while tenant membership is always checked.
