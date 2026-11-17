@@ -3,8 +3,6 @@ name: EBS PRO isolated database replay
 on:
   push:
     branches: [security/booker-authorization-hardening]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
