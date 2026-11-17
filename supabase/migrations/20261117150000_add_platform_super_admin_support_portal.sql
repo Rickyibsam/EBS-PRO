@@ -184,6 +184,9 @@ CREATE POLICY platform_support_tickets_tenant_insert
   WITH CHECK (
     (SELECT private.is_tenant_member_internal(tenant_id))
     AND created_by = (SELECT auth.uid())
+    AND status = 'open'
+    AND assigned_to IS NULL
+    AND resolution IS NULL
   );
 
 CREATE POLICY platform_support_messages_tenant_select
