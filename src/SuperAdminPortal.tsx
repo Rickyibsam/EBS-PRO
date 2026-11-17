@@ -5,6 +5,7 @@ import "./super-admin.css";
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 const db = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+const PUBLIC_APP_URL = "https://ebs-pro.onrender.com";
 
 type PlatformAdmin = { user_id: string; role: "super_admin" | "support_admin" };
 type Company = {
@@ -29,6 +30,7 @@ export default function SuperAdminPortal() {
   const [notice, setNotice] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [recoveryMode, setRecoveryMode] = useState(false);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<string>("");
@@ -79,7 +81,7 @@ export default function SuperAdminPortal() {
     if (!db) { setLoading(false); return; }
     let live = true;
     db.auth.getSession().then(({ data }) => { if (live) setSession(data.session); });
-    const { data: { subscription } } = db.auth.onAuthStateChange((_event, next) => setSession(next));
+    const { data: { subscription } } = db.auth.onAuthStateChange((event, next) => { if (event === "PASSWORD_RECOVERY") setRecoveryMode(true); setSession(next); });
     return () => { live = false; subscription.unsubscribe(); };
   }, []);
 
@@ -122,6 +124,32 @@ export default function SuperAdminPortal() {
       if (error) throw error;
       setSession(data.session);
       setPassword("");
+    } catch (error) { setNotice(errorText(error)); }
+    finally { setBusy(false); }
+  }
+
+  async function sendPasswordReset() {
+    if (!db || !email.trim()) { setNotice("Enter your account email address first."); return; }
+    setBusy(true); setNotice("");
+    try {
+      const { error } = await db.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${PUBLIC_APP_URL}/?portal=super-admin` });
+      if (error) throw error;
+      setNotice("Password recovery email sent. Open the newest link on this website to set a new password.");
+    } catch (error) { setNotice(errorText(error)); }
+    finally { setBusy(false); }
+  }
+
+  async function saveRecoveredPassword(event: FormEvent) {
+    event.preventDefault();
+    if (!db) return;
+    if (password.length < 12 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+      setNotice("Use at least 12 characters with uppercase, lowercase, a number and a symbol."); return;
+    }
+    setBusy(true); setNotice("");
+    try {
+      const { error } = await db.auth.updateUser({ password });
+      if (error) throw error;
+      await db.auth.signOut(); setRecoveryMode(false); setPassword(""); setNotice("Password updated. Sign in with your new password.");
     } catch (error) { setNotice(errorText(error)); }
     finally { setBusy(false); }
   }
@@ -175,7 +203,8 @@ export default function SuperAdminPortal() {
 
   if (!db) return <main className="platform-center"><section className="platform-auth"><h1>EBS PRO Platform Portal</h1><p>Hosting environment is missing the Supabase URL or publishable key.</p></section></main>;
   if (loading) return <main className="platform-center"><div className="platform-loading">EBS PRO · Loading secure platform workspace…</div></main>;
-  if (!session) return <main className="platform-auth-shell"><section className="platform-auth-brand"><div className="platform-mark">E</div><span>PLATFORM OPERATIONS</span><h1>One control room for every EBS PRO company.</h1><p>Customer support, tenant visibility and service operations in a separate protected workspace.</p><small> EBS PRO V.01 · PLATFORM ADMINISTRATION</small></section><section className="platform-auth-side"><form className="platform-auth" onSubmit={signIn}><small>SECURE STAFF SIGN-IN</small><h2>Platform portal</h2><p>Only provisioned Super Admin and Support Admin accounts can enter.</p><label>Email address<input type="email" autoComplete="username" required value={email} onChange={event => setEmail(event.target.value)} /></label><label>Password<input type="password" autoComplete="current-password" required value={password} onChange={event => setPassword(event.target.value)} /></label>{notice && <div className="platform-notice">{notice}</div>}<button disabled={busy}>{busy ? "Signing in…" : "Sign in securely"} <span>→</span></button><a href="/">Return to company ERP</a></form></section></main>;
+  if (recoveryMode) return <main className="platform-auth-shell"><section className="platform-auth-brand"><div className="platform-mark">E</div><span>ACCOUNT SECURITY</span><h1>Secure your platform account.</h1><p>Choose a new password for your EBS PRO Super Admin account.</p></section><section className="platform-auth-side"><form className="platform-auth" onSubmit={saveRecoveredPassword}><small>RESET PASSWORD</small><h2>Set a new password</h2><p>At least 12 characters with uppercase, lowercase, a number and a symbol.</p><label>New password<input type="password" autoComplete="new-password" minLength={12} required value={password} onChange={event => setPassword(event.target.value)} /></label>{notice && <div className="platform-notice">{notice}</div>}<button disabled={busy}>{busy ? "Updating…" : "Update password"} <span>→</span></button></form></section></main>;
+  if (!session) return <main className="platform-auth-shell"><section className="platform-auth-brand"><div className="platform-mark">E</div><span>PLATFORM OPERATIONS</span><h1>One control room for every EBS PRO company.</h1><p>Customer support, tenant visibility and service operations in a separate protected workspace.</p><small> EBS PRO V.01 · PLATFORM ADMINISTRATION</small></section><section className="platform-auth-side"><form className="platform-auth" onSubmit={signIn}><small>SECURE STAFF SIGN-IN</small><h2>Platform portal</h2><p>Only provisioned Super Admin and Support Admin accounts can enter.</p><label>Email address<input type="email" autoComplete="username" required value={email} onChange={event => setEmail(event.target.value)} /></label><label>Password<input type="password" autoComplete="current-password" required value={password} onChange={event => setPassword(event.target.value)} /></label>{notice && <div className="platform-notice">{notice}</div>}<button disabled={busy}>{busy ? "Signing in…" : "Sign in securely"} <span>→</span></button><a href="#" onClick={event => { event.preventDefault(); void sendPasswordReset(); }}>Forgot password?</a><a href="/">Return to company ERP</a></form></section></main>;
   if (!admin) return <main className="platform-center"><section className="platform-auth"><div className="platform-mark">E</div><h1>Platform access restricted</h1><p>{notice || "This account has no active platform support role."}</p><button onClick={() => void db.auth.signOut()}>Sign out</button><a href="/">Return to company ERP</a></section></main>;
 
   return <div className="platform-shell">
