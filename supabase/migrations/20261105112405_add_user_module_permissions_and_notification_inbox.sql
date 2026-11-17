@@ -35,10 +35,10 @@ grant execute on function private.is_tenant_member_internal(uuid) to authenticat
 create table if not exists public.booker_product_visibility (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.organizations(id) on delete cascade,
-  employee_id uuid not null references public.employees(id),
-  vendor_id uuid references public.parties(id),
+  employee_id uuid not null references public.employees(id) on delete cascade,
+  vendor_id uuid references public.parties(id) on delete cascade,
   brand text,
-  product_id uuid references public.products(id),
+  product_id uuid references public.products(id) on delete cascade,
   is_allowed boolean not null default true,
   require_stock boolean not null default true,
   created_at timestamptz not null default now(),
