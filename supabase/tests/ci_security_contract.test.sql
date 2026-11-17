@@ -1,6 +1,6 @@
 begin;
 
-select plan(53);
+select plan(54);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -377,6 +377,16 @@ select ok(
    where c.conrelid='public.booker_product_visibility'::regclass and c.contype='f'
      and pg_get_constraintdef(c.oid) like 'FOREIGN KEY (tenant_id, %'),
   'Booker visibility rules enforce same-tenant employee, vendor and product references'
+);
+
+
+select ok(
+  exists(select 1 from pg_trigger t where t.tgrelid='public.booker_product_visibility'::regclass
+         and not t.tgisinternal and t.tgname='booker_visibility_tenant_guard')
+  and (select position('party_type in' in p.prosrc)>0
+       from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+       where n.nspname='public' and p.proname='validate_booker_visibility_tenant'),
+  'Booker visibility writes validate same-tenant employee, vendor and product ownership'
 );
 
 select * from finish();
