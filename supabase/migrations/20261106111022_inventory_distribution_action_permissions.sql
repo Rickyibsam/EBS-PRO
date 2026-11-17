@@ -69,6 +69,41 @@ create policy stock_take_lines_update on public.stock_take_lines
   using (private.has_tenant_role_internal(tenant_id,array['owner','admin','manager','warehouse']::text[]))
   with check (private.has_tenant_role_internal(tenant_id,array['owner','admin','manager','warehouse']::text[]));
 
+do $policy$
+declare v_table text;v_action text;v_policy text;v_using text;v_check text;
+begin
+  foreach v_table in array array['stock_takes','stock_take_lines'] loop
+    foreach v_action in array array['select','insert','update','delete'] loop
+      v_policy:='module_override_guard_'||v_action;v_using:=null;v_check:=null;
+      if v_action in ('select','update','delete') then
+        v_using:=format('private.module_permission_guard_internal(tenant_id,%L,%L)','inventory',case when v_action='select' then 'view' else v_action end);
+      end if;
+      if v_action in ('insert','update') then
+        v_check:=format('private.module_permission_guard_internal(tenant_id,%L,%L)','inventory',case when v_action='insert' then 'create' else 'update' end);
+      end if;
+      execute format('drop policy if exists %I on public.%I',v_policy,v_table);
+      if v_action='insert' then
+        execute format('create policy %I on public.%I as restrictive for insert to authenticated with check (%s)',v_policy,v_table,v_check);
+      elsif v_action='update' then
+        execute format('create policy %I on public.%I as restrictive for update to authenticated using (%s) with check (%s)',v_policy,v_table,v_using,v_check);
+      else
+        execute format('create policy %I on public.%I as restrictive for %s to authenticated using (%s)',v_policy,v_table,v_action,v_using);
+      end if;
+      v_policy:='module_override_grant_'||v_action;
+      if v_action='insert' then
+        execute format('create policy %I on public.%I as permissive for insert to authenticated with check (private.module_permission_grant_internal(tenant_id,%L,%L))',v_policy,v_table,'inventory','create');
+      elsif v_action='update' then
+        execute format('create policy %I on public.%I as permissive for update to authenticated using (private.module_permission_grant_internal(tenant_id,%L,%L)) with check (private.module_permission_grant_internal(tenant_id,%L,%L))',v_policy,v_table,'inventory','update','inventory','update');
+      elsif v_action='delete' then
+        execute format('create policy %I on public.%I as permissive for delete to authenticated using (private.module_permission_grant_internal(tenant_id,%L,%L))',v_policy,v_table,'inventory','delete');
+      else
+        execute format('create policy %I on public.%I as permissive for select to authenticated using (private.module_permission_grant_internal(tenant_id,%L,%L))',v_policy,v_table,'inventory','view');
+      end if;
+    end loop;
+  end loop;
+end
+$policy$;
+
 grant all on table public.stock_takes,public.stock_take_lines to authenticated;
 revoke all on table public.stock_takes,public.stock_take_lines from anon;
 
