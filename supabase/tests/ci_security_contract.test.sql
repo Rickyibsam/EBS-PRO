@@ -1,6 +1,6 @@
 begin;
 
-select plan(61);
+select plan(62);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -453,6 +453,14 @@ select ok(
          where n.nspname='public' and c.relname='employee_advance_account_mappings'
            and p.polname='module_override_grant_update'),
   'employee advance account mappings honor custom accounts/finance update permissions'
+);
+
+
+select ok(
+  (select count(*)=8 from pg_policy p join pg_class c on c.oid=p.polrelid join pg_namespace n on n.oid=c.relnamespace
+   where n.nspname='public' and c.relname in ('departments','designations')
+     and p.polname in ('module_override_guard_update','module_override_grant_update','module_override_guard_select','module_override_grant_select')),
+  'department and designation masters honor custom HR/payroll view/update permissions'
 );
 
 select * from finish();
