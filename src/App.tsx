@@ -35,13 +35,14 @@ const DeliveryChargeModule = lazy(() => import("./DeliveryChargeModule"));
 const LoginHistoryModule = lazy(() => import("./LoginHistoryModule"));
 const BackupRestoreModule = lazy(() => import("./BackupRestoreModule"));
 const VoucherHistoryModule = lazy(() => import("./VoucherHistoryModule"));
+const SupportCenterModule = lazy(() => import("./SupportCenterModule"));
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 const db = url && key ? createClient(url, key) : null;
 
 type Organization = { id: string; name: string; city: string | null; currency: string };
-const nav = ["Overview","User Permissions","Sales","Booker App","Delivery Man App","Inventory","Batch & Expiry","Stock Take","Van Stock","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Delivery Charges","Recovery","Customer Credit Control","Accounts","Reports","Team & Employees","HR & Attendance","Login History","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Asset & Budget Control","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register","Voucher Revision History","Audit Trail","Booker Product Access","Targets & Incentives","Settings","Backup & Restore"];
+const nav = ["Overview","User Permissions","Sales","Booker App","Delivery Man App","Inventory","Batch & Expiry","Stock Take","Van Stock","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Delivery Charges","Recovery","Customer Credit Control","Accounts","Reports","Team & Employees","HR & Attendance","Login History","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Asset & Budget Control","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register","Voucher Revision History","Audit Trail","Booker Product Access","Targets & Incentives","Settings","Backup & Restore","Support Center"];
 const navGroups = [
  {name:"1. Dashboard & Management",icon:"✦",items:["Overview"]},
  {name:"2. Sales & Customer Management",icon:"◈",items:["Sales","Customers","Invoices","Sales Returns","Customer Credit Control","Recovery","Price Lists"]},
@@ -52,19 +53,19 @@ const navGroups = [
  {name:"7. Distribution & Delivery",icon:"⌖",items:["Delivery Man App","Distribution","Delivery Charges","Routes"]},
  {name:"8. HR & Payroll",icon:"♙",items:["Team & Employees","HR & Attendance","Payroll"]},
  {name:"9. Reports & Analytics",icon:"▤",items:["Reports","Targets & Incentives"]},
- {name:"10. Administration & Security",icon:"⚙",items:["User Permissions","Login History","Settings","Backup & Restore","Voucher Revision History","Audit Trail"]}
+ {name:"10. Administration & Security",icon:"⚙",items:["User Permissions","Login History","Settings","Backup & Restore","Voucher Revision History","Audit Trail","Support Center"]}
 ];
 const roleAccess: Record<string,string[]> = {
  owner: nav, admin: nav.filter(item=>item!=="User Permissions"),
- manager: ["Overview","Sales","Booker App","Inventory","Batch & Expiry","Stock Take","Van Stock","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Delivery Charges","Recovery","Customer Credit Control","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Asset & Budget Control","HR & Attendance","Login History","Booker Product Access","Targets & Incentives"],
+ manager: ["Overview","Sales","Booker App","Inventory","Batch & Expiry","Stock Take","Van Stock","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Delivery Charges","Recovery","Customer Credit Control","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Asset & Budget Control","HR & Attendance","Login History","Booker Product Access","Targets & Incentives","Support Center"],
  accounts: ["Overview","Recovery","Accounts","Invoices","Vendor Invoices","Purchase Returns","Sales Returns","Payroll","Asset & Budget Control","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register","Voucher Revision History","Customer Credit Control","Reports"],
  purchase: ["Overview","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Vendors","Products","Inventory","Vendor Feeding","Reports"],
  sales: ["Overview","Sales","Booker App","Customers","Products","Routes","Invoices","Sales Returns","Reports","Booker Product Access","Targets & Incentives"],
- order_booker: ["Overview","Booker App","Sales","Customers","Products","HR & Attendance"],
- warehouse: ["Overview","Inventory","Batch & Expiry","Stock Take","Van Stock","Distribution","Delivery Charges","Goods Receiving","Stock Transfers","Products","Purchases"],
- cashier: ["Overview","Sales","Invoices"],
- delivery_man: ["Overview","Delivery Man App","Delivery Charges","HR & Attendance"],
- viewer: ["Overview","Reports"]
+ order_booker: ["Overview","Booker App","Sales","Customers","Products","HR & Attendance","Support Center"],
+ warehouse: ["Overview","Inventory","Batch & Expiry","Stock Take","Van Stock","Distribution","Delivery Charges","Goods Receiving","Stock Transfers","Products","Purchases","Support Center"],
+ cashier: ["Overview","Sales","Invoices","Support Center"],
+ delivery_man: ["Overview","Delivery Man App","Delivery Charges","HR & Attendance","Support Center"],
+ viewer: ["Overview","Reports","Support Center"]
 };
 
 const isStrongPassword=(value:string)=>value.length>=12&&/[a-z]/.test(value)&&/[A-Z]/.test(value)&&/\d/.test(value)&&/[^A-Za-z0-9]/.test(value);
@@ -244,6 +245,8 @@ export default function App() {
           ? <VendorCatalogModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Audit Trail"
           ? <AuditModule db={db} tenantId={organization.id} />
+        : active === "Support Center"
+          ? <SupportCenterModule db={db} tenantId={organization.id} userId={session.user.id} />
         : active === "User Permissions"
           ? <UserPermissionsModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : ["Inventory","Distribution","Recovery","Reports","Goods Receiving"].includes(active)
