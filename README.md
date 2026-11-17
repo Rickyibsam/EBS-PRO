@@ -21,6 +21,10 @@ A multi-tenant wholesale and distribution ERP built with React, TypeScript, Vite
 9. **Reports & Analytics** — date/customer/product/brand/booker/area sales, supplier purchases, stock, profitability, outstanding/recovery, CSV and print/PDF.
 10. **Administration & Security** — tenant onboarding, companies/branches/warehouses, staff invitations, roles, owner-managed per-user module/action permissions, audit/login history, company settings, voucher revision history and tenant backup/restore.
 
+## Platform support portal
+
+A separate protected platform staff workspace is available at `/?portal=super-admin`. It includes the cross-company directory, customer support tickets and conversation history. See [the platform portal setup and security guide](docs/PLATFORM_ADMIN_SUPPORT_PORTAL.md). The first Super Admin is intentionally provisioned manually by the project owner; no customer account is automatically elevated.
+
 ## Local development
 
 Requirements: Node.js and npm.
@@ -62,7 +66,7 @@ The project is intended to remain on free hosting/database tiers. Do not enable 
 
 ## Database and security notes
 
-- All 82 public base tables have RLS enabled. Public-schema RPC execution is restricted to signed-in users; future public functions/tables/sequences require explicit grants.
+- All 83 public base tables have RLS enabled. Public-schema RPC execution is restricted to signed-in users; future public functions/tables/sequences require explicit grants.
 - Owner-configured per-user module/action overrides are enforced by restrictive and permissive RLS policies on 77 tenant-scoped business tables. Permission administration and personal notifications use their own RLS rules.
 - Privileged staff invitations run through the authenticated `invite-tenant-member` Edge Function; its service-role key stays server-side.
 - Tenant backup is a manual JSON export and additive same-tenant restore. It is not a substitute for provider-managed point-in-time recovery and does not export Supabase Auth credentials or tenant memberships.

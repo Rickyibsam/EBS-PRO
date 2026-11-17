@@ -35,13 +35,14 @@ const DeliveryChargeModule = lazy(() => import("./DeliveryChargeModule"));
 const LoginHistoryModule = lazy(() => import("./LoginHistoryModule"));
 const BackupRestoreModule = lazy(() => import("./BackupRestoreModule"));
 const VoucherHistoryModule = lazy(() => import("./VoucherHistoryModule"));
+const SupportCenterModule = lazy(() => import("./SupportCenterModule"));
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 const db = url && key ? createClient(url, key) : null;
 
 type Organization = { id: string; name: string; city: string | null; currency: string };
-const nav = ["Overview","User Permissions","Sales","Booker App","Delivery Man App","Inventory","Batch & Expiry","Stock Take","Van Stock","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Delivery Charges","Recovery","Customer Credit Control","Accounts","Reports","Team & Employees","HR & Attendance","Login History","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Asset & Budget Control","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register","Voucher Revision History","Audit Trail","Booker Product Access","Targets & Incentives","Settings","Backup & Restore"];
+const nav = ["Overview","User Permissions","Sales","Booker App","Delivery Man App","Inventory","Batch & Expiry","Stock Take","Van Stock","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Delivery Charges","Recovery","Customer Credit Control","Accounts","Reports","Team & Employees","HR & Attendance","Login History","Routes","Branches & Warehouses","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Asset & Budget Control","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register","Voucher Revision History","Audit Trail","Booker Product Access","Targets & Incentives","Settings","Backup & Restore","Support Center"];
 const navGroups = [
  {name:"1. Dashboard & Management",icon:"✦",items:["Overview"]},
  {name:"2. Sales & Customer Management",icon:"◈",items:["Sales","Customers","Invoices","Sales Returns","Customer Credit Control","Recovery","Price Lists"]},
@@ -52,19 +53,19 @@ const navGroups = [
  {name:"7. Distribution & Delivery",icon:"⌖",items:["Delivery Man App","Distribution","Delivery Charges","Routes"]},
  {name:"8. HR & Payroll",icon:"♙",items:["Team & Employees","HR & Attendance","Payroll"]},
  {name:"9. Reports & Analytics",icon:"▤",items:["Reports","Targets & Incentives"]},
- {name:"10. Administration & Security",icon:"⚙",items:["User Permissions","Login History","Settings","Backup & Restore","Voucher Revision History","Audit Trail"]}
+ {name:"10. Administration & Security",icon:"⚙",items:["User Permissions","Login History","Settings","Backup & Restore","Voucher Revision History","Audit Trail","Support Center"]}
 ];
 const roleAccess: Record<string,string[]> = {
  owner: nav, admin: nav.filter(item=>item!=="User Permissions"),
- manager: ["Overview","Sales","Booker App","Inventory","Batch & Expiry","Stock Take","Van Stock","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Delivery Charges","Recovery","Customer Credit Control","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Asset & Budget Control","HR & Attendance","Login History","Booker Product Access","Targets & Incentives"],
- accounts: ["Overview","Recovery","Accounts","Invoices","Vendor Invoices","Purchase Returns","Sales Returns","Payroll","Asset & Budget Control","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register","Voucher Revision History","Customer Credit Control","Reports"],
- purchase: ["Overview","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Vendors","Products","Inventory","Vendor Feeding","Reports"],
- sales: ["Overview","Sales","Booker App","Customers","Products","Routes","Invoices","Sales Returns","Reports","Booker Product Access","Targets & Incentives"],
- order_booker: ["Overview","Booker App","Sales","Customers","Products","HR & Attendance"],
- warehouse: ["Overview","Inventory","Batch & Expiry","Stock Take","Van Stock","Distribution","Delivery Charges","Goods Receiving","Stock Transfers","Products","Purchases"],
- cashier: ["Overview","Sales","Invoices"],
- delivery_man: ["Overview","Delivery Man App","Delivery Charges","HR & Attendance"],
- viewer: ["Overview","Reports"]
+ manager: ["Overview","Sales","Booker App","Inventory","Batch & Expiry","Stock Take","Van Stock","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Customers","Vendors","Products","Distribution","Delivery Charges","Recovery","Customer Credit Control","Accounts","Reports","Routes","Price Lists","Stock Transfers","Invoices","Sales Returns","Vendor Feeding","Payroll","Asset & Budget Control","HR & Attendance","Login History","Booker Product Access","Targets & Incentives","Support Center"],
+ accounts: ["Overview","Recovery","Accounts","Invoices","Vendor Invoices","Purchase Returns","Sales Returns","Payroll","Asset & Budget Control","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register","Voucher Revision History","Customer Credit Control","Reports","Support Center"],
+ purchase: ["Overview","Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Vendors","Products","Inventory","Vendor Feeding","Reports","Support Center"],
+ sales: ["Overview","Sales","Booker App","Customers","Products","Routes","Invoices","Sales Returns","Reports","Booker Product Access","Targets & Incentives","Support Center"],
+ order_booker: ["Overview","Booker App","Sales","Customers","Products","HR & Attendance","Support Center"],
+ warehouse: ["Overview","Inventory","Batch & Expiry","Stock Take","Van Stock","Distribution","Delivery Charges","Goods Receiving","Stock Transfers","Products","Purchases","Support Center"],
+ cashier: ["Overview","Sales","Invoices","Support Center"],
+ delivery_man: ["Overview","Delivery Man App","Delivery Charges","HR & Attendance","Support Center"],
+ viewer: ["Overview","Reports","Support Center"]
 };
 
 const isStrongPassword=(value:string)=>value.length>=12&&/[a-z]/.test(value)&&/[A-Z]/.test(value)&&/\d/.test(value)&&/[^A-Za-z0-9]/.test(value);
@@ -186,7 +187,7 @@ export default function App() {
   <label>Password<input type="password" minLength={mode==="signup"?12:1} required value={password} onChange={e=>setPassword(e.target.value)} placeholder={mode==="signup"?"12+ chars · upper/lower · number · symbol":"Your password"}/></label>{mode==="signup"&&<p className="password-hint">12+ characters, uppercase and lowercase letters, a number and a symbol.</p>}
   {mode==="login"&&<div className="switch"><a onClick={()=>void sendPasswordReset()}>Forgot password?</a></div>}
   {notice&&<div className="notice">{notice}</div>}<button disabled={busy}>{busy?"Please wait…":mode==="login"?"Sign in":"Create account"} <span>→</span></button>
-  <div className="switch">{mode==="login"?"New to EBS PRO?":"Already registered?"} <a onClick={()=>{setMode(mode==="login"?"signup":"login");setNotice("");}}>{mode==="login"?"Create account":"Sign in"}</a></div></form></section></main>;
+  <div className="switch">{mode==="login"?"New to EBS PRO?":"Already registered?"} <a onClick={()=>{setMode(mode==="login"?"signup":"login");setNotice("");}}>{mode==="login"?"Create account":"Sign in"}</a></div>{mode==="login"&&<div className="switch"><a href="/?portal=super-admin">Platform staff sign in</a></div>}</form></section></main>;
 
   if(!organization)return <main className="center"><form className="setup" onSubmit={addOrganization}><div className="brandline"><div className="logo">E</div><b>EBS <em>PRO</em></b></div><small>COMPANY SETUP</small><h1>Create your business workspace</h1><p>Enter your company name and city. You will be the owner, and the Main Branch will be created automatically.</p><label>Company name<input required minLength={2} value={companyName} onChange={e=>setCompanyName(e.target.value)} placeholder="ABC Distributors"/></label><label>City<input value={city} onChange={e=>setCity(e.target.value)} placeholder="Rawalpindi"/></label>{notice&&<div className="notice">{notice}</div>}<button disabled={busy}>{busy?"Creating…":"Create company"} <span>→</span></button><a className="signout" onClick={()=>void db.auth.signOut()}>Sign out</a></form></main>;
 
@@ -244,6 +245,8 @@ export default function App() {
           ? <VendorCatalogModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : active === "Audit Trail"
           ? <AuditModule db={db} tenantId={organization.id} />
+        : active === "Support Center"
+          ? <SupportCenterModule db={db} tenantId={organization.id} userId={session.user.id} />
         : active === "User Permissions"
           ? <UserPermissionsModule db={db} tenantId={organization.id} currentRole={currentRole} />
         : ["Inventory","Distribution","Recovery","Reports","Goods Receiving"].includes(active)

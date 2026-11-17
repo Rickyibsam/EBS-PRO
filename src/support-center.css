@@ -1,0 +1,40 @@
+.tenant-support{background:#fff;border:1px solid #e5edf2;border-radius:13px;padding:22px;color:#24465f}
+.tenant-support-head{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:18px}
+.tenant-support-head>div:first-child small{font-size:9px;letter-spacing:1.5px;color:#179a86;font-weight:850}
+.tenant-support-head h2{font-size:22px;margin:6px 0;color:#1b405d}
+.tenant-support-head p{font-size:11px;color:#8299aa;margin:0;line-height:1.6}
+.tenant-support-head>div:last-child{display:flex;gap:8px}
+.tenant-support button{border:1px solid #dce7ee;border-radius:8px;background:#fff;color:#45647d;padding:9px 12px;font-size:10px;font-weight:750}
+.tenant-support .tenant-support-primary{background:#174d6b;border-color:#174d6b;color:#fff}
+.tenant-support-notice{margin:12px 0;padding:10px 12px;border:1px solid #e5d7b6;border-radius:8px;background:#fff9ec;color:#7b6231;font-size:11px}
+.tenant-support-form{padding:17px;margin:15px 0;background:#f7fafc;border:1px solid #e5edf3;border-radius:10px}
+.tenant-support-form h3,.tenant-support-list h3{font-size:13px;color:#2a526e;margin:0 0 12px}
+.tenant-support-form label{display:block;font-size:10px;font-weight:800;color:#607d93;margin:11px 0}
+.tenant-support-form input,.tenant-support-form select,.tenant-support-form textarea,.tenant-support-reply textarea{display:block;width:100%;margin-top:6px;border:1px solid #dce7ef;border-radius:7px;padding:10px;background:#fff;color:#294b65;font:inherit;font-size:11px;outline:none}
+.tenant-support-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tenant-support-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
+.tenant-support-layout{display:grid;grid-template-columns:minmax(220px,.8fr) minmax(0,1.6fr);gap:13px}
+.tenant-support-list{border:1px solid #e6edf2;border-radius:10px;padding:13px;min-width:0}
+.tenant-support-list>button{display:grid;width:100%;text-align:left;gap:5px;margin-top:7px;padding:11px;border-radius:8px}
+.tenant-support-list>button.selected{border-color:#5bbdc1;background:#f1fbfb;box-shadow:inset 3px 0 #26aeb2}
+.tenant-support-list>button b{font-size:11px;color:#2b506c}
+.tenant-support-list>button small,.tenant-support-list>button time{font-size:9px;color:#8ba0b1}
+.tenant-support-status{display:inline-block;width:max-content;border-radius:20px;padding:4px 7px;background:#edf3f7;color:#5f7890;font-size:8px;font-weight:850;text-transform:uppercase}
+.tenant-support-status.status-open{background:#fff5e7;color:#a97722}.tenant-support-status.status-resolved{background:#e6f8f2;color:#138268}.tenant-support-status.status-in_progress,.tenant-support-status.status-waiting_customer{background:#eaf4ff;color:#3377ad}
+.tenant-support-detail{border:1px solid #e6edf2;border-radius:10px;padding:15px;min-width:0}
+.tenant-support-ticket-title{display:flex;justify-content:space-between;gap:12px}
+.tenant-support-ticket-title small{font-size:9px;color:#179a86;font-weight:850;letter-spacing:.8px}
+.tenant-support-ticket-title h3{font-size:16px;color:#254c69;margin:5px 0}
+.tenant-support-ticket-title p{font-size:9px;color:#8da2b2;margin:0}
+.tenant-support-description{margin:13px 0;padding:12px;border-radius:8px;background:#f6f9fb;color:#5d778d;font-size:11px;line-height:1.65;white-space:pre-wrap}
+.tenant-support-conversation{border-top:1px solid #e8eef3;padding-top:12px}
+.tenant-support-conversation>b{font-size:11px;color:#355c78}
+.tenant-support-conversation article{padding:10px 0;border-bottom:1px solid #edf2f6}
+.tenant-support-conversation article small{font-size:9px;color:#91a5b5}
+.tenant-support-conversation article p{font-size:11px;line-height:1.6;color:#4c6b82;white-space:pre-wrap;margin:5px 0}
+.tenant-support-reply{display:grid;gap:8px;margin-top:12px}
+.tenant-support-reply button{justify-self:end}
+.tenant-support-empty{font-size:10px;line-height:1.6;color:#91a4b3;text-align:center;padding:16px 8px}
+.tenant-support-empty-detail{min-height:220px;display:grid;place-items:center}
+.tenant-support-footnote{font-size:9px;color:#9aabba;line-height:1.6;margin:14px 0 0}
+@media(max-width:760px){.tenant-support{padding:14px}.tenant-support-head{align-items:flex-start;flex-direction:column}.tenant-support-head>div:last-child{width:100%}.tenant-support-head>div:last-child button{flex:1}.tenant-support-layout{grid-template-columns:1fr}.tenant-support-list{max-height:270px;overflow:auto}.tenant-support-grid{grid-template-columns:1fr}}
