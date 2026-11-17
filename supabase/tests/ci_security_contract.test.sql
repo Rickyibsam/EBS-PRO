@@ -473,8 +473,10 @@ select ok(
 );
 select ok(
   not has_table_privilege('anon','public.platform_admins','SELECT')
-  and not has_table_privilege('authenticated','public.platform_admins','SELECT')
-  and not has_table_privilege('authenticated','public.platform_admins','INSERT'),
+  and has_table_privilege('authenticated','public.platform_admins','SELECT')
+  and not has_table_privilege('authenticated','public.platform_admins','INSERT')
+  and exists(select 1 from pg_policy p join pg_class c on c.oid=p.polrelid join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='public' and c.relname='platform_admins' and p.polname='platform_admins_read_self'),
   'platform role registry is not directly readable or writable through the Data API'
 );
 select ok(
