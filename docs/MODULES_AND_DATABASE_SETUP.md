@@ -123,6 +123,8 @@ The hosted Supabase migration ledger currently records **190 applied migrations*
 
 Two old non-timestamped bootstrap scripts are archived under `docs/legacy-sql/` for historical reference and are not part of the timestamped migration stream. The compatibility bootstrap is intentionally idempotent (`CREATE TABLE IF NOT EXISTS`) and is required for a clean replay; it is not counted as an applied hosted migration. The PR CI disposable database replay is the verification gate for this source stream. Do not reset, delete or recreate the existing production project to attempt this.
 
+The open platform-support feature branch also proposes `20261117150000_add_platform_super_admin_support_portal.sql`. It is not part of the 190 applied production migrations and has not been applied to the hosted database; it must pass the latest disposable replay and receive separate owner approval before production application.
+
 Apply future schema changes as timestamped SQL migrations, commit each migration alongside its application changes, and explicitly grant only the API roles that need access. Never expose the service-role key in frontend code.
 
 ## Free-tier and operational constraints
