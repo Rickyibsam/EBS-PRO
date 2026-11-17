@@ -1,3 +1,37 @@
+-- Restore the immutable voucher revision log before the capture trigger below.
+-- The hosted database has this table, but its original CREATE TABLE DDL was not
+-- present in the checked-in migration history.
+
+create table if not exists public.voucher_revisions (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.organizations(id) on delete cascade,
+  entity_table text not null,
+  entity_id uuid not null,
+  action text not null check (action in ('updated','deleted')),
+  before_data jsonb not null,
+  after_data jsonb,
+  changed_by uuid references auth.users(id),
+  changed_at timestamptz not null default now()
+);
+
+create index if not exists idx_fk_voucher_revisions_c3cb0ece26
+  on public.voucher_revisions(changed_by);
+create index if not exists voucher_revisions_entity_idx
+  on public.voucher_revisions(tenant_id,entity_table,entity_id,changed_at desc);
+
+alter table public.voucher_revisions enable row level security;
+drop policy if exists voucher_revisions_tenant_read on public.voucher_revisions;
+create policy voucher_revisions_tenant_read on public.voucher_revisions
+  for select to authenticated
+  using (public.has_tenant_role(tenant_id,array['owner','admin','manager','accounts']::text[]));
+drop policy if exists voucher_revisions_tenant_insert on public.voucher_revisions;
+create policy voucher_revisions_tenant_insert on public.voucher_revisions
+  for insert to authenticated
+  with check (public.has_tenant_role(tenant_id,array['owner','admin','manager','accounts','sales','purchase','warehouse']::text[]));
+
+revoke all on table public.voucher_revisions from anon,authenticated;
+grant select,insert on table public.voucher_revisions to authenticated;
+
 -- Restored from the hosted Supabase migration ledger.
 -- Original applied statements are preserved below.
 
