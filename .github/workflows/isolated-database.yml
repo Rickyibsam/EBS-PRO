@@ -1,15 +1,15 @@
 name: EBS PRO isolated database replay
 
 on:
-  pull_request:
-    branches: [main]
+  push:
+    branches: [security/booker-authorization-hardening]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: isolated-database-${{ github.event.pull_request.number || github.ref }}
+  group: isolated-database-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      - name: Check out pull request source
+      - name: Check out feature branch
         uses: actions/checkout@v4
 
       - name: Set up Supabase CLI
