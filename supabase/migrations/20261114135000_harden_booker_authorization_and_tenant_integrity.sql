@@ -333,10 +333,10 @@ GRANT EXECUTE ON FUNCTION public.get_booker_catalog(uuid,uuid) TO authenticated;
 DO $legacy_rpc$
 BEGIN
   IF to_regprocedure('public.get_booker_stock_balances(uuid)') IS NOT NULL THEN
-    REVOKE ALL ON FUNCTION public.get_booker_stock_balances(uuid) FROM PUBLIC, anon, authenticated;
+    EXECUTE 'REVOKE ALL ON FUNCTION public.get_booker_stock_balances(uuid) FROM PUBLIC, anon, authenticated';
   END IF;
   IF to_regprocedure('private.get_booker_stock_balances_internal(uuid)') IS NOT NULL THEN
-    REVOKE ALL ON FUNCTION private.get_booker_stock_balances_internal(uuid) FROM PUBLIC, anon, authenticated;
+    EXECUTE 'REVOKE ALL ON FUNCTION private.get_booker_stock_balances_internal(uuid) FROM PUBLIC, anon, authenticated';
   END IF;
 END
 $legacy_rpc$;
