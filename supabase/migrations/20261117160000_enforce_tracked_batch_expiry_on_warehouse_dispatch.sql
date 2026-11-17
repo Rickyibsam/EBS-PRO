@@ -111,3 +111,52 @@ end $function$
 
 COMMENT ON FUNCTION public.dispatch_delivery(uuid,jsonb) IS
   'Warehouse dispatch uses FEFO and excludes expired stock; products configured for batch or expiry tracking cannot dispatch lots missing the required metadata.';
+
+-- Do not enable new tracking requirements while positive on-hand stock still lacks
+-- the required metadata. Existing legacy lots must be reconciled first.
+CREATE OR REPLACE FUNCTION private.guard_product_tracking_enablement()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' AND NEW.track_expiry AND NOT OLD.track_expiry
+     AND EXISTS (
+       SELECT 1
+       FROM public.stock_movements sm
+       WHERE sm.tenant_id = NEW.tenant_id
+         AND sm.product_id = NEW.id
+       GROUP BY sm.batch_number, sm.expiry_date
+       HAVING sum(sm.quantity_in - sm.quantity_out) > 0.0001
+          AND sm.expiry_date IS NULL
+     ) THEN
+    RAISE EXCEPTION 'Expiry tracking cannot be enabled while positive stock has no expiry date. Reconcile the existing stock lots first.'
+      USING ERRCODE = '23514';
+  END IF;
+
+  IF TG_OP = 'UPDATE' AND NEW.track_batch AND NOT OLD.track_batch
+     AND EXISTS (
+       SELECT 1
+       FROM public.stock_movements sm
+       WHERE sm.tenant_id = NEW.tenant_id
+         AND sm.product_id = NEW.id
+       GROUP BY sm.batch_number, sm.expiry_date
+       HAVING sum(sm.quantity_in - sm.quantity_out) > 0.0001
+          AND nullif(btrim(sm.batch_number), '') IS NULL
+     ) THEN
+    RAISE EXCEPTION 'Batch tracking cannot be enabled while positive stock has no batch number. Reconcile the existing stock lots first.'
+      USING ERRCODE = '23514';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION private.guard_product_tracking_enablement() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS guard_product_tracking_enablement ON public.products;
+CREATE TRIGGER guard_product_tracking_enablement
+BEFORE UPDATE OF track_batch, track_expiry ON public.products
+FOR EACH ROW EXECUTE FUNCTION private.guard_product_tracking_enablement();
+
