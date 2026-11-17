@@ -1,6 +1,6 @@
 begin;
 
-select plan(62);
+select plan(70);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -462,6 +462,58 @@ select ok(
    where n.nspname='public' and c.relname in ('departments','designations')
      and p.polname in ('module_override_guard_update','module_override_grant_update','module_override_guard_select','module_override_grant_select')),
   'department and designation masters honor custom HR/payroll view/update permissions'
+);
+
+
+select ok(
+  (select count(*)=3 and bool_and(c.relrowsecurity)
+   from pg_class c join pg_namespace n on n.oid=c.relnamespace
+   where n.nspname='public' and c.relname in ('platform_admins','platform_support_tickets','platform_support_messages')),
+  'platform admin and support tables all enforce row level security'
+);
+select ok(
+  not has_table_privilege('anon','public.platform_admins','SELECT')
+  and not has_table_privilege('authenticated','public.platform_admins','SELECT')
+  and not has_table_privilege('authenticated','public.platform_admins','INSERT'),
+  'platform role registry is not directly readable or writable through the Data API'
+);
+select ok(
+  has_function_privilege('authenticated','public.platform_admin_me()','EXECUTE')
+  and not has_function_privilege('anon','public.platform_admin_me()','EXECUTE')
+  and has_function_privilege('authenticated','public.platform_admin_list_companies()','EXECUTE')
+  and not has_function_privilege('anon','public.platform_admin_list_companies()','EXECUTE'),
+  'platform admin RPCs are authenticated-only'
+);
+select ok(
+  (select p.prosecdef and position('is_platform_staff_internal' in p.prosrc)>0
+   from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+   where n.nspname='public' and p.proname='platform_admin_list_companies'),
+  'company directory RPC uses a server-side platform role check'
+);
+select ok(
+  (select count(*)=9 from pg_policy p join pg_class c on c.oid=p.polrelid join pg_namespace n on n.oid=c.relnamespace
+   where n.nspname='public' and
+     ((c.relname='platform_support_tickets' and p.polname like 'platform_support_tickets_%')
+      or (c.relname='platform_support_messages' and p.polname like 'platform_support_messages_%'))),
+  'support tickets and messages have separate platform-staff and tenant-member policies'
+);
+select ok(
+  (select count(*)=1 from pg_policy p join pg_class c on c.oid=p.polrelid join pg_namespace n on n.oid=c.relnamespace
+   where n.nspname='public' and c.relname='platform_support_tickets' and p.polcmd='w'
+     and p.polname='platform_support_tickets_staff_update'),
+  'only platform staff can update ticket status and assignment'
+);
+select ok(
+  not has_table_privilege('authenticated','public.platform_support_tickets','DELETE')
+  and not has_table_privilege('authenticated','public.platform_support_messages','UPDATE')
+  and not has_table_privilege('authenticated','public.platform_support_messages','DELETE'),
+  'support API grants exclude ticket deletion and message mutation'
+);
+select ok(
+  exists(select 1 from pg_trigger t
+         where t.tgrelid='public.platform_support_messages'::regclass
+           and not t.tgisinternal and t.tgname='platform_support_message_touch_ticket'),
+  'support replies automatically update ticket activity time'
 );
 
 select * from finish();
