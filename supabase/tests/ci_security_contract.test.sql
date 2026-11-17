@@ -1,6 +1,6 @@
 begin;
 
-select plan(44);
+select plan(48);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -304,6 +304,36 @@ select ok(
   exists(select 1 from pg_indexes where schemaname='public' and tablename='delivery_charge_collections'
          and indexname='delivery_charge_collections_tenant_idempotency_uidx'),
   'delivery charge collection retries have a tenant-scoped idempotency index'
+);
+
+
+select ok(
+  (select bool_and(c.relrowsecurity) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+   where n.nspname='public' and c.relname in ('stock_takes','stock_take_lines')),
+  'stock take headers and lines both have RLS enabled'
+);
+select ok(
+  has_function_privilege('authenticated','public.create_stock_take(uuid,uuid,date,jsonb,text)','EXECUTE')
+  and has_function_privilege('authenticated','public.update_stock_take_counts(uuid,jsonb)','EXECUTE')
+  and has_function_privilege('authenticated','public.post_stock_take(uuid)','EXECUTE')
+  and not has_function_privilege('anon','public.create_stock_take(uuid,uuid,date,jsonb,text)','EXECUTE')
+  and not has_function_privilege('anon','public.update_stock_take_counts(uuid,jsonb)','EXECUTE')
+  and not has_function_privilege('anon','public.post_stock_take(uuid)','EXECUTE'),
+  'stock take workflow RPCs are authenticated-only'
+);
+select ok(
+  (select count(*)=1 from pg_constraint c
+   where c.conrelid='public.stock_takes'::regclass and c.contype='f'
+     and pg_get_constraintdef(c.oid) like 'FOREIGN KEY (tenant_id, warehouse_id)%')
+  and (select count(*)=2 from pg_constraint c
+   where c.conrelid='public.stock_take_lines'::regclass and c.contype='f'
+     and pg_get_constraintdef(c.oid) like 'FOREIGN KEY (tenant_id, %'),
+  'stock take headers and lines enforce same-tenant warehouse, parent and product references'
+);
+select ok(
+  exists(select 1 from pg_indexes where schemaname='public' and tablename='stock_take_lines'
+         and indexname='stock_take_lines_lot_uidx'),
+  'stock take prevents duplicate product/batch/expiry count lines'
 );
 
 select * from finish();
