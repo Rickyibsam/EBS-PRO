@@ -59,8 +59,8 @@ values ('00000000-0000-0000-0000-000000000101','00000000-0000-0000-0000-00000000
 insert into public.route_customers(tenant_id,route_id,customer_id,visit_order)
 values ('00000000-0000-0000-0000-000000000101','00000000-0000-0000-0000-000000000901','00000000-0000-0000-0000-000000000801',1);
 
-insert into public.price_lists(id,tenant_id,name,price_type,is_default,is_active,valid_from)
-values ('00000000-0000-0000-0000-000000000a01','00000000-0000-0000-0000-000000000101','Booker VIP Price List','special',false,true,current_date);
+insert into public.price_lists(id,tenant_id,name,price_type,is_default,valid_from)
+values ('00000000-0000-0000-0000-000000000a01','00000000-0000-0000-0000-000000000101','Booker VIP Price List','special',false,current_date);
 
 insert into public.customer_price_lists(tenant_id,customer_id,price_list_id)
 values ('00000000-0000-0000-0000-000000000101','00000000-0000-0000-0000-000000000801','00000000-0000-0000-0000-000000000a01');
