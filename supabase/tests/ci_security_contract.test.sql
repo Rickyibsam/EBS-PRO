@@ -1,6 +1,6 @@
 begin;
 
-select plan(48);
+select plan(49);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -334,6 +334,16 @@ select ok(
   exists(select 1 from pg_indexes where schemaname='public' and tablename='stock_take_lines'
          and indexname='stock_take_lines_lot_uidx'),
   'stock take prevents duplicate product/batch/expiry count lines'
+);
+
+
+select ok(
+  has_function_privilege('authenticated','public.get_erp_report_summary(uuid,date,date)','EXECUTE')
+  and not has_function_privilege('anon','public.get_erp_report_summary(uuid,date,date)','EXECUTE')
+  and (select position('module_permission_grant_internal' in p.prosrc)>0
+       from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+       where n.nspname='public' and p.proname='get_erp_report_summary'),
+  'date-filtered ERP report RPC is authenticated-only and honors custom report permissions'
 );
 
 select * from finish();
