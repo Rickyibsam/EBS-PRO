@@ -1,3 +1,36 @@
+-- Internal authorization helpers referenced by the RLS policies below.
+-- Their original definitions were missing from the migration history.
+create schema if not exists private;
+revoke all on schema private from public,anon;
+
+create or replace function private.has_tenant_role_internal(p_tenant_id uuid,p_roles text[])
+returns boolean
+language sql stable security definer
+set search_path=pg_catalog,public,auth
+as $function$
+  select exists (
+    select 1 from public.tenant_memberships m
+    where m.tenant_id=p_tenant_id and m.user_id=(select auth.uid())
+      and m.is_active and m.role=any(p_roles)
+  );
+$function$;
+
+create or replace function private.is_tenant_member_internal(p_tenant_id uuid)
+returns boolean
+language sql stable security definer
+set search_path=pg_catalog,public,auth
+as $function$
+  select exists (
+    select 1 from public.tenant_memberships m
+    where m.tenant_id=p_tenant_id and m.user_id=(select auth.uid()) and m.is_active
+  );
+$function$;
+
+revoke all on function private.has_tenant_role_internal(uuid,text[]) from public,anon;
+revoke all on function private.is_tenant_member_internal(uuid) from public,anon;
+grant execute on function private.has_tenant_role_internal(uuid,text[]) to authenticated;
+grant execute on function private.is_tenant_member_internal(uuid) to authenticated;
+
 -- Per-user module permission overrides and persistent notification inbox.
 -- Existing role policies remain the default. Explicit owner-set overrides can
 -- restrict or extend a member's access, while tenant membership is always checked.
