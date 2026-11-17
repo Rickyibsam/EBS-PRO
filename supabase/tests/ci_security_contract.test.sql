@@ -1,6 +1,6 @@
 begin;
 
-select plan(71);
+select plan(73);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -523,6 +523,27 @@ select ok(
          where t.tgrelid='public.platform_support_messages'::regclass
            and not t.tgisinternal and t.tgname='platform_support_message_touch_ticket'),
   'support replies automatically update ticket activity time'
+);
+
+
+select ok(
+  (select not p.prosecdef
+      and position('v_product.track_expiry' in p.prosrc)>0
+      and position('expiry_date is not null' in p.prosrc)>0
+      and position('v_product.track_batch' in p.prosrc)>0
+      and position('nullif(btrim(batch_number)' in p.prosrc)>0
+   from pg_proc p
+   where p.oid='public.dispatch_delivery(uuid,jsonb)'::regprocedure),
+  'warehouse dispatch excludes missing expiry and batch metadata when product tracking requires it'
+);
+
+
+select ok(
+  exists(select 1 from pg_trigger t where t.tgrelid='public.products'::regclass and not t.tgisinternal and t.tgname='guard_product_tracking_enablement')
+  and (select p.prosecdef and position('positive stock has no expiry date' in lower(p.prosrc))>0
+        and position('positive stock has no batch number' in lower(p.prosrc))>0
+       from pg_proc p where p.oid='private.guard_product_tracking_enablement()'::regprocedure),
+  'product tracking cannot be enabled while positive legacy stock lacks required metadata'
 );
 
 select * from finish();
