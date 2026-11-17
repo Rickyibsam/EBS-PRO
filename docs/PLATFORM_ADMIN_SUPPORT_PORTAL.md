@@ -16,7 +16,7 @@ It is a separate route from the tenant ERP. A normal company owner, manager, boo
 
 The portal displays organization identity, city, account status, registration date, active membership count, branch count and open support case count. It does not expose tenant invoices, customer ledgers, payroll, stock or bank data.
 
-Support staff can create a ticket for a company, set category and priority, assign it to themselves, update status and record conversation messages. Ticket and message access is protected by RLS and the platform-staff role table.
+Company users can create support requests inside their ERP Support Center, see only their own company’s tickets and messages, and reply to the support team. Platform staff can create a case on behalf of a company, set category and priority, assign it to themselves, update status and record conversation messages. Ticket and message access is protected by RLS and the platform-staff role table.
 
 ## First Super Admin provisioning
 
@@ -48,7 +48,7 @@ Only an existing Super Admin should provision additional Support Admins. Do not 
 - Platform access is separate from `tenant_memberships`; tenant roles never imply platform access.
 - `platform_admins` has RLS enabled and no direct Data API grants. Role lookup is through a narrowly scoped authenticated RPC.
 - The company directory RPC checks the active platform role before returning tenant-level summary data.
-- Support tickets and messages have RLS policies that allow only active platform staff.
+- Support tickets and messages have RLS policies: tenant members can access only their own tenant's tickets/messages, while active platform staff can access the support queue across companies.
 - No service-role key is shipped to the browser.
 - No tenant suspension, deletion, payment mutation, password setting or arbitrary tenant impersonation is exposed in this first release.
 - Every future support action that changes a tenant's data must use explicit customer consent, least-privilege authorization and an immutable audit trail.
@@ -60,6 +60,8 @@ Only an existing Super Admin should provision additional Support Admins. Do not 
 - [ ] Confirm a tenant owner cannot access `/super-admin`.
 - [ ] Provision one verified platform owner using the one-time SQL above.
 - [ ] Verify company directory counts against source tables.
+- [ ] Create a ticket from a tenant ERP login and confirm another tenant cannot read it.
+- [ ] Reply from the tenant ERP, then reply from the platform portal and confirm both sides see the same thread.
 - [ ] Create a ticket, assign it, update its status and add a conversation message.
 - [ ] Confirm a non-platform account cannot read or alter tickets/messages.
 - [ ] Confirm tenant business data is not exposed through the portal.
