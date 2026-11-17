@@ -29,7 +29,7 @@ The application has 10 module groups. The navigation and module screens are pres
 4. **Inventory & Warehouse**
    - Product/SKU, category, brand, unit and alternate-unit management.
    - Multiple branches/warehouses, stock movements, stock valuation and inter-warehouse transfers.
-   - Batch and expiry enforcement, FEFO dispatch, stock take and low-stock alerts.
+   - Batch and expiry enforcement, FEFO dispatch, stock take and low-stock alerts. Products configured with `track_batch` or `track_expiry` are blocked from warehouse dispatch when required metadata is missing; expired stock is excluded.
 
 5. **Purchase & Supplier Management**
    - Supplier records, purchase orders, goods receipts, supplier invoices, returns/debit notes, payments and supplier ledger.
