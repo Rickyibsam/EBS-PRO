@@ -30,6 +30,24 @@ create policy payroll_incentive_accruals_tenant_access on public.payroll_incenti
   using (private.has_tenant_role_internal(tenant_id,array['owner','admin','manager','accounts']::text[]))
   with check (private.has_tenant_role_internal(tenant_id,array['owner','admin','manager','accounts']::text[]));
 
+do $policy$
+declare v_action text;v_policy text;
+begin
+  foreach v_action in array array['select','insert','update','delete'] loop
+    v_policy:='module_override_grant_'||v_action;
+    if v_action='insert' then
+      execute format('create policy %I on public.payroll_incentive_accruals as permissive for insert to authenticated with check (private.module_permission_grant_internal(tenant_id,%L,%L))',v_policy,'hr_payroll','create');
+    elsif v_action='update' then
+      execute format('create policy %I on public.payroll_incentive_accruals as permissive for update to authenticated using (private.module_permission_grant_internal(tenant_id,%L,%L)) with check (private.module_permission_grant_internal(tenant_id,%L,%L))',v_policy,'hr_payroll','update','hr_payroll','update');
+    elsif v_action='delete' then
+      execute format('create policy %I on public.payroll_incentive_accruals as permissive for delete to authenticated using (private.module_permission_grant_internal(tenant_id,%L,%L))',v_policy,'hr_payroll','delete');
+    else
+      execute format('create policy %I on public.payroll_incentive_accruals as permissive for select to authenticated using (private.module_permission_grant_internal(tenant_id,%L,%L))',v_policy,'hr_payroll','view');
+    end if;
+  end loop;
+end
+$policy$;
+
 grant all on table public.payroll_incentive_accruals to authenticated;
 revoke all on table public.payroll_incentive_accruals from anon;
 
