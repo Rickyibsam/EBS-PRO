@@ -2,12 +2,12 @@ begin;
 select plan(12);
 
 insert into auth.users (
-  id,aud,role,email,encrypted_password,email_confirmed_at,confirmed_at,
+  id,aud,role,email,encrypted_password,email_confirmed_at,
   created_at,updated_at,raw_app_meta_data,raw_user_meta_data
 ) values
-('00000000-0000-0000-0000-000000000201','authenticated','authenticated','booker-one@example.test','',now(),now(),now(),now(),
+('00000000-0000-0000-0000-000000000201','authenticated','authenticated','booker-one@example.test','',now(),now(),now(),
  '{"provider":"email","providers":["email"]}','{"full_name":"Booker One"}'),
-('00000000-0000-0000-0000-000000000202','authenticated','authenticated','booker-two@example.test','',now(),now(),now(),now(),
+('00000000-0000-0000-0000-000000000202','authenticated','authenticated','booker-two@example.test','',now(),now(),now(),
  '{"provider":"email","providers":["email"]}','{"full_name":"Booker Two"}');
 
 insert into public.organizations(id,name,slug)
