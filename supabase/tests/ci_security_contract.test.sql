@@ -1,6 +1,6 @@
 begin;
 
-select plan(25);
+select plan(27);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -157,6 +157,16 @@ select ok(
          where n.nspname='public' and c.relname='voucher_revisions'
            and p.polname='voucher_revisions_tenant_insert'),
   'voucher revision history has tenant-scoped read and insert policies'
+);
+
+
+select ok(
+  has_function_privilege('authenticated','public.restore_draft_voucher_revision(uuid)','EXECUTE'),
+  'authenticated users can execute guarded voucher header restore RPC'
+);
+select ok(
+  not has_function_privilege('anon','public.restore_draft_voucher_revision(uuid)','EXECUTE'),
+  'anonymous users cannot execute voucher header restore RPC'
 );
 
 select * from finish();
