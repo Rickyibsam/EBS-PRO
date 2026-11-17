@@ -414,7 +414,8 @@ select ok(
   and (select count(*)=2 from pg_constraint c
    where c.conrelid='public.employees'::regclass and c.contype='f'
      and pg_get_constraintdef(c.oid) like 'FOREIGN KEY (tenant_id, %'
-     and pg_get_constraintdef(c.oid) like '%departments%' or pg_get_constraintdef(c.oid) like '%designations%'),
+     and (pg_get_constraintdef(c.oid) like '%REFERENCES departments%'
+          or pg_get_constraintdef(c.oid) like '%REFERENCES designations%')),
   'employee department/designation and designation department links are tenant-safe'
 );
 
