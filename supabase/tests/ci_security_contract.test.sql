@@ -1,6 +1,6 @@
 begin;
 
-select plan(22);
+select plan(25);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -134,6 +134,29 @@ select ok(
          where n.nspname='public' and c.relname='budget_lines'
            and p.polname='budget_lines_tenant_access'),
   'budget lines have tenant-role access policy'
+);
+
+
+select ok(
+  (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
+   where n.nspname='public' and c.relname='voucher_revisions'),
+  'voucher revision history has RLS enabled'
+);
+select ok(
+  not has_table_privilege('authenticated','public.voucher_revisions','UPDATE')
+  and not has_table_privilege('authenticated','public.voucher_revisions','DELETE'),
+  'authenticated users cannot mutate immutable voucher revision history'
+);
+select ok(
+  exists(select 1 from pg_policy p join pg_class c on c.oid=p.polrelid
+         join pg_namespace n on n.oid=c.relnamespace
+         where n.nspname='public' and c.relname='voucher_revisions'
+           and p.polname='voucher_revisions_tenant_read')
+  and exists(select 1 from pg_policy p join pg_class c on c.oid=p.polrelid
+         join pg_namespace n on n.oid=c.relnamespace
+         where n.nspname='public' and c.relname='voucher_revisions'
+           and p.polname='voucher_revisions_tenant_insert'),
+  'voucher revision history has tenant-scoped read and insert policies'
 );
 
 select * from finish();
