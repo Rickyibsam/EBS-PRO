@@ -159,9 +159,9 @@ GRANT EXECUTE ON FUNCTION public.platform_admin_list_companies() TO authenticate
 COMMENT ON TABLE public.platform_admins IS
   'Platform-level staff access; separate from tenant_memberships and never self-service.';
 COMMENT ON TABLE public.platform_support_tickets IS
-  'Platform support cases linked to a customer tenant; access is limited to active platform staff.';
+  'Platform support cases linked to a customer tenant; customers see their own tenant cases and platform staff see all cases.';
 COMMENT ON TABLE public.platform_support_messages IS
-  'Internal support conversation history; access is limited to active platform staff.';
+  'Support conversation history; tenant members see their own company threads and platform staff see all support threads.';
 
 -- Tenant members can create and read only their own company's support cases.
 CREATE POLICY platform_support_tickets_tenant_select
