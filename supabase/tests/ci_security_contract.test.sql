@@ -1,6 +1,6 @@
 begin;
 
-select plan(31);
+select plan(32);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -197,6 +197,14 @@ select ok(
    from pg_proc p join pg_namespace n on n.oid=p.pronamespace
    where n.nspname='public' and p.proname='enforce_stock_batch_expiry_rules'),
   'batch/expiry validation bypass is limited to authorized backup restore sessions'
+);
+
+
+select ok(
+  (select position('module_permission_grant_internal' in p.prosrc)>0
+   from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+   where n.nspname='public' and p.proname='post_payroll_run'),
+  'payroll posting RPC honors explicit HR/payroll update grants'
 );
 
 select * from finish();
