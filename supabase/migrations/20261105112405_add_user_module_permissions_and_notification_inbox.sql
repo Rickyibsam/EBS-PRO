@@ -31,6 +31,51 @@ revoke all on function private.is_tenant_member_internal(uuid) from public,anon;
 grant execute on function private.has_tenant_role_internal(uuid,text[]) to authenticated;
 grant execute on function private.is_tenant_member_internal(uuid) to authenticated;
 
+-- Restore Booker product visibility rules before the dynamic module-policy sweep.
+create table if not exists public.booker_product_visibility (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.organizations(id) on delete cascade,
+  employee_id uuid not null references public.employees(id),
+  vendor_id uuid references public.parties(id),
+  brand text,
+  product_id uuid references public.products(id),
+  is_allowed boolean not null default true,
+  require_stock boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint booker_product_visibility_scope_check
+    check (vendor_id is not null or nullif(trim(brand),'') is not null or product_id is not null)
+);
+
+create index if not exists booker_product_visibility_employee_idx
+  on public.booker_product_visibility(tenant_id,employee_id);
+create index if not exists booker_product_visibility_vendor_idx
+  on public.booker_product_visibility(tenant_id,vendor_id);
+
+alter table public.booker_product_visibility enable row level security;
+drop policy if exists booker_visibility_read on public.booker_product_visibility;
+create policy booker_visibility_read on public.booker_product_visibility
+  for select to authenticated
+  using (
+    private.has_tenant_role_internal(tenant_id,array['owner','admin','manager','sales']::text[])
+    or exists (
+      select 1 from public.employees e
+      where e.id=booker_product_visibility.employee_id
+        and e.tenant_id=booker_product_visibility.tenant_id
+        and e.user_id=(select auth.uid())
+        and e.employment_status='active'
+        and private.has_tenant_role_internal(e.tenant_id,array['order_booker']::text[])
+    )
+  );
+drop policy if exists booker_visibility_write on public.booker_product_visibility;
+create policy booker_visibility_write on public.booker_product_visibility
+  for all to authenticated
+  using (private.has_tenant_role_internal(tenant_id,array['owner','admin','manager','sales']::text[]))
+  with check (private.has_tenant_role_internal(tenant_id,array['owner','admin','manager','sales']::text[]));
+
+grant all on table public.booker_product_visibility to authenticated;
+revoke all on table public.booker_product_visibility from anon;
+
 -- Per-user module permission overrides and persistent notification inbox.
 -- Existing role policies remain the default. Explicit owner-set overrides can
 -- restrict or extend a member's access, while tenant membership is always checked.
