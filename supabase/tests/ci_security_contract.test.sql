@@ -1,6 +1,6 @@
 begin;
 
-select plan(57);
+select plan(60);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -417,6 +417,28 @@ select ok(
      and (pg_get_constraintdef(c.oid) like '%REFERENCES departments%'
           or pg_get_constraintdef(c.oid) like '%REFERENCES designations%')),
   'employee department/designation and designation department links are tenant-safe'
+);
+
+
+select ok(
+  (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
+   where n.nspname='public' and c.relname='payroll_incentive_accruals'),
+  'payroll incentive accrual ledger has RLS enabled'
+);
+select ok(
+  (select count(*)=4 from pg_constraint c
+   where c.conrelid='public.payroll_incentive_accruals'::regclass and c.contype='f'
+     and pg_get_constraintdef(c.oid) like 'FOREIGN KEY (tenant_id, %'),
+  'payroll incentive accruals enforce same-tenant run, line, employee and target references'
+);
+select ok(
+  exists(select 1 from pg_constraint c
+         where c.conrelid='public.payroll_incentive_accruals'::regclass and c.contype='u'
+           and pg_get_constraintdef(c.oid) like 'UNIQUE (tenant_id, payroll_run_id, sales_target_id)%')
+  and exists(select 1 from pg_policy p join pg_class c on c.oid=p.polrelid join pg_namespace n on n.oid=c.relnamespace
+         where n.nspname='public' and c.relname='payroll_incentive_accruals'
+           and p.polname='module_override_guard_insert'),
+  'payroll incentive accrual import is idempotent and custom-permission guarded'
 );
 
 select * from finish();
