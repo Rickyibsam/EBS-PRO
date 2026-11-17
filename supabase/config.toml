@@ -31,7 +31,7 @@ site_url = "http://127.0.0.1:3000"
 additional_redirect_urls = ["http://127.0.0.1:3000"]
 
 [auth.email]
-enable_signup = true
+enabled = true
 enable_confirmations = false
 
 [analytics]
