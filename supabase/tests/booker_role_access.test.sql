@@ -1,5 +1,5 @@
 begin;
-select plan(14);
+select plan(15);
 
 insert into auth.users (
   id,aud,role,email,encrypted_password,email_confirmed_at,
@@ -92,14 +92,24 @@ select is(
      and sm.product_id='00000000-0000-0000-0000-000000000701'),
   10::numeric,'fixture creates positive stock in the assigned branch warehouse'
 );
+update public.booker_product_visibility
+set require_stock=false
+where tenant_id='00000000-0000-0000-0000-000000000101'
+  and employee_id='00000000-0000-0000-0000-000000000501'
+  and product_id='00000000-0000-0000-0000-000000000701';
 select ok(
   private.booker_product_allowed(
     '00000000-0000-0000-0000-000000000101',
     '00000000-0000-0000-0000-000000000501',
     '00000000-0000-0000-0000-000000000701'
   ),
-  'server visibility helper accepts explicitly allowed in-stock product'
+  'server visibility helper accepts explicitly allowed product without stock gating'
 );
+update public.booker_product_visibility
+set require_stock=true
+where tenant_id='00000000-0000-0000-0000-000000000101'
+  and employee_id='00000000-0000-0000-0000-000000000501'
+  and product_id='00000000-0000-0000-0000-000000000701';
 
 create temporary table booker_catalog_probe(user_key text not null,product_id uuid not null,price numeric) on commit drop;
 create temporary table booker_rls_probe(user_key text not null,table_name text not null,rows_seen bigint not null) on commit drop;
