@@ -1,6 +1,6 @@
 begin;
 
-select plan(35);
+select plan(37);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -231,6 +231,20 @@ select ok(
        from pg_proc p join pg_namespace n on n.oid=p.pronamespace
        where n.nspname='public' and p.proname='apply_commission_return_adjustments'),
   'commission clawback RPC is authenticated-only and honors HR/payroll custom update grants'
+);
+
+
+select ok(
+  (select count(*)=3 from pg_constraint c
+   where c.conrelid='public.sales_incentive_adjustments'::regclass and c.contype='f'
+     and pg_get_constraintdef(c.oid) like 'FOREIGN KEY (tenant_id, %'),
+  'commission clawback rows enforce same-tenant employee, payroll and sales-target references'
+);
+select ok(
+  exists(select 1 from pg_constraint c
+         where c.conrelid='public.sales_incentive_adjustments'::regclass and c.contype='u'
+           and pg_get_constraintdef(c.oid) like 'UNIQUE (tenant_id, sales_target_id, payroll_run_id)%'),
+  'commission clawback ledger is idempotent per tenant, target and payroll run'
 );
 
 select * from finish();
