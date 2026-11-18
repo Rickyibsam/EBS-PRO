@@ -170,7 +170,7 @@ CREATE POLICY platform_support_notifications_mark_own
   WITH CHECK (recipient_id = (SELECT auth.uid()));
 
 
-DO $
+DO $realtime$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime')
      AND NOT EXISTS (
@@ -182,7 +182,7 @@ BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.platform_support_notifications;
   END IF;
 END;
-$;
+$realtime$;
 
 CREATE OR REPLACE FUNCTION private.apply_platform_support_sla()
 RETURNS trigger
