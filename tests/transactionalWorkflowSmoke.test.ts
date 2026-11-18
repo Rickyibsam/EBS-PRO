@@ -104,7 +104,7 @@ test("customer export traverses nested order, delivery and invoice dependencies 
   assert.ok(smoke.includes("public.export_customer_backup(v_tenant_a,v_customer)"));
   assert.ok(smoke.includes("customer backup omitted nested order/delivery/invoice dependencies"));
   assert.ok(smoke.includes("customer backup included a row outside the selected tenant"));
-  assert.ok(smoke.includes("dependency_depth") || smoke.includes("dependency_depth"));
+  assert.ok(smoke.includes("v_customer_backup->>'dependency_depth'"));
 });
 
 test("backup export and same-tenant additive restore are complete and idempotent", () => {
