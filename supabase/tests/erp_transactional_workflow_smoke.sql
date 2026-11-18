@@ -401,8 +401,8 @@ begin
     select 1 from public.products
     where id=v_product and tenant_id=v_tenant_a and track_batch=false and track_expiry=false
   ) then
-    raise exception 'FAIL: van load reconciliation mismatch. Available %, reserved %; expected an untracked product with 2 units.',
-      v_van_available,v_van_reserved || v_van_debug;
+    raise exception 'FAIL: van load reconciliation mismatch. Available %, reserved %, ledger rows %; expected an untracked product with 2 units.',
+      v_van_available,v_van_reserved,v_van_debug;
   end if;
   v_van_dispatch_result:=public.dispatch_van_delivery(
     v_van_delivery,'TX-VAN-01',
