@@ -13,11 +13,14 @@ type Company = {
   created_at: string; member_count: number; branch_count: number; open_ticket_count: number;
 };
 type Ticket = {
-  id: string; tenant_id: string; subject: string; category: string; priority: string;
+  id: string; tenant_id: string; ticket_number: number; subject: string; category: string; priority: string;
   status: string; description: string; resolution: string | null; assigned_to: string | null;
-  created_by: string; created_at: string; updated_at: string;
+  created_by: string; created_at: string; updated_at: string; sla_due_at: string | null;
+  first_response_at: string | null;
 };
 type Message = { id: number; ticket_id: string; sender_id: string; body: string; created_at: string };
+type Attachment = { id: string; ticket_id: string; storage_path: string; file_name: string; mime_type: string; file_size: number; created_at: string };
+type Notification = { id: string; ticket_id: string | null; event_type: string; title: string; body: string; read_at: string | null; created_at: string };
 
 const dateLabel = (value: string) => new Date(value).toLocaleString();
 const errorText = (error: unknown) => error instanceof Error ? error.message : "The request could not be completed.";
@@ -50,6 +53,9 @@ export default function SuperAdminPortal({ embedded = false }: { embedded?: bool
   const [securityBusy, setSecurityBusy] = useState(false);
   const [seoResults, setSeoResults] = useState<Array<{label:string;ok:boolean;detail:string}>>([]);
   const [seoCheckedAt, setSeoCheckedAt] = useState("");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   async function loadPortal() {
     if (!db || !session) return;
@@ -67,14 +73,21 @@ export default function SuperAdminPortal({ embedded = false }: { embedded?: bool
         return;
       }
       setAdmin(access as PlatformAdmin);
-      const [{ data: companyRows, error: companyError }, { data: ticketRows, error: ticketError }] = await Promise.all([
+      const [
+        { data: companyRows, error: companyError },
+        { data: ticketRows, error: ticketError },
+        { data: notificationRows, error: notificationError }
+      ] = await Promise.all([
         db.rpc("platform_admin_list_companies"),
-        db.from("platform_support_tickets").select("*").order("updated_at", { ascending: false }).limit(250)
+        db.from("platform_support_tickets").select("*").order("updated_at", { ascending: false }).limit(250),
+        db.from("platform_support_notifications").select("*").eq("recipient_id", access.user_id).order("created_at", { ascending: false }).limit(50)
       ]);
       if (companyError) throw companyError;
       if (ticketError) throw ticketError;
+      if (notificationError) throw notificationError;
       setCompanies((companyRows || []) as Company[]);
       setTickets((ticketRows || []) as Ticket[]);
+      setNotifications((notificationRows || []) as Notification[]);
     } catch (error) {
       setAdmin(null);
       setNotice(errorText(error));
@@ -100,14 +113,18 @@ export default function SuperAdminPortal({ embedded = false }: { embedded?: bool
   }, [session?.user.id]);
 
   useEffect(() => {
-    if (!db || !selectedTicket || !admin) { setMessages([]); return; }
+    if (!db || !selectedTicket || !admin) { setMessages([]); setAttachments([]); return; }
     let live = true;
-    db.from("platform_support_messages").select("*").eq("ticket_id", selectedTicket).order("created_at")
-      .then(({ data, error }) => {
-        if (!live) return;
-        if (error) setNotice(error.message);
-        else setMessages((data || []) as Message[]);
-      });
+    Promise.all([
+      db.from("platform_support_messages").select("*").eq("ticket_id", selectedTicket).order("created_at"),
+      db.from("platform_support_attachments").select("*").eq("ticket_id", selectedTicket).order("created_at")
+    ]).then(([messageResult, attachmentResult]) => {
+      if (!live) return;
+      if (messageResult.error) setNotice(messageResult.error.message);
+      else setMessages((messageResult.data || []) as Message[]);
+      if (attachmentResult.error) setNotice(attachmentResult.error.message);
+      else setAttachments((attachmentResult.data || []) as Attachment[]);
+    });
     return () => { live = false; };
   }, [selectedTicket, admin?.user_id]);
 
@@ -235,6 +252,42 @@ export default function SuperAdminPortal({ embedded = false }: { embedded?: bool
     finally { setBusy(false); }
   }
 
+  async function uploadTicketFiles(ticketId: string, files: File[]) {
+    if (!db || !admin) return;
+    const allowed = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp", "text/plain"]);
+    for (const file of files) {
+      if (!allowed.has(file.type) || file.size < 1 || file.size > 10 * 1024 * 1024) {
+        throw new Error("Attachments must be PDF, JPG, PNG, WEBP or TXT files up to 10 MiB each.");
+      }
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 100);
+      const path = ticketId + "/" + admin.user_id + "/" + crypto.randomUUID() + "-" + safeName;
+      const { error: uploadError } = await db.storage.from("platform-support-attachments").upload(path, file, { contentType: file.type, upsert: false });
+      if (uploadError) throw uploadError;
+      const { data, error } = await db.from("platform_support_attachments").insert({
+        ticket_id: ticketId, storage_path: path, file_name: file.name, mime_type: file.type,
+        file_size: file.size, uploaded_by: admin.user_id
+      }).select("*").single();
+      if (error) { await db.storage.from("platform-support-attachments").remove([path]); throw error; }
+      setAttachments(current => [...current, data as Attachment]);
+    }
+  }
+
+  async function openAttachment(item: Attachment) {
+    if (!db) return;
+    const { data, error } = await db.storage.from("platform-support-attachments").createSignedUrl(item.storage_path, 60);
+    if (error) { setNotice(error.message); return; }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  }
+
+  async function markNotificationRead(item: Notification) {
+    if (!db || !admin || item.read_at) return;
+    const readAt = new Date().toISOString();
+    const { error } = await db.from("platform_support_notifications").update({ read_at: readAt }).eq("id", item.id).eq("recipient_id", admin.user_id);
+    if (error) { setNotice(error.message); return; }
+    setNotifications(current => current.map(row => row.id === item.id ? { ...row, read_at: readAt } : row));
+    if (item.ticket_id) setSelectedTicket(item.ticket_id);
+  }
+
   async function sendMessage(event: FormEvent) {
     event.preventDefault();
     if (!db || !admin || !activeTicket || !message.trim()) return;
@@ -245,7 +298,12 @@ export default function SuperAdminPortal({ embedded = false }: { embedded?: bool
         .select("*").single();
       if (error) throw error;
       setMessages(current => [...current, data as Message]);
+      if (attachmentFiles.length) {
+        await uploadTicketFiles(activeTicket.id, attachmentFiles);
+        setAttachmentFiles([]);
+      }
       setMessage("");
+      setNotice("Support update sent.");
     } catch (error) { setNotice(errorText(error)); }
     finally { setBusy(false); }
   }
@@ -259,7 +317,7 @@ export default function SuperAdminPortal({ embedded = false }: { embedded?: bool
   if (!admin) return <main className="platform-center"><section className="platform-auth"><div className="platform-mark">E</div><h1>Platform access restricted</h1><p>{notice || "This account has no active platform support role."}</p><button onClick={() => void db.auth.signOut()}>Sign out</button><a href="/">Return to company ERP</a></section></main>;
 
   return <div className="platform-shell">
-    <aside className="platform-sidebar"><div className="platform-brand"><div className="platform-mark">E</div><div><b>EBS <em>PRO</em></b><small>ERP ADMINISTRATION</small></div></div><div className="platform-nav-label">WORKSPACE</div><a className="is-active" href="#overview">◈ Overview</a><a href="#companies">▦ Companies</a><a href="#tickets">▤ Support tickets</a><a href="#security">♙ Password & Security</a><a href="#website-optimization">⚡ Website Optimization</a><div className="platform-sidebar-foot"><span>{admin.role.replaceAll("_", " ").toUpperCase()}</span><small>{session.user.email}</small><button onClick={() => void db.auth.signOut()}>Sign out ↗</button></div></aside>
+    <aside className="platform-sidebar"><div className="platform-brand"><div className="platform-mark">E</div><div><b>EBS <em>PRO</em></b><small>ERP ADMINISTRATION</small></div></div><div className="platform-nav-label">WORKSPACE</div><a className="is-active" href="#overview">◈ Overview</a><a href="#companies">▦ Companies</a><a href="#tickets">▤ Support tickets</a><a href="#notifications">♧ Notifications {notifications.some(item => !item.read_at) ? "•" : ""}</a><a href="#security">♙ Password & Security</a><a href="#website-optimization">⚡ Website Optimization</a><div className="platform-sidebar-foot"><span>{admin.role.replaceAll("_", " ").toUpperCase()}</span><small>{session.user.email}</small><button onClick={() => void db.auth.signOut()}>Sign out ↗</button></div></aside>
     <main className="platform-main">
       <header className="platform-topbar"><div><small>ERP ADMINISTRATION / PLATFORM CONTROL</small><h1>Admin Portal Configuration</h1></div><div className="platform-top-actions"><span>● SECURE SESSION</span><button onClick={() => void loadPortal()}>↻ Refresh</button></div></header>
       <section className="platform-content" id="overview">
@@ -278,6 +336,15 @@ export default function SuperAdminPortal({ embedded = false }: { embedded?: bool
           <div className="platform-form-grid"><label>Category<select value={category} onChange={event => setCategory(event.target.value)}><option value="technical">Technical issue</option><option value="account">Account & access</option><option value="data">Data / transaction issue</option><option value="training">Training request</option><option value="feature">Feature request</option><option value="other">Other</option></select></label><label>Priority<select value={priority} onChange={event => setPriority(event.target.value)}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="critical">Critical</option></select></label></div>
           <label>Issue details<textarea required rows={4} maxLength={8000} value={description} onChange={event => setDescription(event.target.value)} placeholder="What happened, which screen, and what result was expected?" /></label><button disabled={busy}>{busy ? "Creating…" : "Create ticket"}</button>
         </form>}
+        <section className="platform-panel" id="notifications">
+          <div className="platform-section-title"><div><h3>Notifications</h3><p>New customer cases, replies, assignments and status updates.</p></div><span>{notifications.filter(item => !item.read_at).length} unread</span></div>
+          <div className="platform-notification-list">
+            {notifications.map(item => <button key={item.id} className={item.read_at ? "is-read" : "is-unread"} onClick={() => void markNotificationRead(item)}>
+              <span>{item.read_at ? "READ" : "NEW"}</span><b>{item.title}</b><p>{item.body}</p><time>{dateLabel(item.created_at)}</time>
+            </button>)}
+            {!notifications.length && <p className="platform-empty">No platform notifications yet.</p>}
+          </div>
+        </section>
         <section className="platform-panel" id="companies"><div className="platform-section-title"><div><h3>Customer companies</h3><p>Tenant directory and account overview</p></div><input value={companySearch} onChange={event => setCompanySearch(event.target.value)} placeholder="Search company or city…" /></div>
           <div className="platform-table-wrap"><table><thead><tr><th>Company</th><th>City</th><th>Support contact</th><th>Status</th><th>Users</th><th>Branches</th><th>Open cases</th><th>Registered</th></tr></thead><tbody>{filteredCompanies.map(company => <tr key={company.id}><td><b>{company.name}</b><small>{company.id.slice(0, 8)}…</small></td><td>{company.city || "—"}</td><td>{company.contact_email || company.contact_phone || "—"}<small>{company.contact_phone || ""}</small></td><td><span className={"platform-status status-" + company.organization_status}>{company.organization_status}</span></td><td>{company.member_count}</td><td>{company.branch_count}</td><td>{company.open_ticket_count}</td><td>{new Date(company.created_at).toLocaleDateString()}</td></tr>)}{!filteredCompanies.length && <tr><td colSpan={8} className="platform-empty">No companies match this search.</td></tr>}</tbody></table></div>
         </section>
@@ -298,8 +365,10 @@ export default function SuperAdminPortal({ embedded = false }: { embedded?: bool
           {seoResults.length > 0 && <div className="platform-audit-grid">{seoResults.map(item => <article key={item.label}><span className={item.ok ? "audit-pass" : "audit-review"}>{item.ok ? "PASS" : "REVIEW"}</span><b>{item.label}</b><p>{item.detail}</p></article>)}</div>}
         </section>
         <section className="platform-panel" id="tickets"><div className="platform-section-title"><div><h3>Support desk</h3><p>Track issues, assign ownership and record customer communication</p></div><input value={ticketSearch} onChange={event => setTicketSearch(event.target.value)} placeholder="Search tickets…" /></div>
-          <div className="platform-ticket-layout"><div className="platform-ticket-list">{filteredTickets.map(ticket => <button key={ticket.id} className={selectedTicket === ticket.id ? "selected" : ""} onClick={() => setSelectedTicket(ticket.id)}><span className={"platform-priority priority-" + ticket.priority}>{ticket.priority}</span><b>{ticket.subject}</b><small>{companies.find(company => company.id === ticket.tenant_id)?.name || "Company"} · {ticket.status}</small><time>{dateLabel(ticket.updated_at)}</time></button>)}{!filteredTickets.length && <p className="platform-empty">No support tickets yet.</p>}</div>
-            <div className="platform-ticket-detail">{activeTicket ? <><div className="platform-ticket-heading"><div><small>{companies.find(company => company.id === activeTicket.tenant_id)?.name || "Customer company"}</small><h4>{activeTicket.subject}</h4><p>{activeTicket.category} · Opened {dateLabel(activeTicket.created_at)}</p></div><span className={"platform-status status-" + activeTicket.status}>{activeTicket.status}</span></div><p className="platform-ticket-description">{activeTicket.description}</p><div className="platform-ticket-controls"><label>Status<select value={activeTicket.status} onChange={event => void updateTicket({ status: event.target.value })}><option value="open">Open</option><option value="in_progress">In progress</option><option value="waiting_customer">Waiting for customer</option><option value="resolved">Resolved</option><option value="closed">Closed</option></select></label><button disabled={busy} onClick={() => void updateTicket({ assigned_to: admin.user_id })}>Assign to me</button></div><div className="platform-messages"><b>Conversation history</b>{messages.map(item => <article key={item.id}><small>{item.sender_id === admin.user_id ? "You / Support" : "Platform staff"} · {dateLabel(item.created_at)}</small><p>{item.body}</p></article>)}{!messages.length && <p className="platform-empty">No messages recorded for this case.</p>}</div><form className="platform-reply" onSubmit={sendMessage}><textarea rows={3} value={message} onChange={event => setMessage(event.target.value)} placeholder="Write a support update…" /><button disabled={busy || !message.trim()}>Send update</button></form></> : <div className="platform-empty platform-empty-detail">Select a support ticket to review its history.</div>}</div>
+          <div className="platform-ticket-layout"><div className="platform-ticket-list">{filteredTickets.map(ticket => <button key={ticket.id} className={selectedTicket === ticket.id ? "selected" : ""} onClick={() => setSelectedTicket(ticket.id)}><span className={"platform-priority priority-" + ticket.priority}>{ticket.priority}</span><b>#{ticket.ticket_number} · {ticket.subject}</b><small>{companies.find(company => company.id === ticket.tenant_id)?.name || "Company"} · {ticket.status}</small><time>{dateLabel(ticket.updated_at)}</time></button>)}{!filteredTickets.length && <p className="platform-empty">No support tickets yet.</p>}</div>
+            <div className="platform-ticket-detail">{activeTicket ? <><div className="platform-ticket-heading"><div><small>{companies.find(company => company.id === activeTicket.tenant_id)?.name || "Customer company"}</small><h4>{activeTicket.subject}</h4><p>{activeTicket.category} · Opened {dateLabel(activeTicket.created_at)}</p><p className="platform-sla-line">First response: {activeTicket.first_response_at ? dateLabel(activeTicket.first_response_at) : "Pending"} · SLA target: {activeTicket.sla_due_at ? dateLabel(activeTicket.sla_due_at) : "Not set"}</p></div><span className={"platform-status status-" + activeTicket.status}>{activeTicket.status}</span></div><p className="platform-ticket-description">{activeTicket.description}</p><div className="platform-ticket-controls"><label>Status<select value={activeTicket.status} onChange={event => void updateTicket({ status: event.target.value })}><option value="open">Open</option><option value="in_progress">In progress</option><option value="waiting_customer">Waiting for customer</option><option value="resolved">Resolved</option><option value="closed">Closed</option></select></label><button disabled={busy} onClick={() => void updateTicket({ assigned_to: admin.user_id })}>Assign to me</button></div><div className="platform-messages"><b>Conversation history</b>{messages.map(item => <article key={item.id}><small>{item.sender_id === admin.user_id ? "You / Support" : "Platform staff"} · {dateLabel(item.created_at)}</small><p>{item.body}</p></article>)}{!messages.length && <p className="platform-empty">No messages recorded for this case.</p>}</div>
+              <div className="platform-attachment-list"><b>Attachments</b>{attachments.map(item => <button type="button" key={item.id} onClick={() => void openAttachment(item)}>{item.file_name} · {(item.file_size / 1024).toFixed(0)} KB</button>)}{!attachments.length && <small>No files attached.</small>}</div>
+              <form className="platform-reply" onSubmit={sendMessage}><textarea rows={3} value={message} onChange={event => setMessage(event.target.value)} placeholder="Write a support update…" /><label className="platform-file-picker">Attach files<input type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.txt" onChange={event => setAttachmentFiles(Array.from(event.target.files || []))} /></label>{attachmentFiles.length > 0 && <small>{attachmentFiles.length} file(s) selected</small>}<button disabled={busy || (!message.trim() && !attachmentFiles.length)}>Send update</button></form></> : <div className="platform-empty platform-empty-detail">Select a support ticket to review its history.</div>}</div>
           </div>
         </section>
         <footer className="platform-footer">EBS PRO V.01 · Platform administration · Every action is restricted by server-side platform roles.</footer>
