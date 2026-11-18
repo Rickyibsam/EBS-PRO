@@ -68,7 +68,7 @@ BEGIN
     RAISE EXCEPTION 'Super Admin authorization is required.' USING ERRCODE = '42501';
   END IF;
 
-  IF p_role NOT IN ('super_admin','support_admin') OR p_is_active IS NULL THEN
+  IF p_role IS NULL OR p_role NOT IN ('super_admin','support_admin') OR p_is_active IS NULL THEN
     RAISE EXCEPTION 'Choose a valid platform role and active state.' USING ERRCODE = '22023';
   END IF;
 
