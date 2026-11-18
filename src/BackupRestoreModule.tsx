@@ -1,9 +1,25 @@
-import {useState,type ChangeEvent} from "react";
+import {useEffect,useState,type ChangeEvent} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 type Backup=Record<string,any>;
+type Customer={id:string;name:string;party_code:string|null};
 export default function BackupRestoreModule({db,tenantId,currentRole}:{db:SupabaseClient;tenantId:string;currentRole:string}){
  const allowed=["owner","admin"].includes(currentRole);
  const [backup,setBackup]=useState<Backup|null>(null),[fileName,setFileName]=useState(""),[busy,setBusy]=useState(false),[notice,setNotice]=useState(""),[result,setResult]=useState<Backup|null>(null);
+ const [customers,setCustomers]=useState<Customer[]>([]),[customerId,setCustomerId]=useState("");
+ useEffect(()=>{let live=true;void db.from("parties").select("id,name,party_code").eq("tenant_id",tenantId).in("party_type",["customer","both"]).eq("status","active").order("name").then(({data,error})=>{if(!live)return;if(error){setNotice("Customer list could not be loaded: "+error.message);return;}setCustomers((data??[]) as Customer[]);});return()=>{live=false;};},[db,tenantId]);
+ async function downloadCustomerBackup(){
+  if(!allowed||!customerId)return;setBusy(true);setNotice("");setResult(null);
+  try{
+   const {data,error}=await db.rpc("export_customer_backup",{p_tenant_id:tenantId,p_customer_id:customerId});if(error)throw error;
+   if(data?.format!=="EBS-PRO-CUSTOMER-BACKUP-V1")throw new Error("Customer backup response format was invalid.");
+   const selected=customers.find(x=>x.id===customerId);
+   const safeName=(selected?.party_code||selected?.name||"customer").replace(/[^a-z0-9_-]+/gi,"-").replace(/^-|-$/g,"").slice(0,70);
+   const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");
+   a.href=url;a.download="EBS-PRO-customer-"+safeName+"-"+new Date().toISOString().slice(0,10)+".json";a.click();URL.revokeObjectURL(url);
+   setNotice("Customer data export downloaded. This is a read-only export and does not include passwords or unrelated customer records.");
+  }catch(e){setNotice(e instanceof Error?e.message:"Customer backup export failed.");}
+  finally{setBusy(false);}
+ }
  async function downloadBackup(){
   if(!allowed)return;setBusy(true);setNotice("");setResult(null);
   try{
@@ -38,13 +54,14 @@ export default function BackupRestoreModule({db,tenantId,currentRole}:{db:Supaba
   finally{setBusy(false);}
  }
  return <section className="module-page">
-  <div className="module-toolbar"><div><h2>Backup & Restore</h2><p>Manual company backup and safe additive restore for EBS PRO.</p></div><button onClick={()=>void downloadBackup()} disabled={!allowed||busy}>{busy?"Working…":"Download company backup"}</button></div>
+  <div className="module-toolbar"><div><h2>Backup & Restore</h2><p>Company-wide backup, customer-wise export and safe additive restore for EBS PRO.</p></div><button onClick={()=>void downloadBackup()} disabled={!allowed||busy}>{busy?"Working…":"Download company backup"}</button></div>
   {notice&&<div className="notice">{notice}</div>}
   <div className="backup-grid">
-   <div className="transaction-form"><h3>1. Create a backup</h3><p>Downloads a JSON snapshot of the company’s tenant-scoped business tables. Passwords, API secrets and tenant membership/role assignments are excluded.</p><button className="primary-action" disabled={!allowed||busy} onClick={()=>void downloadBackup()}>Download backup JSON</button></div>
-   <div className="transaction-form"><h3>2. Restore a backup</h3><p>Choose a backup exported from this same company. Restore is additive only: it never deletes or overwrites existing records.</p><label>Backup file<input type="file" accept="application/json,.json" onChange={e=>void chooseBackup(e)}/></label>{fileName&&<p><b>Selected:</b> {fileName}</p>}<button className="primary-action" disabled={!allowed||busy||!backup} onClick={()=>void restoreBackup()}>{busy?"Restoring…":"Restore missing records"}</button></div>
+   <div className="transaction-form"><h3>1. Customer-wise data export</h3><p>Export one customer’s profile and directly linked business records for statements, orders, invoices, returns and related activity. This export is read-only and cannot be restored as a company backup.</p><label>Customer<select value={customerId} onChange={e=>setCustomerId(e.target.value)} disabled={!allowed||busy}><option value="">Select a customer</option>{customers.map(c=><option key={c.id} value={c.id}>{c.party_code?c.party_code+" · ":""}{c.name}</option>)}</select></label><button className="primary-action" disabled={!allowed||busy||!customerId} onClick={()=>void downloadCustomerBackup()}>Download customer data JSON</button></div>
+   <div className="transaction-form"><h3>2. Create a company backup</h3><p>Downloads a JSON snapshot of the company’s tenant-scoped business tables. Passwords, API secrets and tenant membership/role assignments are excluded.</p><button className="primary-action" disabled={!allowed||busy} onClick={()=>void downloadBackup()}>Download backup JSON</button></div>
+   <div className="transaction-form"><h3>3. Restore a company backup</h3><p>Choose a backup exported from this same company. Restore is additive only: it never deletes or overwrites existing records.</p><label>Backup file<input type="file" accept="application/json,.json" onChange={e=>void chooseBackup(e)}/></label>{fileName&&<p><b>Selected:</b> {fileName}</p>}<button className="primary-action" disabled={!allowed||busy||!backup} onClick={()=>void restoreBackup()}>{busy?"Restoring…":"Restore missing records"}</button></div>
   </div>
   {result&&<div className="transaction-form"><h3>Restore report · {result.complete===true||result.success===true&&!(result.skipped_tables?.length)? "Complete":"Needs attention"}</h3><div className="kpi-grid"><div><b>{Number(result.imported_rows||0).toLocaleString("en-PK")}</b><span>Records added</span></div><div><b>{result.passes||0}</b><span>Dependency passes</span></div><div><b>{result.skipped_tables?.length||0}</b><span>Tables needing attention</span></div></div>{result.dependency_pass_limit_reached&&<p>The dependency pass limit was reached. Retry only after reviewing unresolved table dependencies.</p>}{result.skipped_tables?.length>0&&<><h4>Tables not restored</h4><ul>{result.skipped_tables.map((x:string)=><li key={x}><b>{x}</b>: {result.errors?.[x]||"Unresolved dependency or validation issue"}</li>)}</ul></>}</div>}
-  <div className="module-footnote"><b>Important:</b> This is a manual JSON backup, not automatic point-in-time recovery. Restore only inserts missing records and may report tables that could not be restored because related records or validation requirements are missing. Keep multiple dated backup copies outside the hosting account.</div>
+  <div className="module-footnote"><b>Important:</b> Company backup is manual JSON, not automatic point-in-time recovery. Customer export includes direct foreign-key relationships only; it is not a full tenant restore. Keep multiple dated company backup copies securely outside the hosting account.</div>
  </section>;
 }
