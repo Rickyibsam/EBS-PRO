@@ -28,7 +28,7 @@ export default function PurchaseInvoiceModule({db,tenantId,currentRole}:{db:Supa
  async function create(e:FormEvent){
   e.preventDefault();if(!canCreate)return;setSaving(true);setNotice("");
   try{
-   if(!selectedGrn||!invoiceNo.trim())throw new Error("Select a posted GRN and enter the supplier's invoice number.");
+   if(!selectedGrn||!invoiceNo.trim())throw new Error("Select a posted GRN and enter the vendor invoice number.");
    const amount=Number(tax);if(!Number.isFinite(amount)||amount<0)throw new Error("Tax amount must be zero or greater.");
    const {data,error}=await db.rpc("create_purchase_invoice",{p_goods_receipt_id:selectedGrn,p_supplier_invoice_no:invoiceNo.trim(),p_invoice_date:invoiceDate,p_due_date:dueDate||null,p_tax_amount:amount,p_notes:notes.trim()||null});
    if(error)throw error;if(data?.success!==true)throw new Error("Vendor invoice draft was not confirmed.");
@@ -44,9 +44,9 @@ export default function PurchaseInvoiceModule({db,tenantId,currentRole}:{db:Supa
   catch(err){setNotice(err instanceof Error?err.message:"Vendor invoice posting failed.");}finally{setSaving(false);}
  }
  return <section className="module-page">
-  <div className="module-toolbar"><div><h2>Vendor Invoices & Accounts Payable</h2><p>Match supplier bills to posted goods receipts, recognize tax and post the payable control ledger.</p></div><button onClick={()=>void load()}>↻ Refresh</button></div>
+  <div className="module-toolbar"><div><h2>Vendor Invoices & Accounts Payable</h2><p>Match vendor bills to posted goods receipts, recognize tax and post the payable control ledger.</p></div><button onClick={()=>void load()}>↻ Refresh</button></div>
   {notice&&<div className="notice">{notice}</div>}
-  {canCreate&&<form className="transaction-form" onSubmit={create}><h3>Match a supplier invoice to a posted GRN</h3><div className="form-grid">
+  {canCreate&&<form className="transaction-form" onSubmit={create}><h3>Match a vendor invoice to a posted GRN</h3><div className="form-grid">
    <label>Posted goods receipt<select required value={selectedGrn} onChange={e=>setSelectedGrn(e.target.value)}><option value="">Select uninvoiced GRN</option>{availableGrns.map(g=>{const po=orders.find(x=>x.id===g.purchase_order_id),supplier=parties.find(x=>x.id===po?.supplier_id);return <option key={g.id} value={g.id}>{g.grn_number} · {supplier?.name||"Vendor"} · {g.received_date}</option>;})}</select></label>
    <label>Vendor invoice number<input required value={invoiceNo} onChange={e=>setInvoiceNo(e.target.value)}/></label>
    <label>Invoice date<input type="date" required value={invoiceDate} onChange={e=>setInvoiceDate(e.target.value)}/></label>
@@ -55,6 +55,6 @@ export default function PurchaseInvoiceModule({db,tenantId,currentRole}:{db:Supa
    <label>Notes<input value={notes} onChange={e=>setNotes(e.target.value)}/></label>
   </div><p className="module-footnote">The invoice net amount is matched to accepted GRN quantities and costs. Differences must be corrected in the GRN/PO before posting; input tax is recorded separately.</p><button disabled={saving||!availableGrns.length}>{saving?"Creating…":"Create matched invoice draft"}</button></form>}
   <h3>Vendor invoice register</h3>
-  {loading?<div className="table-empty">Loading supplier invoices…</div>:<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Vendor</th><th>GRN</th><th>Vendor invoice</th><th>Date</th><th>Due</th><th>Net</th><th>Tax</th><th>Total</th><th>Paid</th><th>Debit notes</th><th>Outstanding</th><th>Status</th><th>Action</th></tr></thead><tbody>{invoices.map(i=>{const g=grns.find(x=>x.id===i.goods_receipt_id);const supplier=parties.find(x=>x.id===i.supplier_id);return <tr key={i.id}><td>{supplier?.name||i.supplier_id}</td><td>{g?.grn_number||"—"}</td><td>{i.supplier_invoice_no}</td><td>{i.invoice_date}</td><td>{i.due_date||"—"}</td><td>{money(i.subtotal)}</td><td>{money(i.tax_amount)}</td><td>{money(i.grand_total)}</td><td>{money(i.paid||0)}</td><td>{money(i.credits||0)}</td><td>{money(i.outstanding??i.grand_total)}</td><td>{i.status}</td><td>{i.status==="draft"&&canPost?<button disabled={saving} onClick={()=>void post(i.id)}>Post to AP</button>:i.status==="posted"?"Posted":"—"}</td></tr>;})}{!invoices.length&&<tr><td colSpan={13} className="table-empty">No supplier invoices have been matched yet.</td></tr>}</tbody></table></div>}
+  {loading?<div className="table-empty">Loading vendor invoices…</div>:<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Vendor</th><th>GRN</th><th>Vendor invoice</th><th>Date</th><th>Due</th><th>Net</th><th>Tax</th><th>Total</th><th>Paid</th><th>Debit notes</th><th>Outstanding</th><th>Status</th><th>Action</th></tr></thead><tbody>{invoices.map(i=>{const g=grns.find(x=>x.id===i.goods_receipt_id);const supplier=parties.find(x=>x.id===i.supplier_id);return <tr key={i.id}><td>{supplier?.name||i.supplier_id}</td><td>{g?.grn_number||"—"}</td><td>{i.supplier_invoice_no}</td><td>{i.invoice_date}</td><td>{i.due_date||"—"}</td><td>{money(i.subtotal)}</td><td>{money(i.tax_amount)}</td><td>{money(i.grand_total)}</td><td>{money(i.paid||0)}</td><td>{money(i.credits||0)}</td><td>{money(i.outstanding??i.grand_total)}</td><td>{i.status}</td><td>{i.status==="draft"&&canPost?<button disabled={saving} onClick={()=>void post(i.id)}>Post to AP</button>:i.status==="posted"?"Posted":"—"}</td></tr>;})}{!invoices.length&&<tr><td colSpan={13} className="table-empty">No vendor invoices have been matched yet.</td></tr>}</tbody></table></div>}
  </section>;
 }
