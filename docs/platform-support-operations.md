@@ -38,3 +38,7 @@ Only an active Super Admin can provision or change platform staff. A staff membe
 ## Escalation and resolution history
 
 Support Admins can escalate an unresolved case to the Super Admin team with a mandatory reason. The database rejects escalation of resolved or closed cases, increments the escalation level under the ticket row lock, records who escalated it, appends an immutable ticket event, and creates a notification for active Super Admins. Ticket event history records creation, status changes, assignment changes, resolution edits and escalations. Tenant users can read history for their own company's tickets; only platform staff can read cross-tenant cases. Client sessions cannot insert or edit history events.
+
+## Agent assignment
+
+Active Super Admins and Support Admins are exposed to the internal agent picker through a server-authorized directory RPC. Ticket assignment is performed through a guarded RPC that rejects inactive or non-platform accounts. Assignment changes automatically create an immutable ticket-history event and notify the affected agent. Tenant users cannot access the platform agent directory.
