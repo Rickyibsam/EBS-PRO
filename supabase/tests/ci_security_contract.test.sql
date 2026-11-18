@@ -1,6 +1,6 @@
 begin;
 
-select plan(73);
+select plan(81);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -64,6 +64,55 @@ select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
    where n.nspname='public' and c.relname='van_stock_movements'),
   'van_stock_movements has RLS enabled'
+);
+select ok(
+  (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
+   where n.nspname='public' and c.relname='van_delivery_reservations'),
+  'van_delivery_reservations has RLS enabled'
+);
+select ok(
+  has_table_privilege('authenticated','public.van_delivery_reservations','select')
+  and has_table_privilege('authenticated','public.van_delivery_reservations','insert')
+  and has_table_privilege('authenticated','public.van_delivery_reservations','update'),
+  'authenticated has only the reservation operations needed by dispatch workflows'
+);
+select ok(
+  not has_table_privilege('anon','public.van_delivery_reservations','select')
+  and not has_table_privilege('anon','public.van_delivery_reservations','insert')
+  and not has_table_privilege('anon','public.van_delivery_reservations','update'),
+  'anonymous role cannot access van delivery reservations'
+);
+select ok(
+  (select count(*)=3 from pg_policies
+   where schemaname='public' and tablename='van_delivery_reservations'
+     and policyname in ('van_delivery_reservations_select','van_delivery_reservations_insert','van_delivery_reservations_update')),
+  'van delivery reservations has tenant-role select, insert and update policies'
+);
+select ok(
+  exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='delivery_shop_visits'
+      and column_name='proof_of_delivery_signature' and data_type='jsonb'
+  ),
+  'delivery shop visits stores POD signature JSON'
+);
+select ok(
+  to_regprocedure('public.save_delivery_pod_signature(uuid,jsonb)') is not null
+  and has_function_privilege('authenticated','public.save_delivery_pod_signature(uuid,jsonb)','execute'),
+  'authenticated users can call the POD signature RPC'
+);
+select ok(
+  not has_function_privilege('anon','public.save_delivery_pod_signature(uuid,jsonb)','execute')
+  and not has_function_privilege('public','public.save_delivery_pod_signature(uuid,jsonb)','execute'),
+  'POD signature RPC is not executable by anonymous or public roles'
+);
+select ok(
+  exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='payroll_lines'
+      and column_name='sales_incentive' and data_type='numeric'
+  ),
+  'payroll lines include sales incentive compensation'
 );
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace

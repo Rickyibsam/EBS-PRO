@@ -115,6 +115,12 @@ declare
   v_failed_line uuid;
   v_failed_visit_result jsonb;
   v_customer_backup jsonb;
+  v_van_available numeric;
+  v_van_reserved numeric;
+  v_van_debug jsonb;
+  v_van_delivery_tenant uuid;
+  v_van_line_tenant uuid;
+  v_van_line_product uuid;
 begin
   select user_id into v_user
   from public.tenant_memberships
@@ -381,6 +387,34 @@ begin
   );
   if coalesce((v_van_load_result->>'replayed')::boolean,true) is not false then
     raise exception 'FAIL: first van stock load was unexpectedly replayed';
+  end if;
+  select tenant_id into v_van_delivery_tenant from public.deliveries where id=v_van_delivery;
+  select tenant_id,product_id into v_van_line_tenant,v_van_line_product
+  from public.delivery_lines where id=v_van_line and delivery_id=v_van_delivery;
+  select coalesce(sum(quantity_in-quantity_out),0) into v_van_available
+  from public.van_stock_movements
+  where tenant_id=v_van_delivery_tenant
+    and vehicle_number=upper(btrim('TX-VAN-01'))
+    and product_id=v_van_line_product
+    and (expiry_date is null or expiry_date>=current_date);
+  select coalesce(sum(reserved_quantity),0) into v_van_reserved
+  from public.van_delivery_reservations
+  where tenant_id=v_tenant_a and vehicle_number='TX-VAN-01' and product_id=v_product and status='active';
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'vehicle_number',vehicle_number,'product_id',product_id,'movement_type',movement_type,
+    'quantity_in',quantity_in,'quantity_out',quantity_out,'batch_number',batch_number,'expiry_date',expiry_date
+  )),'[]'::jsonb) into v_van_debug
+  from public.van_stock_movements where tenant_id=v_tenant_a;
+  if v_van_delivery_tenant is distinct from v_tenant_a
+     or v_van_line_tenant is distinct from v_tenant_a
+     or v_van_line_product is distinct from v_product
+     or v_van_available<2 or v_van_reserved<>0
+     or not exists (
+       select 1 from public.products
+       where id=v_product and tenant_id=v_tenant_a and track_batch=false and track_expiry=false
+     ) then
+    raise exception 'FAIL: van load reconciliation mismatch. Available %, reserved %, ledger rows %, delivery tenant %, line tenant %, line product %; expected matching tenant/product and an untracked product with 2 units.',
+      v_van_available,v_van_reserved,v_van_debug,v_van_delivery_tenant,v_van_line_tenant,v_van_line_product;
   end if;
   v_van_dispatch_result:=public.dispatch_van_delivery(
     v_van_delivery,'TX-VAN-01',
