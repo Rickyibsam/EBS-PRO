@@ -11,7 +11,7 @@ const launchers=[
  {title:"2. Sales & Customer Management",description:"Customer accounts, orders, invoicing, returns and credit control",icon:"◈",modules:["Sales","Customers","Invoices","Sales Returns","Customer Credit Control","Recovery","Price Lists"]},
  {title:"3. Order Booking App",description:"Salesman booking, customer visits, product access and incentives",icon:"▣",modules:["Booker App","Booker Product Access","Targets & Incentives"]},
  {title:"4. Inventory & Warehouse",description:"Product masters, stock, batches, expiry, transfers and stock takes",icon:"▦",modules:["Inventory","Products","Batch & Expiry","Stock Take","Van Stock","Stock Transfers","Branches & Warehouses"]},
- {title:"5. Purchase & Supplier Management",description:"Supplier accounts, purchasing, goods receiving and returns",icon:"⇩",modules:["Purchases","Vendors","Goods Receiving","Vendor Invoices","Purchase Returns","Vendor Feeding"]},
+ {title:"5. Purchase & Vendor Management",description:"Vendor accounts, purchasing, goods receiving and returns",icon:"⇩",modules:["Purchases","Vendors","Goods Receiving","Vendor Invoices","Purchase Returns","Vendor Feeding"]},
  {title:"6. Accounts & Finance",description:"General ledger, cash/bank, reconciliation, assets and budgets",icon:"◉",modules:["Accounts","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register","Asset & Budget Control"]},
  {title:"7. Distribution & Delivery",description:"Delivery assignments, route operations, drivers and charges",icon:"⌖",modules:["Delivery Man App","Distribution","Delivery Charges","Routes"]},
  {title:"8. HR & Payroll",description:"Employee records, attendance, leave, payroll and commissions",icon:"♙",modules:["Team & Employees","HR & Attendance","Payroll","Targets & Incentives"]},
@@ -69,13 +69,13 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
    {label:"Pending deliveries",value:String(deliveries.count??0),detail:"Pending, picked or dispatched",icon:"⌖",tone:"amber"},
    {label:"Receipts today",value:money(dayReceipts),detail:"Customer receipts recorded",icon:"₨",tone:"violet"},
    {label:"Low stock alerts",value:lowCount===null?"—":String(lowCount),detail:lowCount===null?"Not available for this role":"At or below reorder threshold",icon:"!",tone:"amber"},
-   {label:"Purchases today",value:money(dayPurchases),detail:(purchaseInvoices.count??0)+" posted supplier invoices",icon:"⇩",tone:"blue"},
+   {label:"Purchases today",value:money(dayPurchases),detail:(purchaseInvoices.count??0)+" posted vendor invoices",icon:"⇩",tone:"blue"},
    {label:"Purchase orders",value:String(purchases.count??0),detail:"Purchase documents",icon:"▱",tone:"blue"},
    {label:"Stock value",value:stockValue===null?"—":money(stockValue),detail:"Warehouse and van ledger valuation",icon:"▦",tone:"mint"},
    {label:"Net profit today",value:profitValue===null?"—":money(profitValue),detail:"Posted GL income less expenses",icon:"✧",tone:"violet"},
    {label:"Active products",value:String(products.count??0),detail:"Product master records",icon:"▦",tone:"mint"},
    {label:"Customers",value:String(customers.count??0),detail:"Active customer accounts",icon:"♙",tone:"violet"},
-   {label:"Vendors",value:String(vendors.count??0),detail:"Active supplier accounts",icon:"⌂",tone:"amber"},
+   {label:"Vendors",value:String(vendors.count??0),detail:"Active vendor accounts",icon:"⌂",tone:"amber"},
    {label:"Activity (24h)",value:activityCount===null?"—":String(activityCount),detail:activityCount===null?"Not available for this role":"Recorded audit events",icon:"◷",tone:"blue"}
   ];
   const notices:Notice[]=[];
@@ -139,7 +139,7 @@ export default function DashboardModule({db,tenantId,company,allowedModules,onNa
    <div className="dashboard-finance-strip">{["Sales today","Purchases today","Receipts today","Stock value"].map(label=>{const metric=metrics.find(item=>item.label===label);return <div key={label}><small>{label}</small><strong>{metric?.value||"—"}</strong><span>{metric?.detail||"Live company data"}</span></div>;})}</div>
   </section>
   {integrationCheck&&allowedModules.includes("Reports")&&<section className="recent-activity"><div className="dashboard-section-head"><div><span className="section-kicker">CROSS-MODULE CONTROLS</span><h2>ERP integration reconciliation</h2><p>Read-only checks across purchasing, payroll, fixed assets, delivery, Booker and budgets · {new Date(integrationCheck.checked_at).toLocaleString("en-PK")}</p></div><span className={integrationCheck.has_integrity_warnings?"permission-lock":"pulse-live"}>{integrationCheck.has_integrity_warnings?"Review required":"No flagged mismatches"}</span></div><div className="recent-activity-list">{[
-["Purchase returns",Number(integrationCheck.purchase_returns?.posted_without_journal||0)+Number(integrationCheck.purchase_returns?.value_mismatch||0)+Number(integrationCheck.purchase_returns?.stock_movement_mismatch||0)+Number(integrationCheck.purchase_returns?.supplier_ledger_mismatch||0)+Number(integrationCheck.purchase_returns?.unbalanced_journals||0),"Journal, supplier ledger, stock and value reconciliation"],
+["Purchase returns",Number(integrationCheck.purchase_returns?.posted_without_journal||0)+Number(integrationCheck.purchase_returns?.value_mismatch||0)+Number(integrationCheck.purchase_returns?.stock_movement_mismatch||0)+Number(integrationCheck.purchase_returns?.supplier_ledger_mismatch||0)+Number(integrationCheck.purchase_returns?.unbalanced_journals||0),"Journal, vendor ledger, stock and value reconciliation"],
 ["Payroll",Number(integrationCheck.payroll?.posted_runs_without_journal||0)+Number(integrationCheck.payroll?.paid_lines_without_payment_journal||0)+Number(integrationCheck.payroll?.unbalanced_journals||0),"Payroll accrual, salary payment and balanced GL checks"],
 ["Fixed assets",Number(integrationCheck.fixed_assets?.posted_depreciation_without_journal||0)+Number(integrationCheck.fixed_assets?.disposed_assets_without_journal||0),"Depreciation and disposal journal links"],
 ["Delivery",Number(integrationCheck.delivery?.delivered_without_posted_invoice||0)+Number(integrationCheck.delivery?.visits_without_idempotency_key||0)+Number(integrationCheck.delivery?.delivered_visits_without_signature||0),"Invoice, offline replay key and POD signature checks"],
