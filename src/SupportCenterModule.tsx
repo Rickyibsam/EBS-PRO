@@ -47,7 +47,7 @@ export default function SupportCenterModule({db,tenantId,userId}:{db:SupabaseCli
     return ()=>{void db.removeChannel(channel);};
   },[userId]);
   useEffect(()=>{
-    if(!selected){setMessages([]);return;}
+    if(!selected){setMessages([]);setAttachments([]);setTicketEvents([]);return;}
     let live=true;
     Promise.all([
       db.from("platform_support_messages").select("id,ticket_id,sender_id,body,created_at").eq("ticket_id",selected).order("created_at"),
