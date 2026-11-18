@@ -99,6 +99,8 @@ jobs:
         run: supabase test db supabase/tests/booker_role_access.test.sql
       - name: Verify support SLA, attachments and notifications security
         run: supabase test db supabase/tests/platform_support_expansion.test.sql
+      - name: Verify Super Admin staff management and audit authorization
+        run: supabase test db supabase/tests/platform_staff_admin.test.sql
       - name: Stop disposable Supabase stack
         if: always()
         run: supabase stop --no-backup
