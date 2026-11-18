@@ -91,3 +91,27 @@ BEGIN
     USING (private.module_permission_guard_internal(tenant_id,'hr_payroll','delete'));
   END IF;
 END $$;
+
+CREATE OR REPLACE FUNCTION public.decide_employee_leave(p_leave_id uuid,p_decision text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SET search_path TO 'pg_catalog','public','auth'
+AS $function$
+DECLARE v_leave public.employee_leaves%rowtype;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Authentication required.'; END IF;
+  SELECT * INTO v_leave FROM public.employee_leaves WHERE id=p_leave_id FOR UPDATE;
+  IF NOT FOUND OR NOT public.has_tenant_role(v_leave.tenant_id,ARRAY['owner','admin','manager']::text[]) THEN
+    RAISE EXCEPTION 'You cannot approve this leave request.' USING ERRCODE='42501';
+  END IF;
+  IF v_leave.status<>'pending' OR p_decision NOT IN ('approved','rejected') THEN
+    RAISE EXCEPTION 'Only pending leave requests can be decided.';
+  END IF;
+  UPDATE public.employee_leaves
+  SET status=p_decision,approved_by=auth.uid(),approved_at=now()
+  WHERE id=p_leave_id AND tenant_id=v_leave.tenant_id;
+  RETURN jsonb_build_object('success',true,'status',p_decision);
+END;
+$function$;
+REVOKE ALL ON FUNCTION public.decide_employee_leave(uuid,text) FROM public,anon;
+GRANT EXECUTE ON FUNCTION public.decide_employee_leave(uuid,text) TO authenticated;
