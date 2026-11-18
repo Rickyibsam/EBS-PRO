@@ -23,7 +23,7 @@ begin
  get diagnostics v_rows=row_count;
  if v_rows<>1 then raise exception 'Delivery visit record is not available for this proof.';end if;
  return jsonb_build_object('success',true,'delivery_id',v_delivery.id,'signature_points',jsonb_array_length(p_signature));
-end $function$
+end $function$;
 
 
 revoke all on function public.save_delivery_pod_signature(uuid,jsonb) from public, anon;
