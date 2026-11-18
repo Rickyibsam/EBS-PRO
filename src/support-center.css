@@ -55,3 +55,11 @@
 .tenant-support-attachments small{font-size:9px;color:#91a5b5}
 .tenant-support-form input[type=file],.tenant-support-reply input[type=file]{display:block;width:100%;margin-top:6px;font-size:10px}
 .tenant-support-form label small{display:block;margin-top:5px;color:#8ba0b1;font-weight:500}
+
+.tenant-support-event-history{display:grid;gap:7px;padding:12px 0;border-top:1px solid #e8eef3}
+.tenant-support-event-history>b{font-size:10px;color:#355c78}
+.tenant-support-event-history article{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 8px;border-left:2px solid #d8e6ee;padding:7px 9px;background:#f8fbfd}
+.tenant-support-event-history article span{font-size:9px;font-weight:800;color:#45647d;text-transform:capitalize}
+.tenant-support-event-history article time{font-size:8px;color:#91a5b5}
+.tenant-support-event-history article p{grid-column:1/-1;margin:0;font-size:9px;color:#7890a4;overflow-wrap:anywhere}
+.tenant-support-event-history>small{font-size:9px;color:#91a5b5}
