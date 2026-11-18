@@ -146,7 +146,7 @@ export default function SuperAdminPortal({ embedded = false }: { embedded?: bool
   }, [admin?.user_id]);
 
   useEffect(() => {
-    if (!db || !selectedTicket || !admin) { setMessages([]); setAttachments([]); return; }
+    if (!db || !selectedTicket || !admin) { setMessages([]); setAttachments([]); setTicketEvents([]); return; }
     let live = true;
     Promise.all([
       db.from("platform_support_messages").select("*").eq("ticket_id", selectedTicket).order("created_at"),
