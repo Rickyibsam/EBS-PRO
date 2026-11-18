@@ -1,6 +1,6 @@
 begin;
 
-select plan(77);
+select plan(80);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -87,6 +87,24 @@ select ok(
    where schemaname='public' and tablename='van_delivery_reservations'
      and policyname in ('van_delivery_reservations_select','van_delivery_reservations_insert','van_delivery_reservations_update')),
   'van delivery reservations has tenant-role select, insert and update policies'
+);
+select ok(
+  exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='delivery_shop_visits'
+      and column_name='proof_of_delivery_signature' and data_type='jsonb'
+  ),
+  'delivery shop visits stores POD signature JSON'
+);
+select ok(
+  to_regprocedure('public.save_delivery_pod_signature(uuid,jsonb)') is not null
+  and has_function_privilege('authenticated','public.save_delivery_pod_signature(uuid,jsonb)','execute'),
+  'authenticated users can call the POD signature RPC'
+);
+select ok(
+  not has_function_privilege('anon','public.save_delivery_pod_signature(uuid,jsonb)','execute')
+  and not has_function_privilege('public','public.save_delivery_pod_signature(uuid,jsonb)','execute'),
+  'POD signature RPC is not executable by anonymous or public roles'
 );
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
