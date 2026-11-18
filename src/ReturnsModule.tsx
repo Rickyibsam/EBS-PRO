@@ -1,4 +1,5 @@
 import {fetchAllRowsResult} from "./lib/fetchAllRows";
+import {buildCsvWithBom} from "./lib/csvExport";
 import { FormEvent, useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {useModuleAction} from "./lib/modulePermissionContext";
@@ -100,7 +101,7 @@ export default function ReturnsModule({ db, tenantId, currentRole }: { db: Supab
     setSaving(false);
   }
 
-  function exportNotes(){const data=notes.map(n=>({credit_note:n.credit_note_number,date:n.credit_note_date,invoice:invoices.find(i=>i.id===n.sales_invoice_id)?.invoice_number||"",customer:customers.find(c=>c.id===n.customer_id)?.name||"",reason:n.reason,status:n.status,total:n.grand_total}));const keys=Object.keys(data[0]||{credit_note:"",date:"",invoice:"",customer:"",reason:"",status:"",total:""});const csv=[keys.join(","),...data.map(x=>keys.map(k=>'"'+String(x[k as keyof typeof x]??"").replace(/"/g,'""')+'"').join(","))].join("\\r\\n");const blob=new Blob(["\\uFEFF"+csv],{type:"text/csv;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="sales-credit-notes.csv";a.click();URL.revokeObjectURL(url);}
+  function exportNotes(){const data=notes.map(n=>({credit_note:n.credit_note_number,date:n.credit_note_date,invoice:invoices.find(i=>i.id===n.sales_invoice_id)?.invoice_number||"",customer:customers.find(c=>c.id===n.customer_id)?.name||"",reason:n.reason,status:n.status,total:n.grand_total}));const keys=Object.keys(data[0]||{credit_note:"",date:"",invoice:"",customer:"",reason:"",status:"",total:""});const csv=buildCsvWithBom(data,keys);const url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));const a=document.createElement("a");a.href=url;a.download="sales-credit-notes.csv";a.click();URL.revokeObjectURL(url);}
   const invoice=invoices.find(x=>x.id===invoiceId);
   const estimate=invoiceLines.reduce((sum,x)=>{const q=Number(x.return_quantity)||0;const gross=q*Number(x.unit_price);const tax=gross*Number(x.tax_rate)/100;const discount=Number(x.quantity)>0?Number(x.discount_amount)*(q/Number(x.quantity)):0;return sum+gross+tax-discount;},0);
 
