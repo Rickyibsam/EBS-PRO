@@ -44,6 +44,12 @@ export default function SuperAdminPortal({ embedded = false }: { embedded?: bool
   const [priority, setPriority] = useState("normal");
   const [description, setDescription] = useState("");
   const [showNewTicket, setShowNewTicket] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [securityBusy, setSecurityBusy] = useState(false);
+  const [seoResults, setSeoResults] = useState<Array<{label:string;ok:boolean;detail:string}>>([]);
+  const [seoCheckedAt, setSeoCheckedAt] = useState("");
 
   async function loadPortal() {
     if (!db || !session) return;
@@ -154,6 +160,49 @@ export default function SuperAdminPortal({ embedded = false }: { embedded?: bool
     finally { setBusy(false); }
   }
 
+  async function changeOwnPassword(event: FormEvent) {
+    event.preventDefault();
+    if (!db || !session?.user.email) return;
+    if (newPassword.length < 12 || !/[a-z]/.test(newPassword) || !/[A-Z]/.test(newPassword) || !/\\d/.test(newPassword) || !/[^A-Za-z0-9]/.test(newPassword)) {
+      setNotice("Use at least 12 characters with uppercase, lowercase, a number and a symbol."); return;
+    }
+    if (newPassword !== confirmPassword) { setNotice("New password and confirmation do not match."); return; }
+    setSecurityBusy(true); setNotice("");
+    try {
+      const { error: verifyError } = await db.auth.signInWithPassword({ email: session.user.email, password: currentPassword });
+      if (verifyError) throw new Error("Current password is incorrect. Your password was not changed.");
+      const { error } = await db.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
+      setNotice("Your password has been changed successfully.");
+    } catch (error) { setNotice(errorText(error)); }
+    finally { setSecurityBusy(false); }
+  }
+
+  function runWebsiteAudit() {
+    const navEntry = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    const images = Array.from(document.images);
+    const missingAlt = images.filter(image => !image.hasAttribute("alt"));
+    const title = document.title.trim();
+    const description = document.querySelector('meta[name="description"]')?.getAttribute("content")?.trim() || "";
+    const viewport = Boolean(document.querySelector('meta[name="viewport"]'));
+    const canonical = Boolean(document.querySelector('link[rel="canonical"]'));
+    const h1Count = document.querySelectorAll("h1").length;
+    const loadMs = navEntry?.loadEventEnd ? Math.round(navEntry.loadEventEnd - navEntry.startTime) : 0;
+    const checks = [
+      {label:"HTTPS connection",ok:location.protocol === "https:",detail:location.protocol === "https:" ? "Secure HTTPS is active." : "Use HTTPS for all production pages."},
+      {label:"Page title",ok:title.length >= 10 && title.length <= 60,detail:title ? title.length + " characters: " + title : "Add a descriptive page title."},
+      {label:"Meta description",ok:description.length >= 50 && description.length <= 160,detail:description ? description.length + " characters. Recommended range: 50–160." : "Add a concise meta description."},
+      {label:"Mobile viewport",ok:viewport,detail:viewport ? "Viewport meta tag is present." : "Add a responsive viewport meta tag."},
+      {label:"Canonical URL",ok:canonical,detail:canonical ? "Canonical link is present." : "Add a canonical URL on public/indexable pages; do not expose private ERP routes."},
+      {label:"Heading structure",ok:h1Count === 1,detail:"Found " + h1Count + " H1 headings on the current view; aim for one clear page heading."},
+      {label:"Image alternative text",ok:missingAlt.length === 0,detail:missingAlt.length ? missingAlt.length + " of " + images.length + " images have no alt attribute." : images.length + " images checked; alt attributes are present."},
+      {label:"Page load timing",ok:loadMs > 0 && loadMs <= 2500,detail:loadMs ? "Browser load event: " + (loadMs/1000).toFixed(2) + " seconds (single browser sample)." : "Timing unavailable until the next full page load."},
+      {label:"Private ERP indexing protection",ok:Boolean(document.querySelector('meta[name="robots"][content*="noindex"]')),detail:"Authenticated ERP pages should be noindex; public marketing pages need a separate indexable site."}
+    ];
+    setSeoResults(checks); setSeoCheckedAt(new Date().toLocaleString());
+  }
+
   async function createTicket(event: FormEvent) {
     event.preventDefault();
     if (!db || !admin || !companyId) return;
@@ -210,7 +259,7 @@ export default function SuperAdminPortal({ embedded = false }: { embedded?: bool
   if (!admin) return <main className="platform-center"><section className="platform-auth"><div className="platform-mark">E</div><h1>Platform access restricted</h1><p>{notice || "This account has no active platform support role."}</p><button onClick={() => void db.auth.signOut()}>Sign out</button><a href="/">Return to company ERP</a></section></main>;
 
   return <div className="platform-shell">
-    <aside className="platform-sidebar"><div className="platform-brand"><div className="platform-mark">E</div><div><b>EBS <em>PRO</em></b><small>ERP ADMINISTRATION</small></div></div><div className="platform-nav-label">WORKSPACE</div><a className="is-active" href="#overview">◈ Overview</a><a href="#companies">▦ Companies</a><a href="#tickets">▤ Support tickets</a><div className="platform-sidebar-foot"><span>{admin.role.replaceAll("_", " ").toUpperCase()}</span><small>{session.user.email}</small><button onClick={() => void db.auth.signOut()}>Sign out ↗</button></div></aside>
+    <aside className="platform-sidebar"><div className="platform-brand"><div className="platform-mark">E</div><div><b>EBS <em>PRO</em></b><small>ERP ADMINISTRATION</small></div></div><div className="platform-nav-label">WORKSPACE</div><a className="is-active" href="#overview">◈ Overview</a><a href="#companies">▦ Companies</a><a href="#tickets">▤ Support tickets</a><a href="#security">♙ Password & Security</a><a href="#website-optimization">⚡ Website Optimization</a><div className="platform-sidebar-foot"><span>{admin.role.replaceAll("_", " ").toUpperCase()}</span><small>{session.user.email}</small><button onClick={() => void db.auth.signOut()}>Sign out ↗</button></div></aside>
     <main className="platform-main">
       <header className="platform-topbar"><div><small>ERP ADMINISTRATION / PLATFORM CONTROL</small><h1>Admin Portal Configuration</h1></div><div className="platform-top-actions"><span>● SECURE SESSION</span><button onClick={() => void loadPortal()}>↻ Refresh</button></div></header>
       <section className="platform-content" id="overview">
@@ -231,6 +280,22 @@ export default function SuperAdminPortal({ embedded = false }: { embedded?: bool
         </form>}
         <section className="platform-panel" id="companies"><div className="platform-section-title"><div><h3>Customer companies</h3><p>Tenant directory and account overview</p></div><input value={companySearch} onChange={event => setCompanySearch(event.target.value)} placeholder="Search company or city…" /></div>
           <div className="platform-table-wrap"><table><thead><tr><th>Company</th><th>City</th><th>Support contact</th><th>Status</th><th>Users</th><th>Branches</th><th>Open cases</th><th>Registered</th></tr></thead><tbody>{filteredCompanies.map(company => <tr key={company.id}><td><b>{company.name}</b><small>{company.id.slice(0, 8)}…</small></td><td>{company.city || "—"}</td><td>{company.contact_email || company.contact_phone || "—"}<small>{company.contact_phone || ""}</small></td><td><span className={"platform-status status-" + company.organization_status}>{company.organization_status}</span></td><td>{company.member_count}</td><td>{company.branch_count}</td><td>{company.open_ticket_count}</td><td>{new Date(company.created_at).toLocaleDateString()}</td></tr>)}{!filteredCompanies.length && <tr><td colSpan={8} className="platform-empty">No companies match this search.</td></tr>}</tbody></table></div>
+        </section>
+        <section className="platform-panel" id="security">
+          <div className="platform-section-title"><div><h3>Password & Security</h3><p>Change your own Super Admin password with current-password verification.</p></div></div>
+          <form className="platform-security-form" onSubmit={changeOwnPassword}>
+            <label>Current password<input type="password" autoComplete="current-password" required value={currentPassword} onChange={event => setCurrentPassword(event.target.value)} /></label>
+            <label>New password<input type="password" autoComplete="new-password" minLength={12} required value={newPassword} onChange={event => setNewPassword(event.target.value)} /></label>
+            <label>Confirm new password<input type="password" autoComplete="new-password" minLength={12} required value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} /></label>
+            <small>Minimum 12 characters, uppercase, lowercase, number and symbol. Never share your password or recovery link.</small>
+            <button disabled={securityBusy}>{securityBusy ? "Updating…" : "Change my password"}</button>
+          </form>
+        </section>
+        <section className="platform-panel" id="website-optimization">
+          <div className="platform-section-title"><div><h3>Website Optimization</h3><p>Run an on-page technical audit of the current EBS PRO page in this browser.</p></div><button type="button" onClick={runWebsiteAudit}>Run website audit</button></div>
+          <div className="platform-optimization-intro"><b>Performance · Technical SEO · Accessibility · Security</b><p>This audit checks the current page only. It does not crawl the whole website, measure real-user Core Web Vitals, or replace Google Search Console / Lighthouse.</p></div>
+          {seoCheckedAt && <p className="platform-audit-time">Last checked: {seoCheckedAt} · {seoResults.filter(item => item.ok).length}/{seoResults.length} checks passed</p>}
+          {seoResults.length > 0 && <div className="platform-audit-grid">{seoResults.map(item => <article key={item.label}><span className={item.ok ? "audit-pass" : "audit-review"}>{item.ok ? "PASS" : "REVIEW"}</span><b>{item.label}</b><p>{item.detail}</p></article>)}</div>}
         </section>
         <section className="platform-panel" id="tickets"><div className="platform-section-title"><div><h3>Support desk</h3><p>Track issues, assign ownership and record customer communication</p></div><input value={ticketSearch} onChange={event => setTicketSearch(event.target.value)} placeholder="Search tickets…" /></div>
           <div className="platform-ticket-layout"><div className="platform-ticket-list">{filteredTickets.map(ticket => <button key={ticket.id} className={selectedTicket === ticket.id ? "selected" : ""} onClick={() => setSelectedTicket(ticket.id)}><span className={"platform-priority priority-" + ticket.priority}>{ticket.priority}</span><b>{ticket.subject}</b><small>{companies.find(company => company.id === ticket.tenant_id)?.name || "Company"} · {ticket.status}</small><time>{dateLabel(ticket.updated_at)}</time></button>)}{!filteredTickets.length && <p className="platform-empty">No support tickets yet.</p>}</div>
