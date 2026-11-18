@@ -133,6 +133,16 @@ export default function SuperAdminPortal({ embedded = false }: { embedded?: bool
   }, [session?.user.id]);
 
   useEffect(() => {
+    if (!db || !admin) return;
+    const channel = db.channel("platform-support-notifications-" + admin.user_id)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "platform_support_notifications", filter: "recipient_id=eq." + admin.user_id }, payload => {
+        const item = payload.new as Notification;
+        setNotifications(current => current.some(row => row.id === item.id) ? current : [item, ...current].slice(0, 50));
+      }).subscribe();
+    return () => { void db.removeChannel(channel); };
+  }, [admin?.user_id]);
+
+  useEffect(() => {
     if (!db || !selectedTicket || !admin) { setMessages([]); setAttachments([]); return; }
     let live = true;
     Promise.all([
