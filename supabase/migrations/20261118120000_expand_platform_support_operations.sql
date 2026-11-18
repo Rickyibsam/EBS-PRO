@@ -210,7 +210,7 @@ BEGIN
              left('Status changed to ' || replace(NEW.status, '_', ' '), 500)
       FROM public.tenant_memberships tm
       WHERE tm.tenant_id = NEW.tenant_id AND tm.is_active
-        AND tm.user_id <> COALESCE(NEW.created_by, (SELECT auth.uid()));
+        AND ((SELECT auth.uid()) IS NULL OR tm.user_id <> (SELECT auth.uid()));
     END IF;
   END IF;
 
