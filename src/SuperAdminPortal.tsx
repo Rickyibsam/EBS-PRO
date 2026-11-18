@@ -163,7 +163,7 @@ export default function SuperAdminPortal({ embedded = false }: { embedded?: bool
   async function changeOwnPassword(event: FormEvent) {
     event.preventDefault();
     if (!db || !session?.user.email) return;
-    if (newPassword.length < 12 || !/[a-z]/.test(newPassword) || !/[A-Z]/.test(newPassword) || !/\\d/.test(newPassword) || !/[^A-Za-z0-9]/.test(newPassword)) {
+    if (newPassword.length < 12 || !/[a-z]/.test(newPassword) || !/[A-Z]/.test(newPassword) || !/\d/.test(newPassword) || !/[^A-Za-z0-9]/.test(newPassword)) {
       setNotice("Use at least 12 characters with uppercase, lowercase, a number and a symbol."); return;
     }
     if (newPassword !== confirmPassword) { setNotice("New password and confirmation do not match."); return; }
