@@ -117,6 +117,7 @@ declare
   v_customer_backup jsonb;
   v_van_available numeric;
   v_van_reserved numeric;
+  v_van_debug jsonb;
 begin
   select user_id into v_user
   from public.tenant_memberships
@@ -391,12 +392,17 @@ begin
   select coalesce(sum(reserved_quantity),0) into v_van_reserved
   from public.van_delivery_reservations
   where tenant_id=v_tenant_a and vehicle_number='TX-VAN-01' and product_id=v_product and status='active';
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'vehicle_number',vehicle_number,'product_id',product_id,'movement_type',movement_type,
+    'quantity_in',quantity_in,'quantity_out',quantity_out,'batch_number',batch_number,'expiry_date',expiry_date
+  )),'[]'::jsonb) into v_van_debug
+  from public.van_stock_movements where tenant_id=v_tenant_a;
   if v_van_available<2 or v_van_reserved<>0 or not exists (
     select 1 from public.products
     where id=v_product and tenant_id=v_tenant_a and track_batch=false and track_expiry=false
   ) then
     raise exception 'FAIL: van load reconciliation mismatch. Available %, reserved %; expected an untracked product with 2 units.',
-      v_van_available,v_van_reserved;
+      v_van_available,v_van_reserved || v_van_debug;
   end if;
   v_van_dispatch_result:=public.dispatch_van_delivery(
     v_van_delivery,'TX-VAN-01',
