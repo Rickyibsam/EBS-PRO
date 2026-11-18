@@ -23,6 +23,7 @@ type Attachment = { id: string; ticket_id: string; storage_path: string; file_na
 type Notification = { id: string; ticket_id: string | null; event_type: string; title: string; body: string; read_at: string | null; created_at: string };
 type Staff = { user_id: string; email: string; role: "super_admin" | "support_admin"; is_active: boolean; created_at: string; last_sign_in_at: string | null };
 type StaffAudit = { id: number; actor_email: string; target_email: string; action: string; old_role: string | null; new_role: string; old_is_active: boolean | null; new_is_active: boolean; created_at: string };
+type Agent = { user_id: string; email: string; role: "super_admin" | "support_admin" };
 type TicketEvent = { id: number; ticket_id: string; actor_id: string | null; event_type: string; from_value: string | null; to_value: string | null; reason: string | null; created_at: string };
 
 const dateLabel = (value: string) => new Date(value).toLocaleString();
@@ -60,6 +61,7 @@ export default function SuperAdminPortal({ embedded = false }: { embedded?: bool
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
+  const [agents, setAgents] = useState<Agent[]>([]);
   const [staffAudit, setStaffAudit] = useState<StaffAudit[]>([]);
   const [staffEmail, setStaffEmail] = useState("");
   const [staffRole, setStaffRole] = useState<"super_admin" | "support_admin">("support_admin");
@@ -87,15 +89,19 @@ export default function SuperAdminPortal({ embedded = false }: { embedded?: bool
       const [
         { data: companyRows, error: companyError },
         { data: ticketRows, error: ticketError },
-        { data: notificationRows, error: notificationError }
+        { data: notificationRows, error: notificationError },
+        { data: agentRows, error: agentError }
       ] = await Promise.all([
         db.rpc("platform_admin_list_companies"),
         db.from("platform_support_tickets").select("*").order("updated_at", { ascending: false }).limit(250),
-        db.from("platform_support_notifications").select("*").eq("recipient_id", access.user_id).order("created_at", { ascending: false }).limit(50)
+        db.from("platform_support_notifications").select("*").eq("recipient_id", access.user_id).order("created_at", { ascending: false }).limit(50),
+        db.rpc("platform_support_list_agents")
       ]);
       if (companyError) throw companyError;
       if (ticketError) throw ticketError;
       if (notificationError) throw notificationError;
+      if (agentError) throw agentError;
+      setAgents((agentRows || []) as Agent[]);
       setCompanies((companyRows || []) as Company[]);
       setTickets((ticketRows || []) as Ticket[]);
       setNotifications((notificationRows || []) as Notification[]);
@@ -286,6 +292,20 @@ export default function SuperAdminPortal({ embedded = false }: { embedded?: bool
       if (error) throw error;
       setTickets(current => current.map(ticket => ticket.id === data.id ? data as Ticket : ticket));
       setNotice("Ticket updated.");
+    } catch (error) { setNotice(errorText(error)); }
+    finally { setBusy(false); }
+  }
+
+  async function assignTicketTo(assignee: string | null) {
+    if (!db || !activeTicket) return;
+    setBusy(true); setNotice("");
+    try {
+      const { data, error } = await db.rpc("platform_support_assign_ticket", {
+        p_ticket_id: activeTicket.id, p_assignee: assignee
+      });
+      if (error) throw error;
+      setTickets(current => current.map(ticket => ticket.id === activeTicket.id ? { ...ticket, assigned_to: assignee } : ticket));
+      setNotice(assignee ? "Ticket assigned to the selected platform agent." : "Ticket is now unassigned.");
     } catch (error) { setNotice(errorText(error)); }
     finally { setBusy(false); }
   }
@@ -488,7 +508,7 @@ export default function SuperAdminPortal({ embedded = false }: { embedded?: bool
         </section>
         <section className="platform-panel" id="tickets"><div className="platform-section-title"><div><h3>Support desk</h3><p>Track issues, assign ownership and record customer communication</p></div><input value={ticketSearch} onChange={event => setTicketSearch(event.target.value)} placeholder="Search tickets…" /></div>
           <div className="platform-ticket-layout"><div className="platform-ticket-list">{filteredTickets.map(ticket => <button key={ticket.id} className={selectedTicket === ticket.id ? "selected" : ""} onClick={() => setSelectedTicket(ticket.id)}><span className={"platform-priority priority-" + ticket.priority}>{ticket.priority}</span><b>#{ticket.ticket_number} · {ticket.subject}</b><small>{companies.find(company => company.id === ticket.tenant_id)?.name || "Company"} · {ticket.status}</small><time>{dateLabel(ticket.updated_at)}</time></button>)}{!filteredTickets.length && <p className="platform-empty">No support tickets yet.</p>}</div>
-            <div className="platform-ticket-detail">{activeTicket ? <><div className="platform-ticket-heading"><div><small>{companies.find(company => company.id === activeTicket.tenant_id)?.name || "Customer company"}</small><h4>{activeTicket.subject}</h4><p>{activeTicket.category} · Opened {dateLabel(activeTicket.created_at)}</p><p className="platform-sla-line">First response: {activeTicket.first_response_at ? dateLabel(activeTicket.first_response_at) : "Pending"} · SLA target: {activeTicket.sla_due_at ? dateLabel(activeTicket.sla_due_at) : "Not set"}</p><p className="platform-sla-line">Escalation level: {activeTicket.escalation_level} {activeTicket.escalated_at ? "· Escalated " + dateLabel(activeTicket.escalated_at) : ""}</p></div><span className={"platform-status status-" + activeTicket.status}>{activeTicket.status}</span></div><p className="platform-ticket-description">{activeTicket.description}</p><div className="platform-ticket-controls"><label>Status<select value={activeTicket.status} onChange={event => void updateTicket({ status: event.target.value })}><option value="open">Open</option><option value="in_progress">In progress</option><option value="waiting_customer">Waiting for customer</option><option value="resolved">Resolved</option><option value="closed">Closed</option></select></label><button disabled={busy} onClick={() => void updateTicket({ assigned_to: admin.user_id })}>Assign to me</button></div><form className="platform-resolution-form" onSubmit={saveResolution}><label>Resolution summary<textarea rows={3} maxLength={4000} value={resolutionDraft} onChange={event => setResolutionDraft(event.target.value)} placeholder="Record the resolution and steps taken…" /></label><button disabled={busy || !resolutionDraft.trim()}>Save resolution</button></form><div className="platform-messages"><b>Conversation history</b>{messages.map(item => <article key={item.id}><small>{item.sender_id === admin.user_id ? "You / Support" : "Platform staff"} · {dateLabel(item.created_at)}</small><p>{item.body}</p></article>)}{!messages.length && <p className="platform-empty">No messages recorded for this case.</p>}</div>
+            <div className="platform-ticket-detail">{activeTicket ? <><div className="platform-ticket-heading"><div><small>{companies.find(company => company.id === activeTicket.tenant_id)?.name || "Customer company"}</small><h4>{activeTicket.subject}</h4><p>{activeTicket.category} · Opened {dateLabel(activeTicket.created_at)}</p><p className="platform-sla-line">First response: {activeTicket.first_response_at ? dateLabel(activeTicket.first_response_at) : "Pending"} · SLA target: {activeTicket.sla_due_at ? dateLabel(activeTicket.sla_due_at) : "Not set"}</p><p className="platform-sla-line">Escalation level: {activeTicket.escalation_level} {activeTicket.escalated_at ? "· Escalated " + dateLabel(activeTicket.escalated_at) : ""}</p></div><span className={"platform-status status-" + activeTicket.status}>{activeTicket.status}</span></div><p className="platform-ticket-description">{activeTicket.description}</p><div className="platform-ticket-controls"><label>Status<select value={activeTicket.status} onChange={event => void updateTicket({ status: event.target.value })}><option value="open">Open</option><option value="in_progress">In progress</option><option value="waiting_customer">Waiting for customer</option><option value="resolved">Resolved</option><option value="closed">Closed</option></select></label><label>Assigned agent<select value={activeTicket.assigned_to || ""} onChange={event => void assignTicketTo(event.target.value || null)}><option value="">Unassigned</option>{agents.map(agent => <option key={agent.user_id} value={agent.user_id}>{agent.email} · {agent.role.replaceAll("_"," ")}</option>)}</select></label><button disabled={busy} onClick={() => void assignTicketTo(admin.user_id)}>Assign to me</button></div><form className="platform-resolution-form" onSubmit={saveResolution}><label>Resolution summary<textarea rows={3} maxLength={4000} value={resolutionDraft} onChange={event => setResolutionDraft(event.target.value)} placeholder="Record the resolution and steps taken…" /></label><button disabled={busy || !resolutionDraft.trim()}>Save resolution</button></form><div className="platform-messages"><b>Conversation history</b>{messages.map(item => <article key={item.id}><small>{item.sender_id === admin.user_id ? "You / Support" : "Platform staff"} · {dateLabel(item.created_at)}</small><p>{item.body}</p></article>)}{!messages.length && <p className="platform-empty">No messages recorded for this case.</p>}</div>
               {admin.role === "support_admin" && !["resolved","closed"].includes(activeTicket.status) && <form className="platform-escalation-form" onSubmit={escalateTicket}><label>Escalation reason<textarea rows={2} minLength={5} maxLength={1000} value={escalationReason} onChange={event => setEscalationReason(event.target.value)} placeholder="Explain why Super Admin attention is required…" /></label><button disabled={busy || escalationReason.trim().length < 5}>Escalate to Super Admin</button></form>}
               <div className="platform-event-history"><b>Ticket history</b>{ticketEvents.map(item => <article key={item.id}><span>{item.event_type.replaceAll("_"," ")}</span><time>{dateLabel(item.created_at)}</time><p>{item.from_value ? item.from_value + " → " : ""}{item.to_value || item.reason || ""}</p>{item.reason && item.event_type === "escalated" && <small>{item.reason}</small>}</article>)}{!ticketEvents.length && <small>No history entries.</small>}</div>
               <div className="platform-attachment-list"><b>Attachments</b>{attachments.map(item => <button type="button" key={item.id} onClick={() => void openAttachment(item)}>{item.file_name} · {(item.file_size / 1024).toFixed(0)} KB</button>)}{!attachments.length && <small>No files attached.</small>}</div>
