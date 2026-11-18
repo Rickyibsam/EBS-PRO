@@ -72,6 +72,9 @@ BEGIN
     RAISE EXCEPTION 'Choose a valid platform role and active state.' USING ERRCODE = '22023';
   END IF;
 
+  -- Serialize changes so two concurrent requests cannot remove the final active Super Admin.
+  PERFORM pg_advisory_xact_lock(20261118, 1300);
+
   SELECT u.id INTO v_target
   FROM auth.users u
   WHERE lower(u.email) = lower(btrim(p_email))
