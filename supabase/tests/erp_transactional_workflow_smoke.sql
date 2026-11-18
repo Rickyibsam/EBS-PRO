@@ -114,6 +114,7 @@ declare
   v_failed_delivery uuid;
   v_failed_line uuid;
   v_failed_visit_result jsonb;
+  v_customer_backup jsonb;
 begin
   select user_id into v_user
   from public.tenant_memberships
@@ -327,6 +328,32 @@ begin
   if not exists(select 1 from public.journal_entries where tenant_id=v_tenant_a
     and source_type='sales_invoice' and source_id=v_sales_invoice_id and status='posted') then
     raise exception 'FAIL: sales invoice did not create an AR/revenue journal';
+  end if;
+
+  -- Customer export must include nested order, delivery and invoice dependencies,
+  -- while remaining scoped to the selected tenant/customer.
+  v_customer_backup:=public.export_customer_backup(v_tenant_a,v_customer);
+  if v_customer_backup->>'format'<>'EBS-PRO-CUSTOMER-BACKUP-V1'
+     or v_customer_backup->>'tenant_id'<>v_tenant_a::text
+     or v_customer_backup->>'customer_id'<>v_customer::text
+     or (v_customer_backup->>'dependency_depth')::integer<>4 then
+    raise exception 'FAIL: customer backup metadata or tenant scope is invalid';
+  end if;
+  if jsonb_array_length(coalesce(v_customer_backup->'related_tables'->'sales_orders','[]'::jsonb))=0
+     or jsonb_array_length(coalesce(v_customer_backup->'related_tables'->'sales_order_lines','[]'::jsonb))=0
+     or jsonb_array_length(coalesce(v_customer_backup->'related_tables'->'deliveries','[]'::jsonb))=0
+     or jsonb_array_length(coalesce(v_customer_backup->'related_tables'->'delivery_lines','[]'::jsonb))=0
+     or jsonb_array_length(coalesce(v_customer_backup->'related_tables'->'sales_invoices','[]'::jsonb))=0
+     or jsonb_array_length(coalesce(v_customer_backup->'related_tables'->'sales_invoice_lines','[]'::jsonb))=0 then
+    raise exception 'FAIL: customer backup omitted nested order/delivery/invoice dependencies';
+  end if;
+  if exists (
+    select 1
+      from jsonb_each(coalesce(v_customer_backup->'related_tables','{}'::jsonb)) as exported(table_name,rows)
+      cross join lateral jsonb_array_elements(exported.rows) as row_data
+     where row_data->>'tenant_id' is distinct from v_tenant_a::text
+  ) then
+    raise exception 'FAIL: customer backup included a row outside the selected tenant';
   end if;
 
 
