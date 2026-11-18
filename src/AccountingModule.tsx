@@ -19,7 +19,7 @@ export default function AccountingModule({ db, tenantId,currentRole }: { db: Sup
   const [trialRows, setTrialRows] = useState<TrialRow[]>([]);
   const [ledgerParties,setLedgerParties]=useState<Row[]>([]);
   const [ledgerRows,setLedgerRows]=useState<Row[]>([]);
-  const [ledgerType,setLedgerType]=useState("customer");
+  const [ledgerType,setLedgerType]=useState<"customer"|"supplier">("customer");
   const [selectedParty,setSelectedParty]=useState("");
   const [cashAccounts,setCashAccounts]=useState<Row[]>([]);
   const [cashRows,setCashRows]=useState<Row[]>([]);
