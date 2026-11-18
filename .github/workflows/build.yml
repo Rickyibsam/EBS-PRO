@@ -105,6 +105,12 @@ jobs:
         run: supabase test db supabase/tests/platform_support_escalation.test.sql
       - name: Verify support agent directory and ticket assignment authorization
         run: supabase test db supabase/tests/platform_support_agent_assignment.test.sql
+      - name: Install PostgreSQL client for transactional workflow smoke test
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Seed disposable CI-only workflow identities
+        run: PGPASSWORD=postgres psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/ci_seed_smoke_users.sql
+      - name: Run rollback-only transactional workflow smoke test
+        run: PGPASSWORD=postgres psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/erp_transactional_workflow_smoke.sql
       - name: Stop disposable Supabase stack
         if: always()
         run: supabase stop --no-backup
