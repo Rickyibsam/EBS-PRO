@@ -1,6 +1,6 @@
 begin;
 
-select plan(73);
+select plan(77);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -64,6 +64,29 @@ select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
    where n.nspname='public' and c.relname='van_stock_movements'),
   'van_stock_movements has RLS enabled'
+);
+select ok(
+  (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
+   where n.nspname='public' and c.relname='van_delivery_reservations'),
+  'van_delivery_reservations has RLS enabled'
+);
+select ok(
+  has_table_privilege('authenticated','public.van_delivery_reservations','select')
+  and has_table_privilege('authenticated','public.van_delivery_reservations','insert')
+  and has_table_privilege('authenticated','public.van_delivery_reservations','update'),
+  'authenticated has only the reservation operations needed by dispatch workflows'
+);
+select ok(
+  not has_table_privilege('anon','public.van_delivery_reservations','select')
+  and not has_table_privilege('anon','public.van_delivery_reservations','insert')
+  and not has_table_privilege('anon','public.van_delivery_reservations','update'),
+  'anonymous role cannot access van delivery reservations'
+);
+select ok(
+  (select count(*)=3 from pg_policies
+   where schemaname='public' and tablename='van_delivery_reservations'
+     and policyname in ('van_delivery_reservations_select','van_delivery_reservations_insert','van_delivery_reservations_update')),
+  'van delivery reservations has tenant-role select, insert and update policies'
 );
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
