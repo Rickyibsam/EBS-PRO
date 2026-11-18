@@ -1,6 +1,6 @@
 begin;
 
-select plan(80);
+select plan(81);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -105,6 +105,14 @@ select ok(
   not has_function_privilege('anon','public.save_delivery_pod_signature(uuid,jsonb)','execute')
   and not has_function_privilege('public','public.save_delivery_pod_signature(uuid,jsonb)','execute'),
   'POD signature RPC is not executable by anonymous or public roles'
+);
+select ok(
+  exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='payroll_lines'
+      and column_name='sales_incentive' and data_type='numeric'
+  ),
+  'payroll lines include sales incentive compensation'
 );
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
