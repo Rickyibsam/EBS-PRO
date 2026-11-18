@@ -161,3 +161,5 @@
 .platform-resolution-form textarea{width:100%;border:1px solid #dce7f0;border-radius:7px;padding:9px;font:inherit;font-size:10px;resize:vertical}
 .platform-resolution-form button{justify-self:start;border:0;border-radius:7px;background:#174e70;color:#fff;padding:9px 12px;font-size:9px;font-weight:800}
 .platform-resolution-form button:disabled{opacity:.5}
+
+.platform-password-field{display:flex;align-items:stretch;gap:8px;width:100%}.platform-password-field input{flex:1;min-width:0}.platform-password-toggle{flex:0 0 auto;min-width:64px;border:1px solid #b9cbd9;border-radius:8px;background:#f4f8fb;color:#17324c;padding:0 12px;font-weight:700;cursor:pointer}.platform-password-toggle:hover{background:#e7f0f7}.platform-password-toggle:focus-visible{outline:3px solid #36b7c6;outline-offset:2px}
