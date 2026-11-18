@@ -54,7 +54,7 @@ BEGIN
     INSERT INTO public.platform_support_ticket_events
       (ticket_id, actor_id, event_type, to_value, reason)
     VALUES
-      (NEW.id, v_actor, 'created', NEW.status, NEW.description);
+      (NEW.id, v_actor, 'created', NEW.status, NEW.subject);
     RETURN NEW;
   END IF;
 
