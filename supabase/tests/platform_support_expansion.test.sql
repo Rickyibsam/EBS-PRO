@@ -1,5 +1,5 @@
 begin;
-select plan(21);
+select plan(22);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -113,6 +113,15 @@ select ok(
   exists(select 1 from pg_policies where schemaname='storage' and tablename='objects'
          and policyname='platform_support_files_delete_orphan'),
   'users may clean up only their own unregistered support uploads'
+);
+
+select ok(
+  NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime')
+  OR EXISTS (SELECT 1 FROM pg_publication_tables
+             WHERE pubname = 'supabase_realtime'
+               AND schemaname = 'public'
+               AND tablename = 'platform_support_notifications'),
+  'support notifications are included in Supabase Realtime when the publication is available'
 );
 
 select * from finish();
