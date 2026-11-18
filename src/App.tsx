@@ -129,7 +129,7 @@ export default function App() {
       const row = Array.isArray(data) ? data[0] : data;
       setPlatformRole(error ? null : (row?.role === "super_admin" || row?.role === "support_admin" ? row.role : null));
       setPlatformRoleChecked(true);
-    }).catch(() => { if (live) { setPlatformRole(null); setPlatformRoleChecked(true); } });
+    }, () => { if (live) { setPlatformRole(null); setPlatformRoleChecked(true); } });
     return () => { live = false; };
   }, [session?.user.id]);
 
