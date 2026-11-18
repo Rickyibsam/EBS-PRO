@@ -155,3 +155,9 @@
 .platform-event-history article time{font-size:8px;color:#91a5b5}
 .platform-event-history article p,.platform-event-history article small{grid-column:1/-1;margin:0;font-size:9px;color:#7890a4;overflow-wrap:anywhere}
 @media(max-width:600px){.platform-escalation-form{grid-template-columns:1fr}}
+
+.platform-resolution-form{display:grid;gap:8px;margin:12px 0;padding:12px;border:1px solid #dce8ef;border-radius:9px;background:#f8fbfd}
+.platform-resolution-form label{display:grid;gap:6px;font-size:10px;font-weight:800;color:#5d7890}
+.platform-resolution-form textarea{width:100%;border:1px solid #dce7f0;border-radius:7px;padding:9px;font:inherit;font-size:10px;resize:vertical}
+.platform-resolution-form button{justify-self:start;border:0;border-radius:7px;background:#174e70;color:#fff;padding:9px 12px;font-size:9px;font-weight:800}
+.platform-resolution-form button:disabled{opacity:.5}
