@@ -115,6 +115,8 @@ declare
   v_failed_line uuid;
   v_failed_visit_result jsonb;
   v_customer_backup jsonb;
+  v_van_available numeric;
+  v_van_reserved numeric;
 begin
   select user_id into v_user
   from public.tenant_memberships
@@ -381,6 +383,20 @@ begin
   );
   if coalesce((v_van_load_result->>'replayed')::boolean,true) is not false then
     raise exception 'FAIL: first van stock load was unexpectedly replayed';
+  end if;
+  select coalesce(sum(quantity_in-quantity_out),0) into v_van_available
+  from public.van_stock_movements
+  where tenant_id=v_tenant_a and vehicle_number='TX-VAN-01' and product_id=v_product
+    and (expiry_date is null or expiry_date>=current_date);
+  select coalesce(sum(reserved_quantity),0) into v_van_reserved
+  from public.van_delivery_reservations
+  where tenant_id=v_tenant_a and vehicle_number='TX-VAN-01' and product_id=v_product and status='active';
+  if v_van_available<2 or v_van_reserved<>0 or not exists (
+    select 1 from public.products
+    where id=v_product and tenant_id=v_tenant_a and track_batch=false and track_expiry=false
+  ) then
+    raise exception 'FAIL: van load reconciliation mismatch. Available %, reserved %; expected an untracked product with 2 units.',
+      v_van_available,v_van_reserved;
   end if;
   v_van_dispatch_result:=public.dispatch_van_delivery(
     v_van_delivery,'TX-VAN-01',
