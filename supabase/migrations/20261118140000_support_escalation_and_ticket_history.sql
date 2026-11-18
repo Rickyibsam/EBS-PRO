@@ -180,7 +180,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 BEGIN
   IF NEW.resolution IS DISTINCT FROM OLD.resolution AND NEW.resolution IS NOT NULL THEN
     INSERT INTO public.platform_support_notifications
@@ -194,7 +194,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION private.notify_platform_support_resolution() FROM PUBLIC, anon, authenticated;
 DROP TRIGGER IF EXISTS platform_support_ticket_resolution_notify ON public.platform_support_tickets;
