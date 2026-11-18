@@ -38,14 +38,14 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='employee_leaves' AND policyname='employee_leaves_select') THEN
     CREATE POLICY employee_leaves_select ON public.employee_leaves FOR SELECT TO authenticated
     USING (
-      public.has_tenant_role(tenant_id,ARRAY['owner','admin','manager','accounts']::text[])
+      private.has_tenant_role_internal(tenant_id,ARRAY['owner','admin','manager','accounts']::text[])
       OR EXISTS (SELECT 1 FROM public.employees e WHERE e.id=employee_leaves.employee_id AND e.tenant_id=employee_leaves.tenant_id AND e.user_id=(SELECT auth.uid()))
     );
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='employee_leaves' AND policyname='employee_leaves_insert') THEN
     CREATE POLICY employee_leaves_insert ON public.employee_leaves FOR INSERT TO authenticated
     WITH CHECK (
-      public.has_tenant_role(tenant_id,ARRAY['owner','admin','manager']::text[])
+      private.has_tenant_role_internal(tenant_id,ARRAY['owner','admin','manager']::text[])
       OR (created_by=(SELECT auth.uid()) AND EXISTS (
         SELECT 1 FROM public.employees e WHERE e.id=employee_leaves.employee_id AND e.tenant_id=employee_leaves.tenant_id AND e.user_id=(SELECT auth.uid())
       ))
@@ -53,8 +53,8 @@ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='employee_leaves' AND policyname='employee_leaves_update') THEN
     CREATE POLICY employee_leaves_update ON public.employee_leaves FOR UPDATE TO authenticated
-    USING (public.has_tenant_role(tenant_id,ARRAY['owner','admin','manager']::text[]))
-    WITH CHECK (public.has_tenant_role(tenant_id,ARRAY['owner','admin','manager']::text[]));
+    USING (private.has_tenant_role_internal(tenant_id,ARRAY['owner','admin','manager']::text[]))
+    WITH CHECK (private.has_tenant_role_internal(tenant_id,ARRAY['owner','admin','manager']::text[]));
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='employee_leaves' AND policyname='module_override_grant_select') THEN
     CREATE POLICY module_override_grant_select ON public.employee_leaves FOR SELECT TO authenticated
@@ -101,7 +101,7 @@ DECLARE v_leave public.employee_leaves%rowtype;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Authentication required.'; END IF;
   SELECT * INTO v_leave FROM public.employee_leaves WHERE id=p_leave_id FOR UPDATE;
-  IF NOT FOUND OR NOT public.has_tenant_role(v_leave.tenant_id,ARRAY['owner','admin','manager']::text[]) THEN
+  IF NOT FOUND OR NOT private.has_tenant_role_internal(v_leave.tenant_id,ARRAY['owner','admin','manager']::text[]) THEN
     RAISE EXCEPTION 'You cannot approve this leave request.' USING ERRCODE='42501';
   END IF;
   IF v_leave.status<>'pending' OR p_decision NOT IN ('approved','rejected') THEN
