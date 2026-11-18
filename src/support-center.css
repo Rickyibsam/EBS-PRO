@@ -63,3 +63,7 @@
 .tenant-support-event-history article time{font-size:8px;color:#91a5b5}
 .tenant-support-event-history article p{grid-column:1/-1;margin:0;font-size:9px;color:#7890a4;overflow-wrap:anywhere}
 .tenant-support-event-history>small{font-size:9px;color:#91a5b5}
+
+.tenant-support-resolution{margin:10px 0;padding:11px 13px;border:1px solid #cfe6dc;border-radius:8px;background:#f3faf6}
+.tenant-support-resolution b{font-size:10px;color:#28725c}
+.tenant-support-resolution p{margin:5px 0 0;font-size:10px;color:#547d6d;line-height:1.6;white-space:pre-wrap}
