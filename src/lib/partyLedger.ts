@@ -1,0 +1,47 @@
+export type PartyLedgerParty = { id: string; party_type: string; opening_balance?: number | string | null };
+export type PartyLedgerEntry = {
+  id?: string;
+  party_id: string | null;
+  account_code?: string;
+  entry_date?: string;
+  journal_number?: string;
+  narration?: string | null;
+  memo?: string | null;
+  debit: number | string;
+  credit: number | string;
+  is_opening_balance?: boolean;
+  [key: string]: unknown;
+};
+
+/** Add each selected party's opening balance before its posted ledger activity. */
+export function buildPartyLedgerRows(
+  ledgerRows: PartyLedgerEntry[],
+  parties: PartyLedgerParty[],
+  ledgerType: "customer" | "supplier",
+  selectedParty = ""
+): PartyLedgerEntry[] {
+  const code = ledgerType === "customer" ? "1100" : "2000";
+  const allowedTypes = ledgerType === "customer" ? ["customer", "both"] : ["supplier", "both"];
+  const selectedParties = parties.filter(p => allowedTypes.includes(p.party_type) && (!selectedParty || p.id === selectedParty));
+  const openingRows = selectedParties.flatMap(p => {
+    const amount = Number(p.opening_balance ?? 0);
+    if (!Number.isFinite(amount) || amount === 0) return [];
+    const normalDebit = ledgerType === "customer";
+    return [{
+      id: "opening:" + p.id,
+      party_id: p.id,
+      account_code: code,
+      entry_date: "Opening balance",
+      journal_number: "—",
+      narration: "Opening balance",
+      debit: normalDebit ? Math.max(amount, 0) : Math.max(-amount, 0),
+      credit: normalDebit ? Math.max(-amount, 0) : Math.max(amount, 0),
+      is_opening_balance: true
+    }];
+  });
+  const transactions = ledgerRows.filter(row => row.account_code === code && (!selectedParty || row.party_id === selectedParty));
+  return [...openingRows, ...transactions].sort((a, b) => {
+    if (!!a.is_opening_balance !== !!b.is_opening_balance) return a.is_opening_balance ? -1 : 1;
+    return String(a.entry_date ?? "").localeCompare(String(b.entry_date ?? "")) || String(a.journal_number ?? "").localeCompare(String(b.journal_number ?? ""));
+  });
+}
