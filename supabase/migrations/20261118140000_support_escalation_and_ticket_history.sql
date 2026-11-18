@@ -174,5 +174,33 @@ CREATE TRIGGER platform_support_ticket_escalation_notify
 AFTER UPDATE OF escalation_level ON public.platform_support_tickets
 FOR EACH ROW EXECUTE FUNCTION private.notify_platform_support_escalation();
 
+
+CREATE OR REPLACE FUNCTION private.notify_platform_support_resolution()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $
+BEGIN
+  IF NEW.resolution IS DISTINCT FROM OLD.resolution AND NEW.resolution IS NOT NULL THEN
+    INSERT INTO public.platform_support_notifications
+      (recipient_id, tenant_id, ticket_id, event_type, title, body)
+    SELECT tm.user_id, NEW.tenant_id, NEW.id, 'status_changed',
+           'Resolution updated for support ticket #' || NEW.ticket_number,
+           left(NEW.resolution, 500)
+    FROM public.tenant_memberships tm
+    WHERE tm.tenant_id = NEW.tenant_id AND tm.is_active
+      AND ((SELECT auth.uid()) IS NULL OR tm.user_id <> (SELECT auth.uid()));
+  END IF;
+  RETURN NEW;
+END;
+$;
+
+REVOKE ALL ON FUNCTION private.notify_platform_support_resolution() FROM PUBLIC, anon, authenticated;
+DROP TRIGGER IF EXISTS platform_support_ticket_resolution_notify ON public.platform_support_tickets;
+CREATE TRIGGER platform_support_ticket_resolution_notify
+AFTER UPDATE OF resolution ON public.platform_support_tickets
+FOR EACH ROW EXECUTE FUNCTION private.notify_platform_support_resolution();
+
 COMMENT ON TABLE public.platform_support_ticket_events IS
   'Immutable, tenant-scoped history of support ticket creation, status, assignment, resolution and escalation events.';
