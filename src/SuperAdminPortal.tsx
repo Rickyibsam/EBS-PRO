@@ -21,6 +21,8 @@ type Ticket = {
 type Message = { id: number; ticket_id: string; sender_id: string; body: string; created_at: string };
 type Attachment = { id: string; ticket_id: string; storage_path: string; file_name: string; mime_type: string; file_size: number; created_at: string };
 type Notification = { id: string; ticket_id: string | null; event_type: string; title: string; body: string; read_at: string | null; created_at: string };
+type Staff = { user_id: string; email: string; role: "super_admin" | "support_admin"; is_active: boolean; created_at: string; last_sign_in_at: string | null };
+type StaffAudit = { id: number; actor_email: string; target_email: string; action: string; old_role: string | null; new_role: string; old_is_active: boolean | null; new_is_active: boolean; created_at: string };
 
 const dateLabel = (value: string) => new Date(value).toLocaleString();
 const errorText = (error: unknown) => error instanceof Error ? error.message : "The request could not be completed.";
@@ -56,6 +58,11 @@ export default function SuperAdminPortal({ embedded = false }: { embedded?: bool
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [staff, setStaff] = useState<Staff[]>([]);
+  const [staffAudit, setStaffAudit] = useState<StaffAudit[]>([]);
+  const [staffEmail, setStaffEmail] = useState("");
+  const [staffRole, setStaffRole] = useState<"super_admin" | "support_admin">("support_admin");
+  const [staffBusy, setStaffBusy] = useState(false);
 
   async function loadPortal() {
     if (!db || !session) return;
@@ -88,6 +95,19 @@ export default function SuperAdminPortal({ embedded = false }: { embedded?: bool
       setCompanies((companyRows || []) as Company[]);
       setTickets((ticketRows || []) as Ticket[]);
       setNotifications((notificationRows || []) as Notification[]);
+      if (access.role === "super_admin") {
+        const [{ data: staffRows, error: staffError }, { data: auditRows, error: auditError }] = await Promise.all([
+          db.rpc("platform_admin_list_staff"),
+          db.rpc("platform_admin_list_staff_audit")
+        ]);
+        if (staffError) throw staffError;
+        if (auditError) throw auditError;
+        setStaff((staffRows || []) as Staff[]);
+        setStaffAudit((auditRows || []) as StaffAudit[]);
+      } else {
+        setStaff([]);
+        setStaffAudit([]);
+      }
     } catch (error) {
       setAdmin(null);
       setNotice(errorText(error));
@@ -279,6 +299,47 @@ export default function SuperAdminPortal({ embedded = false }: { embedded?: bool
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   }
 
+  async function provisionStaff(event: FormEvent) {
+    event.preventDefault();
+    if (!db || admin?.role !== "super_admin" || !staffEmail.trim()) return;
+    setStaffBusy(true); setNotice("");
+    try {
+      const { error } = await db.rpc("platform_admin_upsert_staff_by_email", {
+        p_email: staffEmail.trim(), p_role: staffRole, p_is_active: true
+      });
+      if (error) throw error;
+      setStaffEmail("");
+      setNotice("Platform staff access updated.");
+      await loadPortal();
+    } catch (error) { setNotice(errorText(error)); }
+    finally { setStaffBusy(false); }
+  }
+
+  async function changeStaffAccess(item: Staff, isActive: boolean) {
+    if (!db || admin?.role !== "super_admin") return;
+    setStaffBusy(true); setNotice("");
+    try {
+      const { error } = await db.rpc("platform_admin_upsert_staff_by_email", {
+        p_email: item.email, p_role: item.role, p_is_active: isActive
+      });
+      if (error) throw error;
+      setNotice("Staff access updated.");
+      await loadPortal();
+    } catch (error) { setNotice(errorText(error)); }
+    finally { setStaffBusy(false); }
+  }
+
+  async function sendStaffPasswordReset(item: Staff) {
+    if (!db || admin?.role !== "super_admin") return;
+    setStaffBusy(true); setNotice("");
+    try {
+      const { error } = await db.auth.resetPasswordForEmail(item.email, { redirectTo: PUBLIC_APP_URL });
+      if (error) throw error;
+      setNotice("Password recovery email sent to " + item.email + ".");
+    } catch (error) { setNotice(errorText(error)); }
+    finally { setStaffBusy(false); }
+  }
+
   async function markNotificationRead(item: Notification) {
     if (!db || !admin || item.read_at) return;
     const readAt = new Date().toISOString();
@@ -317,7 +378,7 @@ export default function SuperAdminPortal({ embedded = false }: { embedded?: bool
   if (!admin) return <main className="platform-center"><section className="platform-auth"><div className="platform-mark">E</div><h1>Platform access restricted</h1><p>{notice || "This account has no active platform support role."}</p><button onClick={() => void db.auth.signOut()}>Sign out</button><a href="/">Return to company ERP</a></section></main>;
 
   return <div className="platform-shell">
-    <aside className="platform-sidebar"><div className="platform-brand"><div className="platform-mark">E</div><div><b>EBS <em>PRO</em></b><small>ERP ADMINISTRATION</small></div></div><div className="platform-nav-label">WORKSPACE</div><a className="is-active" href="#overview">◈ Overview</a><a href="#companies">▦ Companies</a><a href="#tickets">▤ Support tickets</a><a href="#notifications">♧ Notifications {notifications.some(item => !item.read_at) ? "•" : ""}</a><a href="#security">♙ Password & Security</a><a href="#website-optimization">⚡ Website Optimization</a><div className="platform-sidebar-foot"><span>{admin.role.replaceAll("_", " ").toUpperCase()}</span><small>{session.user.email}</small><button onClick={() => void db.auth.signOut()}>Sign out ↗</button></div></aside>
+    <aside className="platform-sidebar"><div className="platform-brand"><div className="platform-mark">E</div><div><b>EBS <em>PRO</em></b><small>ERP ADMINISTRATION</small></div></div><div className="platform-nav-label">WORKSPACE</div><a className="is-active" href="#overview">◈ Overview</a><a href="#companies">▦ Companies</a><a href="#tickets">▤ Support tickets</a><a href="#notifications">♧ Notifications {notifications.some(item => !item.read_at) ? "•" : ""}</a>{admin.role === "super_admin" && <a href="#staff">♙ Support Staff</a>}<a href="#security">♙ Password & Security</a><a href="#website-optimization">⚡ Website Optimization</a><div className="platform-sidebar-foot"><span>{admin.role.replaceAll("_", " ").toUpperCase()}</span><small>{session.user.email}</small><button onClick={() => void db.auth.signOut()}>Sign out ↗</button></div></aside>
     <main className="platform-main">
       <header className="platform-topbar"><div><small>ERP ADMINISTRATION / PLATFORM CONTROL</small><h1>Admin Portal Configuration</h1></div><div className="platform-top-actions"><span>● SECURE SESSION</span><button onClick={() => void loadPortal()}>↻ Refresh</button></div></header>
       <section className="platform-content" id="overview">
@@ -348,6 +409,24 @@ export default function SuperAdminPortal({ embedded = false }: { embedded?: bool
         <section className="platform-panel" id="companies"><div className="platform-section-title"><div><h3>Customer companies</h3><p>Tenant directory and account overview</p></div><input value={companySearch} onChange={event => setCompanySearch(event.target.value)} placeholder="Search company or city…" /></div>
           <div className="platform-table-wrap"><table><thead><tr><th>Company</th><th>City</th><th>Support contact</th><th>Status</th><th>Users</th><th>Branches</th><th>Open cases</th><th>Registered</th></tr></thead><tbody>{filteredCompanies.map(company => <tr key={company.id}><td><b>{company.name}</b><small>{company.id.slice(0, 8)}…</small></td><td>{company.city || "—"}</td><td>{company.contact_email || company.contact_phone || "—"}<small>{company.contact_phone || ""}</small></td><td><span className={"platform-status status-" + company.organization_status}>{company.organization_status}</span></td><td>{company.member_count}</td><td>{company.branch_count}</td><td>{company.open_ticket_count}</td><td>{new Date(company.created_at).toLocaleDateString()}</td></tr>)}{!filteredCompanies.length && <tr><td colSpan={8} className="platform-empty">No companies match this search.</td></tr>}</tbody></table></div>
         </section>
+        {admin.role === "super_admin" && <section className="platform-panel" id="staff">
+          <div className="platform-section-title"><div><h3>Platform Staff Management</h3><p>Provision only registered, email-confirmed EBS PRO accounts. Support staff do not receive tenant financial access.</p></div></div>
+          <form className="platform-staff-form" onSubmit={provisionStaff}>
+            <label>Registered account email<input type="email" required value={staffEmail} onChange={event => setStaffEmail(event.target.value)} placeholder="staff@example.com" /></label>
+            <label>Platform role<select value={staffRole} onChange={event => setStaffRole(event.target.value as "super_admin" | "support_admin")}><option value="support_admin">Support Admin</option><option value="super_admin">Super Admin</option></select></label>
+            <button disabled={staffBusy || !staffEmail.trim()}>{staffBusy ? "Saving…" : "Grant platform access"}</button>
+          </form>
+          <p className="platform-staff-hint">The staff member must first create an EBS PRO account and confirm its email. Passwords are never visible here; use the recovery email action to let a staff member set their own password.</p>
+          <div className="platform-table-wrap"><table><thead><tr><th>Staff account</th><th>Role</th><th>Access</th><th>Last sign-in</th><th>Actions</th></tr></thead><tbody>
+            {staff.map(item => <tr key={item.user_id}><td><b>{item.email}</b><small>{item.user_id.slice(0, 8)}…</small></td><td>{item.role.replaceAll("_", " ")}</td><td><span className={"platform-status " + (item.is_active ? "status-active" : "status-closed")}>{item.is_active ? "Active" : "Inactive"}</span></td><td>{item.last_sign_in_at ? dateLabel(item.last_sign_in_at) : "Never"}</td><td><div className="platform-staff-actions"><button disabled={staffBusy || (item.user_id === admin.user_id && item.is_active)} onClick={() => void changeStaffAccess(item, !item.is_active)}>{item.is_active ? "Deactivate" : "Activate"}</button><button disabled={staffBusy} onClick={() => void sendStaffPasswordReset(item)}>Send password reset</button></div></td></tr>)}
+            {!staff.length && <tr><td colSpan={5} className="platform-empty">No platform staff accounts have been provisioned.</td></tr>}
+          </tbody></table></div>
+          <div className="platform-section-title"><div><h3>Staff access audit</h3><p>Immutable record of staff provisioning and role/access changes.</p></div></div>
+          <div className="platform-table-wrap"><table><thead><tr><th>Time</th><th>Performed by</th><th>Target account</th><th>Action</th><th>Role change</th><th>Access</th></tr></thead><tbody>
+            {staffAudit.map(item => <tr key={item.id}><td>{dateLabel(item.created_at)}</td><td>{item.actor_email}</td><td>{item.target_email}</td><td>{item.action.replaceAll("_", " ")}</td><td>{item.old_role || "—"} → {item.new_role}</td><td>{item.old_is_active === null ? "—" : item.old_is_active ? "Active" : "Inactive"} → {item.new_is_active ? "Active" : "Inactive"}</td></tr>)}
+            {!staffAudit.length && <tr><td colSpan={6} className="platform-empty">No staff access changes recorded yet.</td></tr>}
+          </tbody></table></div>
+        </section>}
         <section className="platform-panel" id="security">
           <div className="platform-section-title"><div><h3>Password & Security</h3><p>Change your own Super Admin password with current-password verification.</p></div></div>
           <form className="platform-security-form" onSubmit={changeOwnPassword}>
