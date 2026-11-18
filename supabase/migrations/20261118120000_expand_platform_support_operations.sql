@@ -169,6 +169,21 @@ CREATE POLICY platform_support_notifications_mark_own
   USING (recipient_id = (SELECT auth.uid()))
   WITH CHECK (recipient_id = (SELECT auth.uid()));
 
+
+DO $
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime')
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_publication_tables
+       WHERE pubname = 'supabase_realtime'
+         AND schemaname = 'public'
+         AND tablename = 'platform_support_notifications'
+     ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.platform_support_notifications;
+  END IF;
+END;
+$;
+
 CREATE OR REPLACE FUNCTION private.apply_platform_support_sla()
 RETURNS trigger
 LANGUAGE plpgsql
