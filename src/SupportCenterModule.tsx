@@ -81,7 +81,7 @@ export default function SupportCenterModule({db,tenantId,userId}:{db:SupabaseCli
   async function createTicket(event:FormEvent){
     event.preventDefault();setBusy(true);setNotice("");
     try{
-      const {data,error}=await db.from("platform_support_tickets").insert({tenant_id:tenantId,created_by:userId,subject:subject.trim(),category,priority,description:description.trim(),status:"open"}).select("id,tenant_id,subject,category,priority,status,description,created_at,updated_at").single();
+      const {data,error}=await db.from("platform_support_tickets").insert({tenant_id:tenantId,created_by:userId,subject:subject.trim(),category,priority,description:description.trim(),status:"open"}).select("*").single();
       if(error)throw error;
       setTickets(current=>[data as Ticket,...current]);setSelected(data.id);
       if(selectedFiles.length){await uploadTicketFiles(data.id,selectedFiles);setSelectedFiles([]);}
