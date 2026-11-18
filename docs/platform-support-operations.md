@@ -30,3 +30,7 @@ Database triggers create in-app notifications for new tickets, staff replies, cu
 The ERP is an authenticated business application, not a public marketing website. The application shell therefore sends `noindex, nofollow` metadata to avoid indexing private workspace routes. Public SEO landing pages, if needed later, should be hosted as separate public pages with their own indexable metadata.
 
 The Vite build separates React and Supabase vendor bundles to improve browser caching. The PWA shell cache version is incremented when the static shell changes. The Super Admin browser audit checks the current page only; it is not a full-site crawl or a field Core Web Vitals measurement.
+
+## Platform staff administration
+
+Only an active Super Admin can provision or change platform staff. A staff member must already have a registered EBS PRO account with a confirmed email address. The staff role is either Super Admin or Support Admin; it is separate from tenant memberships and does not grant tenant financial access. The final active Super Admin cannot be demoted or deactivated, and concurrent staff-role changes are serialized. Staff changes are recorded in an immutable audit table. Passwords are never displayed; the portal can send a Supabase password-recovery email to a staff member.
