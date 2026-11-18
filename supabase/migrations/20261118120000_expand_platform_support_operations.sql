@@ -15,6 +15,9 @@ UPDATE public.platform_support_tickets
 SET ticket_number = nextval('public.platform_support_ticket_number_seq')
 WHERE ticket_number IS NULL;
 
+REVOKE ALL ON SEQUENCE public.platform_support_ticket_number_seq FROM PUBLIC, anon;
+GRANT USAGE, SELECT ON SEQUENCE public.platform_support_ticket_number_seq TO authenticated;
+
 ALTER TABLE public.platform_support_tickets
   ALTER COLUMN ticket_number SET DEFAULT nextval('public.platform_support_ticket_number_seq'),
   ALTER COLUMN ticket_number SET NOT NULL;
@@ -91,7 +94,7 @@ CREATE POLICY platform_support_files_read
     AND EXISTS (
       SELECT 1
       FROM public.platform_support_tickets st
-      WHERE st.id = ((storage.foldername(name))[1])::uuid
+      WHERE st.id::text = (storage.foldername(name))[1]
         AND (
           (SELECT private.is_platform_staff_internal(ARRAY['super_admin','support_admin']::text[]))
           OR (SELECT private.is_tenant_member_internal(st.tenant_id))
