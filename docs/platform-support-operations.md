@@ -34,3 +34,7 @@ The Vite build separates React and Supabase vendor bundles to improve browser ca
 ## Platform staff administration
 
 Only an active Super Admin can provision or change platform staff. A staff member must already have a registered EBS PRO account with a confirmed email address. The staff role is either Super Admin or Support Admin; it is separate from tenant memberships and does not grant tenant financial access. The final active Super Admin cannot be demoted or deactivated, and concurrent staff-role changes are serialized. Staff changes are recorded in an immutable audit table. Passwords are never displayed; the portal can send a Supabase password-recovery email to a staff member.
+
+## Escalation and resolution history
+
+Support Admins can escalate an unresolved case to the Super Admin team with a mandatory reason. The database rejects escalation of resolved or closed cases, increments the escalation level under the ticket row lock, records who escalated it, appends an immutable ticket event, and creates a notification for active Super Admins. Ticket event history records creation, status changes, assignment changes, resolution edits and escalations. Tenant users can read history for their own company's tickets; only platform staff can read cross-tenant cases. Client sessions cannot insert or edit history events.
