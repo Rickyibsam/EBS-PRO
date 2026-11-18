@@ -21,9 +21,9 @@ CREATE TABLE IF NOT EXISTS public.employee_attendance (
 );
 CREATE INDEX IF NOT EXISTS employee_attendance_tenant_date_idx
   ON public.employee_attendance(tenant_id, attendance_date DESC);
-CREATE INDEX IF NOT EXISTS idx_fk_employee_attendance_employee
+CREATE INDEX IF NOT EXISTS idx_fk_employee_attendance_f4ed333095
   ON public.employee_attendance(employee_id);
-CREATE INDEX IF NOT EXISTS idx_fk_employee_attendance_recorded_by
+CREATE INDEX IF NOT EXISTS idx_fk_employee_attendance_20c0458c14
   ON public.employee_attendance(recorded_by);
 
 ALTER TABLE public.employee_attendance ENABLE ROW LEVEL SECURITY;
