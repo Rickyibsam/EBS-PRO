@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 
-const allowedAdvisories = new Set(["GHSA-fc5q-39xc-vjpf"]);
+const allowedAdvisories = new Set(["GHSA-FC5Q-39XC-VJPF"]);
 const result = spawnSync("npm", ["audit", "--json"], { encoding: "utf8" });
 
 let report;
