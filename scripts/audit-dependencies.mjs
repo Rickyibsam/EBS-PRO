@@ -21,11 +21,13 @@ for (const [name, vulnerability] of Object.entries(vulnerabilities)) {
     .filter(item => item && typeof item === "object")
     .map(item => String(item.url || "").match(/GHSA-[a-z0-9-]+/i)?.[0]?.toUpperCase())
     .filter(Boolean);
+  const fix = vulnerability.fixAvailable;
+  const noCompatibleFix = fix === false || fix == null || (typeof fix === "object" && fix.isSemVerMajor === true);
   const onlyKnownUnfixedAdvisory =
     name === "picomatch" &&
     vulnerability.severity === "high" &&
     vulnerability.isDirect === false &&
-    vulnerability.fixAvailable === false &&
+    noCompatibleFix &&
     advisoryIds.length > 0 &&
     advisoryIds.every(id => allowedAdvisories.has(id));
 
