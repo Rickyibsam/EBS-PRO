@@ -9,7 +9,7 @@ const modules=[
  {key:"sales_customer",label:"Sales & Customer Management"},
  {key:"order_booking",label:"Order Booking App"},
  {key:"inventory",label:"Inventory & Warehouse"},
- {key:"purchase_supplier",label:"Purchase & Supplier Management"},
+ {key:"purchase_supplier",label:"Purchase & Vendor Management"},
  {key:"accounts_finance",label:"Accounts & Finance"},
  {key:"distribution_delivery",label:"Distribution & Delivery"},
  {key:"hr_payroll",label:"HR & Payroll"},
