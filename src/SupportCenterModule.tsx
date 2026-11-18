@@ -37,6 +37,14 @@ export default function SupportCenterModule({db,tenantId,userId}:{db:SupabaseCli
   }
   useEffect(()=>{void loadTickets();void loadNotifications();},[tenantId,userId]);
   useEffect(()=>{
+    const channel=db.channel("tenant-support-notifications-"+userId)
+      .on("postgres_changes",{event:"INSERT",schema:"public",table:"platform_support_notifications",filter:"recipient_id=eq."+userId},payload=>{
+        const item=payload.new as Notification;
+        setNotifications(current=>current.some(row=>row.id===item.id)?current:[item,...current].slice(0,30));
+      }).subscribe();
+    return ()=>{void db.removeChannel(channel);};
+  },[userId]);
+  useEffect(()=>{
     if(!selected){setMessages([]);return;}
     let live=true;
     Promise.all([
