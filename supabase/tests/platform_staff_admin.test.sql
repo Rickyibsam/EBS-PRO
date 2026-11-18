@@ -1,5 +1,5 @@
 begin;
-select plan(10);
+select plan(11);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -61,6 +61,13 @@ select ok(
    where n.nspname='public' and p.proname in ('platform_admin_list_staff','platform_admin_upsert_staff_by_email','platform_admin_list_staff_audit'))
   and not has_function_privilege('anon','public.platform_admin_list_staff()','EXECUTE'),
   'staff management API remains server-authorized'
+);
+
+select ok(
+  (select position('pg_advisory_xact_lock' in p.prosrc)>0
+   from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+   where n.nspname='public' and p.proname='platform_admin_upsert_staff_by_email'),
+  'concurrent staff changes are serialized around the last Super Admin safeguard'
 );
 
 select * from finish();
