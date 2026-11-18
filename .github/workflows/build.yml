@@ -89,8 +89,8 @@ jobs:
           version: v2.stable
       - name: Verify Supabase CLI version
         run: supabase --version
-      - name: Start disposable local Supabase stack
-        run: supabase start
+      - name: Start disposable local Supabase stack (mail service not needed in CI)
+        run: supabase start --exclude mail
       - name: Replay complete migration history on disposable PostgreSQL
         run: supabase db reset --local
       - name: Verify database security contract
