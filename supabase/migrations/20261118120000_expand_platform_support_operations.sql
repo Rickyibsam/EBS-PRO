@@ -37,7 +37,8 @@ CREATE TABLE IF NOT EXISTS public.platform_support_attachments (
   mime_type text NOT NULL CHECK (mime_type IN ('application/pdf','image/jpeg','image/png','image/webp','text/plain')),
   file_size bigint NOT NULL CHECK (file_size BETWEEN 1 AND 10485760),
   uploaded_by uuid NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
-  created_at timestamptz NOT NULL DEFAULT now()
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (storage_path LIKE ticket_id::text || '/' || uploaded_by::text || '/%')
 );
 
 CREATE INDEX IF NOT EXISTS platform_support_attachments_ticket_idx
@@ -112,6 +113,26 @@ CREATE POLICY platform_support_files_insert
       SELECT 1
       FROM public.platform_support_tickets st
       WHERE st.id = ((storage.foldername(name))[1])::uuid
+        AND (
+          (SELECT private.is_platform_staff_internal(ARRAY['super_admin','support_admin']::text[]))
+          OR (SELECT private.is_tenant_member_internal(st.tenant_id))
+        )
+    )
+  );
+
+DROP POLICY IF EXISTS platform_support_files_delete_orphan ON storage.objects;
+CREATE POLICY platform_support_files_delete_orphan
+  ON storage.objects FOR DELETE TO authenticated
+  USING (
+    bucket_id = 'platform-support-attachments'
+    AND (storage.foldername(name))[2] = (SELECT auth.uid())::text
+    AND NOT EXISTS (
+      SELECT 1 FROM public.platform_support_attachments a
+      WHERE a.storage_path = storage.objects.name
+    )
+    AND EXISTS (
+      SELECT 1 FROM public.platform_support_tickets st
+      WHERE st.id::text = (storage.foldername(name))[1]
         AND (
           (SELECT private.is_platform_staff_internal(ARRAY['super_admin','support_admin']::text[]))
           OR (SELECT private.is_tenant_member_internal(st.tenant_id))
