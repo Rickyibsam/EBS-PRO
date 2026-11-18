@@ -1,6 +1,15 @@
 -- Restore the van delivery reservation table to the checked-in migration history.
 -- This table already exists in production but was missing from clean database replay.
 
+-- Ensure the composite tenant keys required by reservation foreign keys exist
+-- in a clean migration replay as well as on the hosted schema.
+create unique index if not exists tenant_fk_uq_41e5772da4560071d172
+  on public.deliveries(tenant_id, id);
+create unique index if not exists tenant_fk_uq_b78bca17f77dda47bf07
+  on public.delivery_lines(tenant_id, id);
+create unique index if not exists tenant_fk_uq_b51c904c7f7a587fa42b
+  on public.products(tenant_id, id);
+
 create table if not exists public.van_delivery_reservations (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.organizations(id) on delete cascade,
