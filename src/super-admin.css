@@ -132,3 +132,13 @@
 .platform-file-picker{display:grid;gap:5px;font-size:9px;color:#607d93}
 .platform-file-picker input{font-size:10px;max-width:100%}
 .platform-reply>small{font-size:9px;color:#7f96a8}
+
+.platform-staff-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(180px,.5fr) auto;gap:10px;align-items:end;margin:14px 0;padding:14px;border:1px solid #e5edf4;border-radius:9px;background:#f8fbfd}
+.platform-staff-form label{display:grid;gap:6px;font-size:10px;font-weight:800;color:#5d7890}
+.platform-staff-form input,.platform-staff-form select{width:100%;min-width:0;border:1px solid #dce7f0;border-radius:7px;background:#fff;padding:10px;color:#315675;font:inherit;font-size:11px}
+.platform-staff-form button,.platform-staff-actions button{border:1px solid #dce7f0;border-radius:7px;background:#174e70;color:#fff;padding:10px 12px;font-size:9px;font-weight:800}
+.platform-staff-form button:disabled,.platform-staff-actions button:disabled{opacity:.5;cursor:not-allowed}
+.platform-staff-hint{font-size:10px;color:#8198aa;line-height:1.6}
+.platform-staff-actions{display:flex;flex-wrap:wrap;gap:5px}
+.platform-staff-actions button{background:#fff;color:#45647d;padding:7px 8px}
+@media(max-width:760px){.platform-staff-form{grid-template-columns:1fr}.platform-staff-form button{justify-self:start}}
