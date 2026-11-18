@@ -1,5 +1,5 @@
 begin;
-select plan(19);
+select plan(21);
 
 select ok(
   (select c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -100,6 +100,19 @@ select ok(
   and not has_table_privilege('authenticated','public.platform_support_attachments','UPDATE')
   and not has_table_privilege('authenticated','public.platform_support_attachments','DELETE'),
   'support attachment metadata is append-only for authenticated users'
+);
+
+select ok(
+  exists(select 1 from pg_constraint c
+         where c.conrelid='public.platform_support_attachments'::regclass
+           and c.contype='c'
+           and pg_get_constraintdef(c.oid) like '%storage_path%uploaded_by%'),
+  'support attachment paths are bound to their uploader and ticket'
+);
+select ok(
+  exists(select 1 from pg_policies where schemaname='storage' and tablename='objects'
+         and policyname='platform_support_files_delete_orphan'),
+  'users may clean up only their own unregistered support uploads'
 );
 
 select * from finish();
