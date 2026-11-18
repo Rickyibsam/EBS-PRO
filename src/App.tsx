@@ -79,6 +79,7 @@ export default function App() {
   const [tenantChoices,setTenantChoices] = useState<Array<Organization & {role:string}>>([]);
   const [currentRole,setCurrentRole] = useState("viewer");
   const [platformRole,setPlatformRole] = useState<string|null>(null);
+  const [platformRoleChecked,setPlatformRoleChecked] = useState(false);
   const [modulePermissions,setModulePermissions] = useState<Record<string,boolean>>({});
   const [moduleActionPermissions,setModuleActionPermissions] = useState<Record<string,ModuleActionPermission>>({});
   const [mode,setMode] = useState<"login"|"signup">("login");
@@ -121,12 +122,14 @@ export default function App() {
   // Platform authorization comes from a server-checked RPC, never from tenant roles.
   useEffect(() => {
     let live = true;
-    if (!db || !session) { setPlatformRole(null); return; }
+    if (!db || !session) { setPlatformRole(null); setPlatformRoleChecked(true); return; }
+    setPlatformRoleChecked(false);
     db.rpc("platform_admin_me").then(({ data, error }) => {
       if (!live) return;
       const row = Array.isArray(data) ? data[0] : data;
       setPlatformRole(error ? null : (row?.role === "super_admin" || row?.role === "support_admin" ? row.role : null));
-    }).catch(() => { if (live) setPlatformRole(null); });
+      setPlatformRoleChecked(true);
+    }).catch(() => { if (live) { setPlatformRole(null); setPlatformRoleChecked(true); } });
     return () => { live = false; };
   }, [session?.user.id]);
 
@@ -204,6 +207,7 @@ export default function App() {
   {notice&&<div className="notice">{notice}</div>}<button disabled={busy}>{busy?"Please wait…":mode==="login"?"Sign in":"Create account"} <span>→</span></button>
   <div className="switch">{mode==="login"?"New to EBS PRO?":"Already registered?"} <a onClick={()=>{setMode(mode==="login"?"signup":"login");setNotice("");}}>{mode==="login"?"Create account":"Sign in"}</a></div></form></section></main>;
 
+  if(!organization && !platformRoleChecked)return <main className="center"><div className="logo">E</div><p>Checking platform access…</p></main>;
   if(!organization && platformRole)return <Suspense fallback={<main className="center">Loading administration…</main>}><SuperAdminPortal embedded /></Suspense>;
   if(!organization)return <main className="center"><form className="setup" onSubmit={addOrganization}><div className="brandline"><div className="logo">E</div><b>EBS <em>PRO</em></b></div><small>COMPANY SETUP</small><h1>Create your business workspace</h1><p>Enter your company name and city. You will be the owner, and the Main Branch will be created automatically.</p><label>Company name<input required minLength={2} value={companyName} onChange={e=>setCompanyName(e.target.value)} placeholder="ABC Distributors"/></label><label>City<input value={city} onChange={e=>setCity(e.target.value)} placeholder="Rawalpindi"/></label>{notice&&<div className="notice">{notice}</div>}<button disabled={busy}>{busy?"Creating…":"Create company"} <span>→</span></button><a className="signout" onClick={()=>void db.auth.signOut()}>Sign out</a></form></main>;
 
