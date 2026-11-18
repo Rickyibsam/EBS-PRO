@@ -86,37 +86,47 @@ export default function SuperAdminPortal({ embedded = false }: { embedded?: bool
         return;
       }
       setAdmin(access as PlatformAdmin);
-      const [
-        { data: companyRows, error: companyError },
-        { data: ticketRows, error: ticketError },
-        { data: notificationRows, error: notificationError },
-        { data: agentRows, error: agentError }
-      ] = await Promise.all([
-        db.rpc("platform_admin_list_companies"),
-        db.from("platform_support_tickets").select("*").order("updated_at", { ascending: false }).limit(250),
-        db.from("platform_support_notifications").select("*").eq("recipient_id", access.user_id).order("created_at", { ascending: false }).limit(50),
-        db.rpc("platform_support_list_agents")
-      ]);
-      if (companyError) throw companyError;
-      if (ticketError) throw ticketError;
-      if (notificationError) throw notificationError;
-      if (agentError) throw agentError;
-      setAgents((agentRows || []) as Agent[]);
-      setCompanies((companyRows || []) as Company[]);
-      setTickets((ticketRows || []) as Ticket[]);
-      setNotifications((notificationRows || []) as Notification[]);
-      if (access.role === "super_admin") {
-        const [{ data: staffRows, error: staffError }, { data: auditRows, error: auditError }] = await Promise.all([
-          db.rpc("platform_admin_list_staff"),
-          db.rpc("platform_admin_list_staff_audit")
+
+      // Authorization is the only prerequisite for opening the workspace.
+      // Load operational data after the shell is visible so a slow audit or
+      // support query cannot leave Super Admin stuck behind a full-screen loader.
+      setLoading(false);
+
+      try {
+        const [
+          { data: companyRows, error: companyError },
+          { data: ticketRows, error: ticketError },
+          { data: notificationRows, error: notificationError },
+          { data: agentRows, error: agentError }
+        ] = await Promise.all([
+          db.rpc("platform_admin_list_companies"),
+          db.from("platform_support_tickets").select("*").order("updated_at", { ascending: false }).limit(250),
+          db.from("platform_support_notifications").select("*").eq("recipient_id", access.user_id).order("created_at", { ascending: false }).limit(50),
+          db.rpc("platform_support_list_agents")
         ]);
-        if (staffError) throw staffError;
-        if (auditError) throw auditError;
-        setStaff((staffRows || []) as Staff[]);
-        setStaffAudit((auditRows || []) as StaffAudit[]);
-      } else {
-        setStaff([]);
-        setStaffAudit([]);
+        if (companyError) throw companyError;
+        if (ticketError) throw ticketError;
+        if (notificationError) throw notificationError;
+        if (agentError) throw agentError;
+        setAgents((agentRows || []) as Agent[]);
+        setCompanies((companyRows || []) as Company[]);
+        setTickets((ticketRows || []) as Ticket[]);
+        setNotifications((notificationRows || []) as Notification[]);
+        if (access.role === "super_admin") {
+          const [{ data: staffRows, error: staffError }, { data: auditRows, error: auditError }] = await Promise.all([
+            db.rpc("platform_admin_list_staff"),
+            db.rpc("platform_admin_list_staff_audit")
+          ]);
+          if (staffError) throw staffError;
+          if (auditError) throw auditError;
+          setStaff((staffRows || []) as Staff[]);
+          setStaffAudit((auditRows || []) as StaffAudit[]);
+        } else {
+          setStaff([]);
+          setStaffAudit([]);
+        }
+      } catch (dataError) {
+        setNotice("Workspace opened, but some platform data could not be loaded: " + errorText(dataError));
       }
     } catch (error) {
       setAdmin(null);
