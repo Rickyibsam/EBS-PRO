@@ -59,7 +59,7 @@ begin
   ) then
     create policy van_delivery_reservations_select
       on public.van_delivery_reservations for select to authenticated
-      using (private.has_tenant_role_internal(
+      using (public.has_tenant_role(
         tenant_id, array['owner','admin','manager','warehouse']::text[]
       ));
   end if;
@@ -71,7 +71,7 @@ begin
   ) then
     create policy van_delivery_reservations_insert
       on public.van_delivery_reservations for insert to authenticated
-      with check (private.has_tenant_role_internal(
+      with check (public.has_tenant_role(
         tenant_id, array['owner','admin','manager','warehouse']::text[]
       ));
   end if;
@@ -83,10 +83,10 @@ begin
   ) then
     create policy van_delivery_reservations_update
       on public.van_delivery_reservations for update to authenticated
-      using (private.has_tenant_role_internal(
+      using (public.has_tenant_role(
         tenant_id, array['owner','admin','manager','warehouse']::text[]
       ))
-      with check (private.has_tenant_role_internal(
+      with check (public.has_tenant_role(
         tenant_id, array['owner','admin','manager','warehouse']::text[]
       ));
   end if;
