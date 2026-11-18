@@ -50,7 +50,7 @@ const navGroups = [
  {name:"2. Sales & Customer Management",icon:"◈",items:["Sales","Customers","Invoices","Sales Returns","Customer Credit Control","Recovery","Price Lists"]},
  {name:"3. Order Booking App",icon:"▣",items:["Booker App","Booker Product Access"]},
  {name:"4. Inventory & Warehouse",icon:"▦",items:["Inventory","Products","Batch & Expiry","Stock Take","Van Stock","Stock Transfers","Branches & Warehouses"]},
- {name:"5. Purchase & Supplier Management",icon:"⇩",items:["Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Vendors","Vendor Feeding"]},
+ {name:"5. Purchase & Vendor Management",icon:"⇩",items:["Purchases","Goods Receiving","Vendor Invoices","Purchase Returns","Vendors","Vendor Feeding"]},
  {name:"6. Accounts & Finance",icon:"◉",items:["Accounts","Bank Reconciliation","Vendor Statement Reconciliation","Cheque Register","Tax Register","Asset & Budget Control"]},
  {name:"7. Distribution & Delivery",icon:"⌖",items:["Delivery Man App","Distribution","Delivery Charges","Routes"]},
  {name:"8. HR & Payroll",icon:"♙",items:["Team & Employees","HR & Attendance","Payroll"]},
