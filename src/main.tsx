@@ -1,7 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import SuperAdminPortal from "./SuperAdminPortal";
 import "./styles.css";
 import "./modern-theme.css";
 import "./executive-dashboard.css";
@@ -13,8 +12,6 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
   });
 }
 
-const isPlatformPortal = window.location.pathname.replace(/\/$/, "") === "/super-admin" || new URLSearchParams(window.location.search).get("portal") === "super-admin";
-
 ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>{isPlatformPortal ? <SuperAdminPortal /> : <App />}</React.StrictMode>
+  <React.StrictMode><App /></React.StrictMode>
 );
