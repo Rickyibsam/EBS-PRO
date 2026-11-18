@@ -34,25 +34,25 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='employee_attendance' AND policyname='employee_attendance_select') THEN
     CREATE POLICY employee_attendance_select ON public.employee_attendance FOR SELECT TO authenticated
     USING (
-      public.has_tenant_role(tenant_id, ARRAY['owner','admin','manager','accounts']::text[])
+      private.has_tenant_role_internal(tenant_id, ARRAY['owner','admin','manager','accounts']::text[])
       OR EXISTS (SELECT 1 FROM public.employees e WHERE e.id=employee_attendance.employee_id AND e.tenant_id=employee_attendance.tenant_id AND e.user_id=(SELECT auth.uid()))
     );
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='employee_attendance' AND policyname='employee_attendance_insert') THEN
     CREATE POLICY employee_attendance_insert ON public.employee_attendance FOR INSERT TO authenticated
     WITH CHECK (
-      public.has_tenant_role(tenant_id, ARRAY['owner','admin','manager']::text[])
+      private.has_tenant_role_internal(tenant_id, ARRAY['owner','admin','manager']::text[])
       OR EXISTS (SELECT 1 FROM public.employees e WHERE e.id=employee_attendance.employee_id AND e.tenant_id=employee_attendance.tenant_id AND e.user_id=(SELECT auth.uid()))
     );
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='employee_attendance' AND policyname='employee_attendance_update') THEN
     CREATE POLICY employee_attendance_update ON public.employee_attendance FOR UPDATE TO authenticated
     USING (
-      public.has_tenant_role(tenant_id, ARRAY['owner','admin','manager']::text[])
+      private.has_tenant_role_internal(tenant_id, ARRAY['owner','admin','manager']::text[])
       OR EXISTS (SELECT 1 FROM public.employees e WHERE e.id=employee_attendance.employee_id AND e.tenant_id=employee_attendance.tenant_id AND e.user_id=(SELECT auth.uid()))
     )
     WITH CHECK (
-      public.has_tenant_role(tenant_id, ARRAY['owner','admin','manager']::text[])
+      private.has_tenant_role_internal(tenant_id, ARRAY['owner','admin','manager']::text[])
       OR EXISTS (SELECT 1 FROM public.employees e WHERE e.id=employee_attendance.employee_id AND e.tenant_id=employee_attendance.tenant_id AND e.user_id=(SELECT auth.uid()))
     );
   END IF;
@@ -109,7 +109,7 @@ DECLARE
   v_id uuid;
 BEGIN
   IF v_user IS NULL THEN RAISE EXCEPTION 'Authentication required.'; END IF;
-  IF NOT public.has_tenant_role(p_tenant_id,ARRAY['owner','admin','manager']::text[])
+  IF NOT private.has_tenant_role_internal(p_tenant_id,ARRAY['owner','admin','manager']::text[])
      AND NOT EXISTS (
        SELECT 1 FROM public.employees e
        WHERE e.id=p_employee_id AND e.tenant_id=p_tenant_id
