@@ -1,4 +1,4 @@
-export type PartyLedgerParty = Record<string, any> & { id: string; party_type: string; opening_balance?: number | string | null };
+export type PartyLedgerParty = Record<string, any>;
 export type PartyLedgerRow = Record<string, any> & {
   party_id: string | null;
   account_code: string;
