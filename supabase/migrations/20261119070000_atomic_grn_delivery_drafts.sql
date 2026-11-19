@@ -38,6 +38,7 @@ declare
   v_line record;
   v_requested integer;
   v_inserted integer:=0;
+  v_reserved numeric:=0;
   v_role_allowed boolean;
   v_is_owner_admin boolean;
   v_has_override boolean;
@@ -123,9 +124,16 @@ begin
     if not found or not v_po.is_active then
       raise exception 'A GRN line does not match an active product on this purchase order';
     end if;
+    select coalesce(sum(grl.accepted_quantity*grl.conversion_to_base),0)
+    into v_reserved
+    from public.goods_receipt_lines grl
+    join public.goods_receipts gr on gr.id=grl.goods_receipt_id and gr.tenant_id=grl.tenant_id
+    where grl.tenant_id=p_tenant_id
+      and grl.purchase_order_line_id=v_line.purchase_order_line_id
+      and gr.status='draft';
     if v_line.accepted_quantity*v_po.conversion_to_base>
-       v_po.quantity*v_po.conversion_to_base-v_po.received_base_quantity+0.000001 then
-      raise exception 'Accepted quantity exceeds the remaining purchase order quantity';
+       v_po.quantity*v_po.conversion_to_base-v_po.received_base_quantity-v_reserved+0.000001 then
+      raise exception 'Accepted quantity exceeds the remaining unreserved purchase order quantity';
     end if;
     if v_line.accepted_quantity>0 and v_po.track_batch
        and nullif(btrim(v_line.batch_number),'') is null then
