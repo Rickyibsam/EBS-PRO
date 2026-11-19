@@ -117,7 +117,7 @@ using (
 );
 
 create or replace function public.get_delivery_staff(p_tenant_id uuid)
-returns table(id uuid,full_name text,employee_code text,branch_id uuid)
+returns table(id uuid,full_name text,employee_code text,job_title text,branch_id uuid)
 language plpgsql
 security definer
 set search_path=pg_catalog,public,private,auth
@@ -131,7 +131,7 @@ begin
     raise exception 'Distribution delivery view permission required' using errcode='42501';
   end if;
   return query
-  select e.id,e.full_name::text,e.employee_code::text,e.branch_id
+  select e.id,e.full_name::text,e.employee_code::text,e.job_title::text,e.branch_id
   from public.employees e
   where e.tenant_id=p_tenant_id and e.employment_status='active'
   order by e.full_name,e.id;
