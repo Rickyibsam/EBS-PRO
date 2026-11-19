@@ -1,4 +1,5 @@
 import {fetchAllRowsResult} from "./lib/fetchAllRows";
+import {sumActivePurchaseReturnQuantities} from "./lib/purchaseReturnQuantities";
 import {FormEvent,useEffect,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 import {useModuleAction} from "./lib/modulePermissionContext";
@@ -14,11 +15,11 @@ export default function PurchaseReturnsModule({db,tenantId,currentRole}:{db:Supa
   setLoading(true);setNotice("");
   const [g,o,p,pr,n,l]=await Promise.all([
    fetchAllRowsResult<any>((from,to)=>db.from("goods_receipts").select("id,grn_number,received_date,purchase_order_id,warehouse_id,status").eq("tenant_id",tenantId).eq("status","posted").order("received_date",{ascending:false}).order("id",{ascending:true}).range(from,to)),
-   db.from("purchase_orders").select("id,po_number,supplier_id").eq("tenant_id",tenantId),
-   db.from("parties").select("id,name,party_code").eq("tenant_id",tenantId).in("party_type",["supplier","both"]).order("name"),
-   db.from("products").select("id,name,sku").eq("tenant_id",tenantId),
+   fetchAllRowsResult<any>((from,to)=>db.from("purchase_orders").select("id,po_number,supplier_id").eq("tenant_id",tenantId).order("id",{ascending:true}).range(from,to)),
+   fetchAllRowsResult<any>((from,to)=>db.from("parties").select("id,name,party_code").eq("tenant_id",tenantId).in("party_type",["supplier","both"]).order("name").order("id",{ascending:true}).range(from,to)),
+   fetchAllRowsResult<any>((from,to)=>db.from("products").select("id,name,sku").eq("tenant_id",tenantId).order("name").order("id",{ascending:true}).range(from,to)),
    fetchAllRowsResult<any>((from,to)=>db.from("purchase_debit_notes").select("id,goods_receipt_id,supplier_id,debit_note_number,note_date,reason,status,subtotal,warehouse_id").eq("tenant_id",tenantId).order("note_date",{ascending:false}).order("id",{ascending:true}).range(from,to)),
-   db.from("purchase_debit_note_lines").select("goods_receipt_line_id,quantity").eq("tenant_id",tenantId)
+   fetchAllRowsResult<any>((from,to)=>db.from("purchase_debit_note_lines").select("goods_receipt_line_id,quantity").eq("tenant_id",tenantId).order("id",{ascending:true}).range(from,to))
   ]);
   const err=g.error||o.error||p.error||pr.error||n.error||l.error;if(err)setNotice(err.message);else{setGrns(g.data??[]);setOrders(o.data??[]);setParties(p.data??[]);setProducts(pr.data??[]);setNotes(n.data??[]);setLines(l.data??[]);}
   setLoading(false);
@@ -26,12 +27,15 @@ export default function PurchaseReturnsModule({db,tenantId,currentRole}:{db:Supa
  useEffect(()=>{void load();},[tenantId]);
  async function chooseGrn(id:string){
   setSelectedGrn(id);setNotice("");if(!id){setLines([]);return;}
-  const {data,error}=await db.from("goods_receipt_lines").select("id,product_id,unit_id,quantity,conversion_to_base,accepted_quantity,unit_cost,batch_number,expiry_date").eq("tenant_id",tenantId).eq("goods_receipt_id",id).gt("accepted_quantity",0);
-  if(error){setNotice(error.message);return;}
-  const used=new Map<string,number>();const {data:old,error:oldError}=await db.from("purchase_debit_note_lines").select("goods_receipt_line_id,quantity,purchase_debit_notes!inner(status)").eq("tenant_id",tenantId).in("goods_receipt_line_id",(data??[]).map(x=>x.id));
-  if(oldError){setNotice(oldError.message);return;}
-  for(const x of old??[]){if(["draft","posted"].includes(x.purchase_debit_notes?.[0]?.status))used.set(x.goods_receipt_line_id,(used.get(x.goods_receipt_line_id)||0)+Number(x.quantity));}
-  setLines((data??[]).map(x=>({...x,already_returned:used.get(x.id)||0,return_quantity:"0"})));
+  const grnResult=await fetchAllRowsResult<any>((from,to)=>db.from("goods_receipt_lines").select("id,product_id,unit_id,quantity,conversion_to_base,accepted_quantity,unit_cost,batch_number,expiry_date").eq("tenant_id",tenantId).eq("goods_receipt_id",id).gt("accepted_quantity",0).order("id",{ascending:true}).range(from,to));
+  if(grnResult.error){setNotice(grnResult.error.message);return;}
+  const grnLines=grnResult.data??[];
+  const oldResult=grnLines.length
+   ? await fetchAllRowsResult<any>((from,to)=>db.from("purchase_debit_note_lines").select("goods_receipt_line_id,quantity,purchase_debit_notes!inner(status)").eq("tenant_id",tenantId).in("goods_receipt_line_id",grnLines.map(x=>x.id)).order("id",{ascending:true}).range(from,to))
+   : {data:[],error:null};
+  if(oldResult.error){setNotice(oldResult.error.message);return;}
+  const used=sumActivePurchaseReturnQuantities(oldResult.data??[]);
+  setLines(grnLines.map(x=>({...x,already_returned:used.get(x.id)||0,return_quantity:"0"})));
  }
  async function create(e:FormEvent){
   e.preventDefault();if(!canCreate)return;setSaving(true);setNotice("");
