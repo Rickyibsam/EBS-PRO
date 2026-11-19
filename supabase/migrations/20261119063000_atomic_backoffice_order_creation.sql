@@ -86,15 +86,18 @@ begin
     if p_booker_employee_id is not null and not exists(
       select 1 from public.employees e where e.id=p_booker_employee_id
         and e.tenant_id=p_tenant_id and e.employment_status='active'
-    ) then raise exception 'Selected Booker must be an active employee in this company'; end if;
+        and (e.branch_id is null or e.branch_id=p_branch_id)
+    ) then raise exception 'Selected Booker must be an active employee assigned to this branch'; end if;
     if p_delivery_man_employee_id is not null and not exists(
       select 1 from public.employees e where e.id=p_delivery_man_employee_id
         and e.tenant_id=p_tenant_id and e.employment_status='active'
-    ) then raise exception 'Selected delivery man must be an active employee in this company'; end if;
+        and (e.branch_id is null or e.branch_id=p_branch_id)
+    ) then raise exception 'Selected delivery man must be an active employee assigned to this branch'; end if;
     if p_route_id is not null and not exists(
       select 1 from public.sales_routes r where r.id=p_route_id
         and r.tenant_id=p_tenant_id and r.is_active
-    ) then raise exception 'Selected sales route must be active in this company'; end if;
+        and (r.branch_id is null or r.branch_id=p_branch_id)
+    ) then raise exception 'Selected sales route must be active in this branch'; end if;
   else
     if not exists(select 1 from public.parties p where p.id=p_party_id and p.tenant_id=p_tenant_id
       and p.status='active' and p.party_type in ('supplier','both')) then
