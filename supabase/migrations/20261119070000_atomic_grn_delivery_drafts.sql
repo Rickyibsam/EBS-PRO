@@ -59,17 +59,18 @@ begin
     raise exception 'Goods receipt creation is disabled for this user' using errcode='42501';
   end if;
 
-  select po.id,po.branch_id,po.status into v_po
+  select po.id,coalesce(po.branch_id,po_wh.branch_id) as branch_id,po.status into v_po
   from public.purchase_orders po
+  left join public.warehouses po_wh on po_wh.id=po.warehouse_id and po_wh.tenant_id=po.tenant_id
   where po.id=p_purchase_order_id and po.tenant_id=p_tenant_id
-  for update;
+  for update of po;
   if not found or v_po.status not in ('approved','part_received') then
     raise exception 'Select an approved or partially received purchase order';
   end if;
   if p_warehouse_id is null or not exists(
     select 1 from public.warehouses w
     where w.id=p_warehouse_id and w.tenant_id=p_tenant_id and w.is_active
-      and w.branch_id=v_po.branch_id
+      and (v_po.branch_id is null or w.branch_id=v_po.branch_id)
   ) then
     raise exception 'GRN warehouse must be active and belong to the purchase order branch';
   end if;
@@ -221,16 +222,18 @@ begin
     raise exception 'Delivery creation is disabled for this user' using errcode='42501';
   end if;
 
-  select so.id,so.branch_id,so.status into v_order
+  select so.id,coalesce(so.branch_id,so_wh.branch_id) as branch_id,so.status into v_order
   from public.sales_orders so
+  left join public.warehouses so_wh on so_wh.id=so.warehouse_id and so_wh.tenant_id=so.tenant_id
   where so.id=p_sales_order_id and so.tenant_id=p_tenant_id
-  for update;
+  for update of so;
   if not found or v_order.status not in ('approved','allocated') then
     raise exception 'Select an approved or allocated sales order';
   end if;
   if p_warehouse_id is null or not exists(
     select 1 from public.warehouses w where w.id=p_warehouse_id
-      and w.tenant_id=p_tenant_id and w.is_active and w.branch_id=v_order.branch_id
+      and w.tenant_id=p_tenant_id and w.is_active
+      and (v_order.branch_id is null or w.branch_id=v_order.branch_id)
   ) then
     raise exception 'Delivery warehouse must be active and belong to the sales order branch';
   end if;
