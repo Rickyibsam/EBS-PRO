@@ -321,6 +321,13 @@ begin
     v_inserted:=v_inserted+1;
   end loop;
 
+  update public.sales_orders
+  set status='allocated',
+      route_id=coalesce(v_route_id,route_id),
+      delivery_man_employee_id=coalesce(v_delivery_man_id,delivery_man_employee_id),
+      updated_at=now()
+  where id=p_sales_order_id and tenant_id=p_tenant_id and status in ('approved','allocated');
+
   return jsonb_build_object('success',true,'delivery_id',v_delivery_id,
     'delivery_number',v_number,'line_count',v_inserted,'status','pending');
 end
