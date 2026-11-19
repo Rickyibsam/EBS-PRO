@@ -229,3 +229,79 @@ revoke all on function public.post_goods_receipt(uuid) from public,anon;
 grant execute on function public.post_goods_receipt(uuid) to authenticated;
 
 
+
+
+CREATE OR REPLACE FUNCTION public.post_stock_transfer(p_transfer_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog', 'public', 'private', 'auth'
+AS $function$
+declare
+ v_transfer public.stock_transfers%rowtype;
+ v_line record;
+ v_user uuid:=auth.uid();
+ v_balance numeric;
+ v_value numeric;
+ v_cost numeric;
+ v_count integer:=0;
+ v_role_allowed boolean;
+ v_is_owner_admin boolean;
+ v_has_override boolean;
+begin
+ if v_user is null then raise exception 'Authentication required'; end if;
+ select * into v_transfer from public.stock_transfers where id=p_transfer_id for update;
+ if not found then raise exception 'Stock transfer not found'; end if;
+ v_role_allowed:=public.has_tenant_role(v_transfer.tenant_id,array['owner','admin','manager','warehouse']);
+ v_is_owner_admin:=public.has_tenant_role(v_transfer.tenant_id,array['owner','admin']);
+ select exists(select 1 from public.tenant_user_module_permissions p
+   where p.tenant_id=v_transfer.tenant_id and p.user_id=v_user and p.module_key='inventory')
+ into v_has_override;
+ if not v_role_allowed then
+   if not private.module_permission_grant_internal(v_transfer.tenant_id,'inventory','update') then
+     raise exception 'Stock transfer posting permission required' using errcode='42501';
+   end if;
+ elsif not v_is_owner_admin and v_has_override
+       and not private.module_permission_grant_internal(v_transfer.tenant_id,'inventory','update') then
+   raise exception 'Stock transfer posting is disabled for this user' using errcode='42501';
+ end if;
+ if v_transfer.status<>'draft' then raise exception 'Only draft stock transfers can be posted'; end if;
+ if v_transfer.from_warehouse_id=v_transfer.to_warehouse_id then raise exception 'Source and destination warehouses must be different'; end if;
+ if not exists(select 1 from public.warehouses w where w.id=v_transfer.from_warehouse_id and w.tenant_id=v_transfer.tenant_id and w.is_active)
+    or not exists(select 1 from public.warehouses w where w.id=v_transfer.to_warehouse_id and w.tenant_id=v_transfer.tenant_id and w.is_active) then
+  raise exception 'Both stock transfer warehouses must be active in this company';
+ end if;
+ if not exists(select 1 from public.stock_transfer_lines where tenant_id=v_transfer.tenant_id and stock_transfer_id=v_transfer.id) then raise exception 'Add at least one transfer line'; end if;
+ for v_line in select * from public.stock_transfer_lines where tenant_id=v_transfer.tenant_id and stock_transfer_id=v_transfer.id for update loop
+  if v_line.quantity_base is null or v_line.quantity_base<=0 then raise exception 'Transfer quantity must be greater than zero'; end if;
+  if not exists(select 1 from public.products p where p.id=v_line.product_id and p.tenant_id=v_transfer.tenant_id and p.is_active) then
+   raise exception 'Stock transfer product is not active in this company';
+  end if;
+  if v_transfer.from_warehouse_id::text<v_transfer.to_warehouse_id::text then
+   perform pg_advisory_xact_lock(hashtextextended(v_transfer.tenant_id::text||':'||v_transfer.from_warehouse_id::text||':'||v_line.product_id::text,0));
+   perform pg_advisory_xact_lock(hashtextextended(v_transfer.tenant_id::text||':'||v_transfer.to_warehouse_id::text||':'||v_line.product_id::text,0));
+  else
+   perform pg_advisory_xact_lock(hashtextextended(v_transfer.tenant_id::text||':'||v_transfer.to_warehouse_id::text||':'||v_line.product_id::text,0));
+   perform pg_advisory_xact_lock(hashtextextended(v_transfer.tenant_id::text||':'||v_transfer.from_warehouse_id::text||':'||v_line.product_id::text,0));
+  end if;
+  select coalesce(sum(quantity_in-quantity_out),0),coalesce(sum(quantity_in*unit_cost)-sum(quantity_out*unit_cost),0)
+   into v_balance,v_value from public.stock_movements
+   where tenant_id=v_transfer.tenant_id and warehouse_id=v_transfer.from_warehouse_id and product_id=v_line.product_id;
+  if v_balance<v_line.quantity_base then raise exception 'Insufficient source stock for product %. Available %, requested %',v_line.product_id,v_balance,v_line.quantity_base; end if;
+  v_cost:=case when v_balance>0 then greatest(v_value/v_balance,0) else 0 end;
+  update public.stock_transfer_lines set unit_cost=v_cost where id=v_line.id and tenant_id=v_transfer.tenant_id;
+  insert into public.stock_movements(tenant_id,warehouse_id,product_id,movement_type,reference_type,reference_id,quantity_in,quantity_out,unit_cost,movement_at,created_by,notes)
+  values
+   (v_transfer.tenant_id,v_transfer.from_warehouse_id,v_line.product_id,'transfer_out','stock_transfer',v_transfer.id,0,v_line.quantity_base,v_cost,now(),v_user,'Transfer out '||v_transfer.transfer_number),
+   (v_transfer.tenant_id,v_transfer.to_warehouse_id,v_line.product_id,'transfer_in','stock_transfer',v_transfer.id,v_line.quantity_base,0,v_cost,now(),v_user,'Transfer in '||v_transfer.transfer_number);
+  v_count:=v_count+1;
+ end loop;
+ perform set_config('ebs.stock_transfer_posting',v_transfer.id::text,true);
+ update public.stock_transfers set status='posted',posted_by=v_user,posted_at=now() where id=v_transfer.id and tenant_id=v_transfer.tenant_id;
+ return jsonb_build_object('success',true,'transfer_id',v_transfer.id,'lines_posted',v_count,'status','posted');
+end;
+$function$
+
+
+revoke all on function public.post_stock_transfer(uuid) from public,anon;
+grant execute on function public.post_stock_transfer(uuid) to authenticated;
