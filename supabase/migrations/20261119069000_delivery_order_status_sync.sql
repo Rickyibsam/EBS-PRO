@@ -35,7 +35,8 @@ begin
   select d.id,d.status,d.route_id,d.delivery_man_employee_id
   into v_delivery
   from public.deliveries d
-  where d.id=p_delivery_id and d.tenant_id=p_tenant_id and d.sales_order_id=p_sales_order_id;
+  where d.id=p_delivery_id and d.tenant_id=p_tenant_id and d.sales_order_id=p_sales_order_id
+  for update;
   if not found then raise exception 'Delivery does not belong to the selected sales order'; end if;
 
   select so.status into v_order_status
