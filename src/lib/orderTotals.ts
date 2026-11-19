@@ -12,6 +12,8 @@ export type OrderTotals = {
   grandTotal: number;
 };
 
+const roundMoney=(value:number)=>Math.round((value+Number.EPSILON)*100)/100;
+
 export function calculateOrderTotals(lines: OrderLineAmountInput[]): OrderTotals {
   let subtotal=0;
   let taxTotal=0;
@@ -20,11 +22,14 @@ export function calculateOrderTotals(lines: OrderLineAmountInput[]): OrderTotals
     const quantity=Number(line.quantity)||0;
     const rate=Number(line.rate)||0;
     const taxRate=Number(line.tax_rate)||0;
-    const discount=Number(line.discount)||0;
-    const gross=quantity*rate;
+    const discount=roundMoney(Number(line.discount)||0);
+    const gross=roundMoney(quantity*rate);
     subtotal+=gross;
     discountTotal+=discount;
-    taxTotal+=Math.max(0,gross-discount)*taxRate/100;
+    taxTotal+=roundMoney(Math.max(0,gross-discount)*taxRate/100);
   }
-  return {subtotal,taxTotal,discountTotal,grandTotal:subtotal+taxTotal-discountTotal};
+  subtotal=roundMoney(subtotal);
+  discountTotal=roundMoney(discountTotal);
+  taxTotal=roundMoney(taxTotal);
+  return {subtotal,taxTotal,discountTotal,grandTotal:roundMoney(subtotal+taxTotal-discountTotal)};
 }
