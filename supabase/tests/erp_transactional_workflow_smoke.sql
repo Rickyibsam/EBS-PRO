@@ -292,6 +292,23 @@ begin
      or (select count(*) from public.sales_order_lines where sales_order_id=v_backoffice_sales_order and tenant_id=v_tenant_a)<>1 then
     raise exception 'FAIL: back-office sales order was not saved atomically with correct totals: %',v_backoffice_order_result;
   end if;
+  select count(*) into v_order_count_before from public.sales_orders where tenant_id=v_tenant_a;
+  v_rejected:=false;
+  begin
+    perform public.create_backoffice_order(
+      v_tenant_a,'sales_order',v_branch_a,v_warehouse,v_customer,current_date,
+      'Invalid unit must roll back the whole order',v_employee,null,null,
+      jsonb_build_array(jsonb_build_object(
+        'product_id',v_product,'unit_id',gen_random_uuid(),'quantity',1,
+        'unit_rate',50,'tax_rate',17,'discount_amount',0
+      ))
+    );
+  exception when others then
+    v_rejected:=true;
+  end;
+  if not v_rejected or (select count(*) from public.sales_orders where tenant_id=v_tenant_a)<>v_order_count_before then
+    raise exception 'FAIL: invalid back-office sales order left a partial header';
+  end if;
 
   -- Purchase -> GRN -> stock ledger -> supplier invoice -> GL workflow.
   insert into public.parties(id,tenant_id,party_code,party_type,name)
