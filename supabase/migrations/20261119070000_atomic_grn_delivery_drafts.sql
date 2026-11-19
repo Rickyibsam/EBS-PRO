@@ -28,7 +28,7 @@ create or replace function public.create_goods_receipt_draft(
 )
 returns jsonb
 language plpgsql
-security invoker
+security definer
 set search_path=pg_catalog,public,private,auth
 as $function$
 declare
