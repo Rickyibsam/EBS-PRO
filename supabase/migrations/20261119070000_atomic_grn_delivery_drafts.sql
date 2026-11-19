@@ -255,7 +255,7 @@ begin
     raise exception 'Delivery contains duplicate or invalid sales order line references';
   end if;
 
-  v_number:=public.next_document_number(p_tenant_id,'delivery');
+  v_number:=public.next_document_number_for_branch(p_tenant_id,'delivery',v_order.branch_id);
   insert into public.deliveries(
     tenant_id,sales_order_id,warehouse_id,delivery_number,delivery_date,
     driver_name,vehicle_number,status,notes,route_id,delivery_man_employee_id
