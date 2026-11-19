@@ -41,9 +41,14 @@ begin
     raise exception 'Not authorized to allocate a document number' using errcode='42501';
   end if;
 
-  v_role_allowed:=public.has_tenant_role(
-    p_tenant_id,array['owner','admin','manager','sales','purchase','warehouse','accounts']
-  );
+  v_role_allowed:=case v_module_key
+    when 'sales_customer' then public.has_tenant_role(p_tenant_id,array['owner','admin','manager','sales','cashier'])
+    when 'purchase_supplier' then public.has_tenant_role(p_tenant_id,array['owner','admin','manager','purchase','warehouse'])
+    when 'distribution_delivery' then public.has_tenant_role(p_tenant_id,array['owner','admin','manager','warehouse'])
+    when 'accounts_finance' then public.has_tenant_role(p_tenant_id,array['owner','admin','manager','accounts','cashier'])
+    when 'hr_payroll' then public.has_tenant_role(p_tenant_id,array['owner','admin','manager','accounts'])
+    when 'inventory' then public.has_tenant_role(p_tenant_id,array['owner','admin','manager','warehouse'])
+    else false end;
   v_is_platform_owner:=public.has_tenant_role(p_tenant_id,array['owner','admin']);
   select exists(
     select 1 from public.tenant_user_module_permissions p
