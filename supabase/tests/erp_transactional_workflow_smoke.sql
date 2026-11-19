@@ -372,8 +372,21 @@ begin
      or not exists(select 1 from public.deliveries
        where id=(v_delivery_draft_result->>'delivery_id')::uuid and status='pending'
          and route_id=v_route and delivery_man_employee_id=v_employee
-         and driver_name='Smoke Test Booker') then
+         and driver_name='Smoke Test Booker')
+     or not exists(select 1 from public.sales_orders
+       where id=v_backoffice_sales_order and status='allocated') then
     raise exception 'FAIL: atomic delivery draft creation failed: %',v_delivery_draft_result;
+  end if;
+  v_rejected:=false;
+  begin
+    perform public.sync_sales_order_delivery_status(
+      v_tenant_a,v_backoffice_sales_order,(v_delivery_draft_result->>'delivery_id')::uuid,'delivered'
+    );
+  exception when others then
+    v_rejected:=true;
+  end;
+  if not v_rejected or (select status from public.sales_orders where id=v_backoffice_sales_order)<>'allocated' then
+    raise exception 'FAIL: delivery status helper allowed premature sales order completion';
   end if;
   select count(*) into v_delivery_count_before from public.deliveries where tenant_id=v_tenant_a;
   v_rejected:=false;
