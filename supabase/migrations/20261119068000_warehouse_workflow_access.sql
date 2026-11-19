@@ -135,13 +135,25 @@ language plpgsql
 security definer
 set search_path=pg_catalog,public,private,auth
 as $function$
+declare
+  v_user uuid:=auth.uid();
+  v_role_allowed boolean;
+  v_is_owner_admin boolean;
+  v_has_override boolean;
 begin
-  if auth.uid() is null then raise exception 'Authentication required' using errcode='42501'; end if;
-  if not (
-    public.has_tenant_role(p_tenant_id,array['owner','admin','manager','warehouse'])
-    or private.module_permission_grant_internal(p_tenant_id,'distribution_delivery','view')
-  ) then
-    raise exception 'Distribution delivery view permission required' using errcode='42501';
+  if v_user is null then raise exception 'Authentication required' using errcode='42501'; end if;
+  v_role_allowed:=public.has_tenant_role(p_tenant_id,array['owner','admin','manager','warehouse']);
+  v_is_owner_admin:=public.has_tenant_role(p_tenant_id,array['owner','admin']);
+  select exists(select 1 from public.tenant_user_module_permissions p
+    where p.tenant_id=p_tenant_id and p.user_id=v_user and p.module_key='distribution_delivery')
+  into v_has_override;
+  if not v_role_allowed then
+    if not private.module_permission_grant_internal(p_tenant_id,'distribution_delivery','view') then
+      raise exception 'Distribution delivery view permission required' using errcode='42501';
+    end if;
+  elsif not v_is_owner_admin and v_has_override
+        and not private.module_permission_grant_internal(p_tenant_id,'distribution_delivery','view') then
+    raise exception 'Distribution delivery view is disabled for this user' using errcode='42501';
   end if;
   return query
   select e.id,e.full_name::text,e.employee_code::text,e.job_title::text,e.branch_id
