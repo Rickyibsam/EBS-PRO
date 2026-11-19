@@ -1,6 +1,7 @@
 import {findProductByBarcodeOrSku} from "./lib/erpAccess";
 import {isTransientNetworkError} from "./lib/network";
 import {fetchAllRowsResult} from "./lib/fetchAllRows";
+import {toLocalDateInput} from "./lib/localDate";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {enqueueBookerOrder,getPendingBookerOrders,removePendingBookerOrder,cacheBookerSnapshot,getBookerSnapshot,enqueueBookerVisit,getPendingBookerVisits,removePendingBookerVisit,saveBookerDraft,getBookerDraft,clearBookerOfflineUserData} from "./bookerOfflineQueue";
@@ -130,7 +131,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       setPrices(defaultPrices); setListId(defaultPriceListId);
       const { data: routeAssign, error: assignmentError } = await fetchAllRowsResult<Row>((from,to)=>db.from("route_assignments").select("id,route_id,assigned_from,assigned_to").eq("tenant_id",tenantId).eq("employee_id",emp.data.id).order("assigned_from",{ascending:false}).order("id",{ascending:true}).range(from,to));
       if (assignmentError) throw assignmentError;
-      const assignments = (routeAssign || []).filter(x => x.assigned_from <= new Date().toISOString().slice(0,10) && (!x.assigned_to || x.assigned_to >= new Date().toISOString().slice(0,10)));
+      const assignments = (routeAssign || []).filter(x => x.assigned_from <= toLocalDateInput() && (!x.assigned_to || x.assigned_to >= toLocalDateInput()));
       if (!assignments.length) { setRoutes([]); throw new Error("No active sales route is assigned to your employee account."); }
       const routeResult = await fetchAllRowsResult<Row>((from,to)=>db.from("sales_routes").select("id,route_code,name,area_description").eq("tenant_id",tenantId).in("id",assignments.map(x=>x.route_id)).eq("is_active",true).order("name").order("id",{ascending:true}).range(from,to));
       if (routeResult.error) throw routeResult.error;
@@ -352,7 +353,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       <div className="form-grid">
         <label>Assigned route<select required disabled={!navigator.onLine} value={routeId} onChange={e => setRouteId(e.target.value)}><option value="">Select route</option>{routes.map(r => <option key={r.id} value={r.id}>{r.route_code} · {r.name}</option>)}</select></label>
         <label>Route customer<select required disabled={!navigator.onLine} value={customerId} onChange={e => setCustomerId(e.target.value)}><option value="">Select assigned customer</option>{customers.map(c => <option key={c.id} value={c.id}>{c.party_code} · {c.name}</option>)}</select></label><button type="button" disabled={!navigator.onLine||!routeId||saving} onClick={()=>setShowNewCustomer(x=>!x)}>＋ New customer</button><label>Field visit<button type="button" disabled={saving||!customerId} onClick={()=>void recordVisit()}>GPS check-in</button></label>
-        <label>Required delivery date<input type="date" min={new Date().toISOString().slice(0,10)} value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)}/></label>
+        <label>Required delivery date<input type="date" min={toLocalDateInput()} value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)}/></label>
       </div>
       {showNewCustomer&&<div className="transaction-form"><h3>Register route customer</h3><form className="form-grid" onSubmit={createRouteCustomer}><label>Customer name<input required value={newCustomer.name} onChange={e=>setNewCustomer({...newCustomer,name:e.target.value})}/></label><label>Phone<input value={newCustomer.phone} onChange={e=>setNewCustomer({...newCustomer,phone:e.target.value})}/></label><label>Address<input value={newCustomer.address} onChange={e=>setNewCustomer({...newCustomer,address:e.target.value})}/></label><label>City / Area<input value={newCustomer.city} onChange={e=>setNewCustomer({...newCustomer,city:e.target.value})}/></label><button disabled={saving}>Save customer to route</button></form></div>}
       <h3>Order items</h3>
