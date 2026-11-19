@@ -34,6 +34,9 @@ declare
   v_grn_line uuid := gen_random_uuid();
   v_purchase_invoice uuid;
   v_debit_note uuid;
+  v_backoffice_order_result jsonb;
+  v_backoffice_sales_order uuid;
+  v_order_count_before integer;
   v_invoice_result jsonb;
   v_debit_result jsonb;
   v_inventory_account uuid := gen_random_uuid();
@@ -176,8 +179,8 @@ begin
   values(v_unit,v_tenant_a,'Smoke Test Unit','EA','quantity',0);
   insert into public.products(tenant_id,sku,name,base_unit_id,sales_tax_rate,sale_price)
   values(v_tenant_a,'TX-SKU','Smoke Test Product',v_unit,17,50) returning id into v_product;
-  insert into public.product_units(tenant_id,product_id,unit_id,conversion_to_base,is_sales_unit)
-  values(v_tenant_a,v_product,v_unit,1,true);
+  insert into public.product_units(tenant_id,product_id,unit_id,conversion_to_base,is_purchase_unit,is_sales_unit)
+  values(v_tenant_a,v_product,v_unit,1,true,true);
   insert into public.price_lists(tenant_id,name,price_type,is_default)
   values(v_tenant_a,'Smoke Test Price List','retail',true) returning id into v_price_list;
   insert into public.product_prices(tenant_id,price_list_id,product_id,unit_id,price,min_quantity)
@@ -273,15 +276,43 @@ begin
     (v_disposal_gain_account,v_tenant_a,'4900','Gain on Asset Disposal','income'),
     (v_disposal_loss_account,v_tenant_a,'5900','Loss on Asset Disposal','expense');
 
+  -- Back-office sales order header and lines must save atomically with matching tax totals.
+  v_backoffice_order_result:=public.create_backoffice_order(
+    v_tenant_a,'sales_order',v_branch_a,v_warehouse,v_customer,current_date,
+    'Smoke test back-office sales order',v_employee,null,null,
+    jsonb_build_array(jsonb_build_object(
+      'product_id',v_product,'unit_id',v_unit,'quantity',1,
+      'unit_rate',50,'tax_rate',17,'discount_amount',5
+    ))
+  );
+  v_backoffice_sales_order:=(v_backoffice_order_result->>'order_id')::uuid;
+  if coalesce((v_backoffice_order_result->>'success')::boolean,false) is not true
+     or not exists(select 1 from public.sales_orders where id=v_backoffice_sales_order
+       and status='draft' and subtotal=50 and discount_total=5 and tax_total=7.65 and grand_total=52.65)
+     or (select count(*) from public.sales_order_lines where sales_order_id=v_backoffice_sales_order and tenant_id=v_tenant_a)<>1 then
+    raise exception 'FAIL: back-office sales order was not saved atomically with correct totals: %',v_backoffice_order_result;
+  end if;
+
   -- Purchase -> GRN -> stock ledger -> supplier invoice -> GL workflow.
   insert into public.parties(id,tenant_id,party_code,party_type,name)
   values(v_supplier,v_tenant_a,'TX-SUP','supplier','Smoke Test Supplier');
-  insert into public.purchase_orders(id,tenant_id,branch_id,warehouse_id,supplier_id,po_number,status,created_by)
-  values(v_purchase_order,v_tenant_a,v_branch_a,
-    v_warehouse,
-    v_supplier,'TX-PO-001','draft',v_user);
-  insert into public.purchase_order_lines(id,tenant_id,purchase_order_id,product_id,unit_id,quantity,conversion_to_base,unit_cost,tax_rate,line_total)
-  values(v_purchase_order_line,v_tenant_a,v_purchase_order,v_product,v_unit,10,1,20,10,200);
+  v_backoffice_order_result:=public.create_backoffice_order(
+    v_tenant_a,'purchase_order',v_branch_a,v_warehouse,v_supplier,current_date,
+    'Smoke test back-office purchase order',null,null,null,
+    jsonb_build_array(jsonb_build_object(
+      'product_id',v_product,'unit_id',v_unit,'quantity',10,
+      'unit_rate',20,'tax_rate',10,'discount_amount',0
+    ))
+  );
+  v_purchase_order:=(v_backoffice_order_result->>'order_id')::uuid;
+  select id into v_purchase_order_line from public.purchase_order_lines
+  where tenant_id=v_tenant_a and purchase_order_id=v_purchase_order limit 1;
+  if coalesce((v_backoffice_order_result->>'success')::boolean,false) is not true
+     or not exists(select 1 from public.purchase_orders where id=v_purchase_order
+       and status='draft' and subtotal=200 and tax_total=20 and grand_total=220)
+     or v_purchase_order_line is null then
+    raise exception 'FAIL: back-office purchase order was not saved atomically: %',v_backoffice_order_result;
+  end if;
   update public.purchase_orders set status='approved',approved_by=v_user
   where id=v_purchase_order and tenant_id=v_tenant_a;
   insert into public.goods_receipts(id,tenant_id,purchase_order_id,warehouse_id,grn_number,received_date,status,received_by)
