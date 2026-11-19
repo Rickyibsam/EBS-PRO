@@ -17,15 +17,11 @@ export function calculateOrderTotals(lines: OrderLineAmountInput[]): OrderTotals
   let taxTotal=0;
   let discountTotal=0;
   for(const line of lines){
-    const quantity=Number(line.quantity);
-    const rate=Number(line.rate);
-    const taxRate=Number(line.tax_rate);
-    const discount=Number(line.discount);
-    if(![quantity,rate,taxRate,discount].every(Number.isFinite)||quantity<0||rate<0||taxRate<0||discount<0){
-      throw new Error("Order quantity, rate, tax and discount must be valid non-negative values.");
-    }
+    const quantity=Number(line.quantity)||0;
+    const rate=Number(line.rate)||0;
+    const taxRate=Number(line.tax_rate)||0;
+    const discount=Number(line.discount)||0;
     const gross=quantity*rate;
-    if(discount>gross+0.000001)throw new Error("A line discount cannot exceed the pre-tax gross amount.");
     subtotal+=gross;
     discountTotal+=discount;
     taxTotal+=Math.max(0,gross-discount)*taxRate/100;
