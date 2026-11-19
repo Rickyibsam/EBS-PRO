@@ -97,7 +97,8 @@ grant execute on function public.sync_sales_order_delivery_status(uuid,uuid,uuid
 CREATE OR REPLACE FUNCTION public.dispatch_delivery(p_delivery_id uuid, p_lines jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
- SET search_path TO 'pg_catalog', 'public', 'auth'
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog', 'public', 'private', 'auth'
 AS $function$
 declare
  v_delivery public.deliveries%rowtype;
@@ -204,7 +205,8 @@ end $function$
 CREATE OR REPLACE FUNCTION public.complete_delivery(p_delivery_id uuid, p_lines jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
- SET search_path TO 'pg_catalog', 'public', 'auth'
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog', 'public', 'private', 'auth'
 AS $function$
 declare
  v_delivery public.deliveries%rowtype;
@@ -317,7 +319,8 @@ end;$function$
 CREATE OR REPLACE FUNCTION public.dispatch_van_delivery(p_delivery_id uuid, p_vehicle_number text, p_lines jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
- SET search_path TO 'pg_catalog', 'public', 'auth'
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog', 'public', 'private', 'auth'
 AS $function$
 declare v_delivery public.deliveries%rowtype;v_line public.delivery_lines%rowtype;x record;v_available numeric;v_count integer;v_product public.products%rowtype;
 begin
