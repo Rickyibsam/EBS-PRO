@@ -17,10 +17,10 @@ begin
  if not found then raise exception 'Asset not found.'; end if;
  v_role_allowed:=public.has_tenant_role(v_asset.tenant_id,array['owner','admin','manager','accounts']);
  v_is_owner_admin:=public.has_tenant_role(v_asset.tenant_id,array['owner','admin']);
- select exists(select 1 from public.tenant_user_module_permissions p where p.tenant_id=v_asset.tenant_id and p.user_id=v_user and p.module_key='fixed_assets') into v_has_override;
+ select exists(select 1 from public.tenant_user_module_permissions p where p.tenant_id=v_asset.tenant_id and p.user_id=v_user and p.module_key='accounts_finance') into v_has_override;
  if not v_role_allowed then
-  if not private.module_permission_grant_internal(v_asset.tenant_id,'fixed_assets','update') then raise exception 'You cannot dispose this asset.' using errcode='42501'; end if;
- elsif not v_is_owner_admin and v_has_override and not private.module_permission_grant_internal(v_asset.tenant_id,'fixed_assets','update') then
+  if not private.module_permission_grant_internal(v_asset.tenant_id,'accounts_finance','update') then raise exception 'You cannot dispose this asset.' using errcode='42501'; end if;
+ elsif not v_is_owner_admin and v_has_override and not private.module_permission_grant_internal(v_asset.tenant_id,'accounts_finance','update') then
   raise exception 'Asset disposal is disabled for this user' using errcode='42501';
  end if;
  if v_asset.status not in ('active','fully_depreciated') then raise exception 'Asset is already disposed or inactive.'; end if;
@@ -278,10 +278,10 @@ begin
  if not found then raise exception 'Asset not found.';end if;
  v_role_allowed:=public.has_tenant_role(v_asset.tenant_id,array['owner','admin','manager','accounts']);
  v_is_owner_admin:=public.has_tenant_role(v_asset.tenant_id,array['owner','admin']);
- select exists(select 1 from public.tenant_user_module_permissions p where p.tenant_id=v_asset.tenant_id and p.user_id=v_user and p.module_key='fixed_assets') into v_has_override;
+ select exists(select 1 from public.tenant_user_module_permissions p where p.tenant_id=v_asset.tenant_id and p.user_id=v_user and p.module_key='accounts_finance') into v_has_override;
  if not v_role_allowed then
-  if not private.module_permission_grant_internal(v_asset.tenant_id,'fixed_assets','update') then raise exception 'You cannot post asset depreciation.' using errcode='42501';end if;
- elsif not v_is_owner_admin and v_has_override and not private.module_permission_grant_internal(v_asset.tenant_id,'fixed_assets','update') then
+  if not private.module_permission_grant_internal(v_asset.tenant_id,'accounts_finance','update') then raise exception 'You cannot post asset depreciation.' using errcode='42501';end if;
+ elsif not v_is_owner_admin and v_has_override and not private.module_permission_grant_internal(v_asset.tenant_id,'accounts_finance','update') then
   raise exception 'Asset depreciation posting is disabled for this user' using errcode='42501';
  end if;
  if p_period_start is null or p_period_end is null or p_period_start>p_period_end or date_trunc('month',p_period_start)::date<>date_trunc('month',p_period_end)::date then raise exception 'Select one valid calendar month.';end if;
