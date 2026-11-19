@@ -401,6 +401,8 @@ begin
 end
 $function$;
 
+revoke all on function private.guard_delivery_line_order_quantity() from public,anon,authenticated;
+
 drop trigger if exists guard_delivery_line_order_quantity on public.delivery_lines;
 create trigger guard_delivery_line_order_quantity
 before insert or update of tenant_id,delivery_id,quantity_base,picked_quantity_base,delivered_quantity_base,
