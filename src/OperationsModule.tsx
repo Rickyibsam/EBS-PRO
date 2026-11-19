@@ -129,7 +129,7 @@ export default function OperationsModule({db,tenantId,module,currentRole}:{db:Su
      const {error}=await db.rpc("record_expense",{p_tenant_id:tenantId,p_description:form.description.trim(),p_amount:amount,p_payment_method:form.payment_method||"cash",p_expense_date:form.expense_date||toLocalDateInput(),p_branch_id:form.branch_id||null,p_expense_account_id:form.expense_account_id||null});
      if(error)throw error;
    }
-   setForm({});setShowForm(false);setNotice(savedMessage||(inventory?"Stock adjustment recorded.":receiving?"Goods receipt draft saved. Review and post it only after physical stock verification.":distribution?"Delivery draft created. Order remains approved until physical dispatch is confirmed.":recovery?"Payment/receipt recorded.":"Expense voucher recorded."));await load();
+   setForm({});setShowForm(false);setNotice(savedMessage||(inventory?"Stock adjustment recorded.":receiving?"Goods receipt draft saved. Review and post it only after physical stock verification.":distribution?"Delivery draft created. Sales order is allocated; stock moves only after dispatch is confirmed.":recovery?"Payment/receipt recorded.":"Expense voucher recorded."));await load();
   }catch(err){setNotice(err instanceof Error?err.message:"The record could not be saved.");}
   setSaving(false);
  }
