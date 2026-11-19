@@ -1,9 +1,10 @@
+import {toLocalDateInput} from "./lib/localDate";
 import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import {useEffect,useMemo,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 type TaxRow={id:string;number:string;date:string;party:string;tax:number;gross:number;kind:"Output"|"Input"|"Credit note"};
 const money=(v:number)=>"PKR "+Number(v||0).toLocaleString("en-PK",{minimumFractionDigits:2,maximumFractionDigits:2});
-const today=new Date().toISOString().slice(0,10),monthStart=today.slice(0,8)+"01";
+const today=toLocalDateInput(),monthStart=today.slice(0,8)+"01";
 export default function TaxRegisterModule({db,tenantId}:{db:SupabaseClient;tenantId:string}){
  const [rows,setRows]=useState<TaxRow[]>([]),[loading,setLoading]=useState(true),[notice,setNotice]=useState(""),[from,setFrom]=useState(monthStart),[to,setTo]=useState(today),[kind,setKind]=useState("all");
  async function load(){setLoading(true);setNotice("");const [s,p,c,party]=await Promise.all([
