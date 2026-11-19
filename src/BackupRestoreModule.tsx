@@ -1,3 +1,4 @@
+import {toLocalDateInput} from "./lib/localDate";
 import {useEffect,useState,type ChangeEvent} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 import {fetchAllRowsResult} from "./lib/fetchAllRows";
@@ -16,7 +17,7 @@ export default function BackupRestoreModule({db,tenantId,currentRole}:{db:Supaba
    const selected=customers.find(x=>x.id===customerId);
    const safeName=(selected?.party_code||selected?.name||"customer").replace(/[^a-z0-9_-]+/gi,"-").replace(/^-|-$/g,"").slice(0,70);
    const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");
-   a.href=url;a.download="EBS-PRO-customer-"+safeName+"-"+new Date().toISOString().slice(0,10)+".json";a.click();URL.revokeObjectURL(url);
+   a.href=url;a.download="EBS-PRO-customer-"+safeName+"-"+toLocalDateInput()+".json";a.click();URL.revokeObjectURL(url);
    setNotice("Customer data export downloaded. This is a read-only export and does not include passwords or unrelated customer records.");
   }catch(e){setNotice(e instanceof Error?e.message:"Customer backup export failed.");}
   finally{setBusy(false);}
@@ -28,7 +29,7 @@ export default function BackupRestoreModule({db,tenantId,currentRole}:{db:Supaba
    if(data?.format!=="EBS-PRO-TENANT-BACKUP-V1"||data?.tenant_id!==tenantId||!data?.tables||typeof data.tables!=="object"||Array.isArray(data.tables))throw new Error("Company backup response format or company ownership was invalid.");
    if(Object.values(data.tables).some(rows=>!Array.isArray(rows)))throw new Error("Company backup contains malformed table data.");
    const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");
-   a.href=url;a.download="EBS-PRO-backup-"+new Date().toISOString().slice(0,10)+".json";a.click();URL.revokeObjectURL(url);
+   a.href=url;a.download="EBS-PRO-backup-"+toLocalDateInput()+".json";a.click();URL.revokeObjectURL(url);
    setNotice("Company backup downloaded. Keep this file in a secure location outside the ERP.");
   }catch(e){setNotice(e instanceof Error?e.message:"Backup export failed.");}
   finally{setBusy(false);}
