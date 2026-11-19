@@ -1,5 +1,6 @@
 import {findProductByBarcodeOrSku} from "./lib/erpAccess";
 import {isTransientNetworkError} from "./lib/network";
+import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {enqueueBookerOrder,getPendingBookerOrders,removePendingBookerOrder,cacheBookerSnapshot,getBookerSnapshot,enqueueBookerVisit,getPendingBookerVisits,removePendingBookerVisit,saveBookerDraft,getBookerDraft,clearBookerOfflineUserData} from "./bookerOfflineQueue";
@@ -103,15 +104,15 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       if (typeof draftData.deliveryDate === "string") setDeliveryDate(draftData.deliveryDate);
       const [emp, u, recent] = await Promise.all([
         db.from("employees").select("id,employee_code,full_name,branch_id").eq("tenant_id", tenantId).eq("user_id", auth.user.id).eq("employment_status", "active").maybeSingle(),
-        db.from("units_of_measure").select("id,name,symbol").eq("tenant_id", tenantId).order("name"),
+        fetchAllRowsResult<Row>((from,to)=>db.from("units_of_measure").select("id,name,symbol").eq("tenant_id",tenantId).order("name").order("id",{ascending:true}).range(from,to)),
         db.from("sales_orders").select("id,order_number,order_date,status,grand_total").eq("tenant_id", tenantId).eq("created_by", auth.user.id).eq("order_source", "order_booker").order("created_at", { ascending: false }).limit(30)
       ]);
       const err = emp.error || u.error || recent.error;
       if (err) throw err;
       if (!emp.data) throw new Error("Your active employee profile is not linked to this login. Ask the administrator to link your employee account and branch.");
-      const catalogResult = await db.rpc("get_booker_catalog", { p_tenant_id: tenantId, p_customer_id: null });
+      const catalogResult = await fetchAllRowsResult<Row>((from,to)=>db.rpc("get_booker_catalog",{p_tenant_id:tenantId,p_customer_id:null}).order("product_id").order("unit_id").order("price_list_id").range(from,to));
       if (catalogResult.error) throw catalogResult.error;
-      const catalogRows = (catalogResult.data || []) as Row[];
+      const catalogRows = catalogResult.data || [];
       const visibleProducts = [...new Map(catalogRows.map(row => [row.product_id, {
         id: row.product_id, sku: row.sku, barcode: row.barcode, name: row.name,
         brand: row.brand, sales_tax_rate: row.sales_tax_rate
@@ -127,11 +128,11 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       setEmployee(emp.data); setProducts(visibleProducts); setProductUnits(visibleProductUnits);
       setUnits(u.data || []); setOrders(recent.data || []);
       setPrices(defaultPrices); setListId(defaultPriceListId);
-      const { data: routeAssign, error: assignmentError } = await db.from("route_assignments").select("id,route_id,assigned_from,assigned_to").eq("tenant_id", tenantId).eq("employee_id", emp.data.id);
+      const { data: routeAssign, error: assignmentError } = await fetchAllRowsResult<Row>((from,to)=>db.from("route_assignments").select("id,route_id,assigned_from,assigned_to").eq("tenant_id",tenantId).eq("employee_id",emp.data.id).order("assigned_from",{ascending:false}).order("id",{ascending:true}).range(from,to));
       if (assignmentError) throw assignmentError;
       const assignments = (routeAssign || []).filter(x => x.assigned_from <= new Date().toISOString().slice(0,10) && (!x.assigned_to || x.assigned_to >= new Date().toISOString().slice(0,10)));
       if (!assignments.length) { setRoutes([]); throw new Error("No active sales route is assigned to your employee account."); }
-      const routeResult = await db.from("sales_routes").select("id,route_code,name,area_description").eq("tenant_id", tenantId).in("id", assignments.map(x => x.route_id)).eq("is_active", true).order("name");
+      const routeResult = await fetchAllRowsResult<Row>((from,to)=>db.from("sales_routes").select("id,route_code,name,area_description").eq("tenant_id",tenantId).in("id",assignments.map(x=>x.route_id)).eq("is_active",true).order("name").order("id",{ascending:true}).range(from,to));
       if (routeResult.error) throw routeResult.error;
       setRoutes(routeResult.data || []);
       const savedRouteId = String(draftData.routeId || "");
@@ -224,11 +225,11 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
     async function loadCustomers() {
       if(!navigator.onLine)return;
       if (!routeId) { setCustomers([]); setCustomerId(""); return; }
-      const { data: links, error } = await db.from("route_customers").select("customer_id,visit_order").eq("tenant_id", tenantId).eq("route_id", routeId).order("visit_order");
+      const { data: links, error } = await fetchAllRowsResult<Row>((from,to)=>db.from("route_customers").select("customer_id,visit_order").eq("tenant_id",tenantId).eq("route_id",routeId).order("visit_order").order("customer_id",{ascending:true}).range(from,to));
       if (error) { if (!cancelled) setNotice(error.message); return; }
       const ids = (links || []).map(x => x.customer_id);
       if (!ids.length) { if (!cancelled) { setCustomers([]); setCustomerId(""); } return; }
-      const { data, error: partyError } = await db.from("parties").select("id,party_code,name,phone,credit_limit").eq("tenant_id", tenantId).in("id", ids).eq("status", "active").order("name");
+      const { data, error: partyError } = await fetchAllRowsResult<Row>((from,to)=>db.from("parties").select("id,party_code,name,phone,credit_limit").eq("tenant_id",tenantId).in("id",ids).eq("status","active").order("name").order("id",{ascending:true}).range(from,to));
       if (partyError) { if (!cancelled) setNotice(partyError.message); return; }
       if (!cancelled) {
         setCustomers(data || []);
@@ -246,9 +247,9 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
     async function loadCustomerPrices() {
       if(!navigator.onLine)return;
       if (!customerId) { setPrices([]); setListId(""); return; }
-      const { data, error } = await db.rpc("get_booker_catalog", { p_tenant_id: tenantId, p_customer_id: customerId });
+      const { data, error } = await fetchAllRowsResult<Row>((from,to)=>db.rpc("get_booker_catalog",{p_tenant_id:tenantId,p_customer_id:customerId}).order("product_id").order("unit_id").order("price_list_id").range(from,to));
       if (error) { if (!cancelled) setNotice(error.message); return; }
-      const catalogRows = (data || []) as Row[];
+      const catalogRows = data || [];
       const allowedProducts = [...new Map(catalogRows.map(row => [row.product_id, {
         id: row.product_id, sku: row.sku, barcode: row.barcode, name: row.name,
         brand: row.brand, sales_tax_rate: row.sales_tax_rate
