@@ -36,7 +36,11 @@ declare
   v_debit_note uuid;
   v_backoffice_order_result jsonb;
   v_backoffice_sales_order uuid;
+  v_backoffice_sales_line uuid;
   v_order_count_before integer;
+  v_grn_result jsonb;
+  v_delivery_draft_result jsonb;
+  v_delivery_count_before integer;
   v_invoice_result jsonb;
   v_debit_result jsonb;
   v_inventory_account uuid := gen_random_uuid();
@@ -324,6 +328,36 @@ begin
     raise exception 'FAIL: invalid back-office sales order left a partial header';
   end if;
 
+  -- Delivery drafts reserve sales order quantities and cannot be duplicated beyond the order.
+  update public.sales_orders set status='approved',approved_by=v_user,approved_at=now()
+  where id=v_backoffice_sales_order and tenant_id=v_tenant_a;
+  select id into v_backoffice_sales_line from public.sales_order_lines
+  where tenant_id=v_tenant_a and sales_order_id=v_backoffice_sales_order limit 1;
+  v_delivery_draft_result:=public.create_delivery_draft(
+    v_tenant_a,v_backoffice_sales_order,v_warehouse,current_date,
+    null,null,'Atomic delivery reservation test',null,null,
+    jsonb_build_array(jsonb_build_object('sales_order_line_id',v_backoffice_sales_line,'quantity_base',1))
+  );
+  if coalesce((v_delivery_draft_result->>'success')::boolean,false) is not true
+     or not exists(select 1 from public.deliveries
+       where id=(v_delivery_draft_result->>'delivery_id')::uuid and status='pending') then
+    raise exception 'FAIL: atomic delivery draft creation failed: %',v_delivery_draft_result;
+  end if;
+  select count(*) into v_delivery_count_before from public.deliveries where tenant_id=v_tenant_a;
+  v_rejected:=false;
+  begin
+    perform public.create_delivery_draft(
+      v_tenant_a,v_backoffice_sales_order,v_warehouse,current_date,
+      null,null,'Duplicate delivery must be blocked',null,null,
+      jsonb_build_array(jsonb_build_object('sales_order_line_id',v_backoffice_sales_line,'quantity_base',1))
+    );
+  exception when others then
+    v_rejected:=true;
+  end;
+  if not v_rejected or (select count(*) from public.deliveries where tenant_id=v_tenant_a)<>v_delivery_count_before then
+    raise exception 'FAIL: duplicate delivery draft exceeded the sales order quantity';
+  end if;
+
   -- Purchase -> GRN -> stock ledger -> supplier invoice -> GL workflow.
   insert into public.parties(id,tenant_id,party_code,party_type,name)
   values(v_supplier,v_tenant_a,'TX-SUP','supplier','Smoke Test Supplier');
@@ -346,12 +380,37 @@ begin
   end if;
   update public.purchase_orders set status='approved',approved_by=v_user
   where id=v_purchase_order and tenant_id=v_tenant_a;
-  insert into public.goods_receipts(id,tenant_id,purchase_order_id,warehouse_id,grn_number,received_date,status,received_by)
-  values(v_grn,v_tenant_a,v_purchase_order,
-    v_warehouse,
-    'TX-GRN-001',current_date,'draft',v_user);
-  insert into public.goods_receipt_lines(id,tenant_id,goods_receipt_id,product_id,unit_id,quantity,conversion_to_base,accepted_quantity,rejected_quantity,unit_cost,purchase_order_line_id)
-  values(v_grn_line,v_tenant_a,v_grn,v_product,v_unit,7,1,7,0,20,v_purchase_order_line);
+  v_grn_result:=public.create_goods_receipt_draft(
+    v_tenant_a,v_purchase_order,v_warehouse,current_date,null,'Atomic GRN smoke test',
+    jsonb_build_array(jsonb_build_object(
+      'purchase_order_line_id',v_purchase_order_line,'quantity',7,
+      'accepted_quantity',7,'rejected_quantity',0,'unit_cost',20,
+      'batch_number',null,'manufactured_date',null,'expiry_date',null
+    ))
+  );
+  if coalesce((v_grn_result->>'success')::boolean,false) is not true
+     or coalesce((v_grn_result->>'line_count')::integer,0)<>1 then
+    raise exception 'FAIL: atomic GRN draft creation failed: %',v_grn_result;
+  end if;
+  v_grn:=(v_grn_result->>'goods_receipt_id')::uuid;
+  select id into v_grn_line from public.goods_receipt_lines
+  where tenant_id=v_tenant_a and goods_receipt_id=v_grn limit 1;
+  v_rejected:=false;
+  begin
+    perform public.create_goods_receipt_draft(
+      v_tenant_a,v_purchase_order,v_warehouse,current_date,null,'Excess draft GRN must be blocked',
+      jsonb_build_array(jsonb_build_object(
+        'purchase_order_line_id',v_purchase_order_line,'quantity',4,
+        'accepted_quantity',4,'rejected_quantity',0,'unit_cost',20,
+        'batch_number',null,'manufactured_date',null,'expiry_date',null
+      ))
+    );
+  exception when others then
+    v_rejected:=true;
+  end;
+  if not v_rejected or (select count(*) from public.goods_receipts where tenant_id=v_tenant_a and purchase_order_id=v_purchase_order)<>1 then
+    raise exception 'FAIL: duplicate GRN drafts exceeded the remaining purchase order quantity';
+  end if;
   perform public.post_goods_receipt(v_grn);
   if not exists(select 1 from public.stock_movements where tenant_id=v_tenant_a
     and reference_type='goods_receipt' and reference_id=v_grn and quantity_in=7) then
