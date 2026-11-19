@@ -377,6 +377,17 @@ begin
        where id=v_backoffice_sales_order and status='allocated') then
     raise exception 'FAIL: atomic delivery draft creation failed: %',v_delivery_draft_result;
   end if;
+  perform set_config('request.jwt.claim.sub',v_booker_user::text,true);
+  v_rejected:=false;
+  begin
+    perform public.sync_sales_order_delivery_status(
+      v_tenant_a,v_backoffice_sales_order,(v_delivery_draft_result->>'delivery_id')::uuid,'allocated'
+    );
+  exception when insufficient_privilege then
+    v_rejected:=true;
+  end;
+  if not v_rejected then raise exception 'FAIL: unauthorized user changed delivery-derived sales order status'; end if;
+  perform set_config('request.jwt.claim.sub',v_user::text,true);
   v_rejected:=false;
   begin
     perform public.sync_sales_order_delivery_status(
