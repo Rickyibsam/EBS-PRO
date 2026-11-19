@@ -28,15 +28,15 @@ export default function DeliveryManModule({db,tenantId}:{db:SupabaseClient;tenan
    const ids=deliveryRows.map(x=>x.sales_order_id),deliveryIds=deliveryRows.map(x=>x.id);
    if(ids.length){
     const [o,l,v]=await Promise.all([
-     db.from("sales_orders").select("id,order_number,customer_id,order_date").eq("tenant_id",tenantId).in("id",ids),
-     db.from("delivery_lines").select("id,delivery_id,product_id,quantity_base,picked_quantity_base,delivered_quantity_base").eq("tenant_id",tenantId).in("delivery_id",deliveryIds),
-     db.from("delivery_shop_visits").select("id,delivery_id,customer_id,visit_at,visit_status,notes,line_quantities,proof_of_delivery_signature,latitude,longitude").eq("tenant_id",tenantId).in("delivery_id",deliveryIds).order("visit_at",{ascending:false})
+     fetchAllRowsResult<any>((from,to)=>db.from("sales_orders").select("id,order_number,customer_id,order_date").eq("tenant_id",tenantId).in("id",ids).order("id",{ascending:true}).range(from,to)),
+     fetchAllRowsResult<any>((from,to)=>db.from("delivery_lines").select("id,delivery_id,product_id,quantity_base,picked_quantity_base,delivered_quantity_base").eq("tenant_id",tenantId).in("delivery_id",deliveryIds).order("delivery_id").order("id",{ascending:true}).range(from,to)),
+     fetchAllRowsResult<any>((from,to)=>db.from("delivery_shop_visits").select("id,delivery_id,customer_id,visit_at,visit_status,notes,line_quantities,proof_of_delivery_signature,latitude,longitude").eq("tenant_id",tenantId).in("delivery_id",deliveryIds).order("visit_at",{ascending:false}).order("id",{ascending:true}).range(from,to))
     ]);
     const err=o.error||l.error||v.error;if(err)throw err;setOrders(o.data??[]);setLines(l.data??[]);setVisits(v.data??[]);
     const customerIds=[...new Set((o.data??[]).map(x=>x.customer_id))],productIds=[...new Set((l.data??[]).map(x=>x.product_id))];
     const [cu,pr]=await Promise.all([
-     customerIds.length?db.from("parties").select("id,name,phone,address").eq("tenant_id",tenantId).in("id",customerIds):Promise.resolve({data:[],error:null}),
-     productIds.length?db.from("products").select("id,name,sku,barcode").eq("tenant_id",tenantId).in("id",productIds):Promise.resolve({data:[],error:null})
+     customerIds.length?fetchAllRowsResult<any>((from,to)=>db.from("parties").select("id,name,phone,address").eq("tenant_id",tenantId).in("id",customerIds).order("id",{ascending:true}).range(from,to)):Promise.resolve({data:[],error:null}),
+     productIds.length?fetchAllRowsResult<any>((from,to)=>db.from("products").select("id,name,sku,barcode").eq("tenant_id",tenantId).in("id",productIds).order("id",{ascending:true}).range(from,to)):Promise.resolve({data:[],error:null})
     ]);
     if(cu.error)throw cu.error;if(pr.error)throw pr.error;setCustomers(cu.data??[]);setProducts(pr.data??[]);
    await cacheDeliverySnapshot(tenantId,user.user.id,{employee:emp,deliveries:deliveryRows,orders:o.data??[],lines:l.data??[],visits:v.data??[],customers:cu.data??[],products:pr.data??[]});
