@@ -1,3 +1,4 @@
+import {toLocalDateInput} from "./lib/localDate";
 import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import { FormEvent, useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -68,7 +69,7 @@ export default function AdminModule({db,tenantId,module,currentRole}:{db:Supabas
      if(error)throw error;if(data?.error)throw new Error(data.error);setNotice(data?.message||"Staff account configured.");
     } else if(routes){
     if(form.route_id&&form.customer_id){const {error}=await db.from("route_customers").insert({tenant_id:tenantId,route_id:form.route_id,customer_id:form.customer_id,visit_order:Number(form.visit_order||1),visit_day:form.visit_day===""?null:Number(form.visit_day)});if(error)throw error;setNotice("Customer assigned to route.");}
-    else if(form.route_id&&form.employee_id){const {error}=await db.from("route_assignments").insert({tenant_id:tenantId,route_id:form.route_id,employee_id:form.employee_id,assigned_from:form.assigned_from||new Date().toISOString().slice(0,10),assigned_to:form.assigned_to||null});if(error)throw error;setNotice("Employee assigned to route.");}
+    else if(form.route_id&&form.employee_id){const {error}=await db.from("route_assignments").insert({tenant_id:tenantId,route_id:form.route_id,employee_id:form.employee_id,assigned_from:form.assigned_from||toLocalDateInput(),assigned_to:form.assigned_to||null});if(error)throw error;setNotice("Employee assigned to route.");}
     else {if(!form.name?.trim())throw new Error("Enter a route name, or select an existing route for an assignment.");const {error}=await db.from("sales_routes").insert({tenant_id:tenantId,branch_id:form.branch_id||null,route_code:"",name:form.name.trim(),area_description:form.area_description.trim()||null,is_active:true});if(error)throw error;setNotice("Sales route created successfully.");}
    } else if(locations){
     if(form.record_type==="warehouse"){if(!form.branch_id)throw new Error("Select a branch for this warehouse.");const {error}=await db.from("warehouses").insert({tenant_id:tenantId,branch_id:form.branch_id,code:"",name:form.name.trim(),address:form.address.trim()||null,is_default:false,is_active:true});if(error)throw error;setNotice("Warehouse created successfully.");}
