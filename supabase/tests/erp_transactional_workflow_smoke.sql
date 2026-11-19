@@ -329,7 +329,7 @@ begin
   end if;
 
   -- Delivery drafts reserve sales order quantities and cannot be duplicated beyond the order.
-  update public.sales_orders set status='approved',approved_by=v_user,approved_at=now()
+  update public.sales_orders set status='approved',approved_by=v_user
   where id=v_backoffice_sales_order and tenant_id=v_tenant_a;
   select id into v_backoffice_sales_line from public.sales_order_lines
   where tenant_id=v_tenant_a and sales_order_id=v_backoffice_sales_order limit 1;
