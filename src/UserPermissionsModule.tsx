@@ -1,4 +1,5 @@
 import {isModuleActionAllowed} from "./lib/erpAccess";
+import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import {useEffect,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 type Member={id:string;user_id:string;role:string;is_active:boolean;full_name?:string;employee_code?:string;email?:string};
@@ -27,9 +28,9 @@ export default function UserPermissionsModule({db,tenantId,currentRole}:{db:Supa
   setLoading(true);setNotice("");
   try{
    const [m,e,p]=await Promise.all([
-    db.from("tenant_memberships").select("id,user_id,role,is_active").eq("tenant_id",tenantId).order("created_at"),
-    db.from("employees").select("user_id,full_name,employee_code").eq("tenant_id",tenantId),
-    db.from("tenant_user_module_permissions").select("id,user_id,module_key,can_view,can_create,can_update,can_delete").eq("tenant_id",tenantId)
+    fetchAllRowsResult<Member>((from,to)=>db.from("tenant_memberships").select("id,user_id,role,is_active,created_at").eq("tenant_id",tenantId).order("created_at").order("id",{ascending:true}).range(from,to)),
+    fetchAllRowsResult<{user_id:string;full_name?:string;employee_code?:string}>((from,to)=>db.from("employees").select("user_id,full_name,employee_code").eq("tenant_id",tenantId).order("user_id").order("id",{ascending:true}).range(from,to)),
+    fetchAllRowsResult<PermissionRow>((from,to)=>db.from("tenant_user_module_permissions").select("id,user_id,module_key,can_view,can_create,can_update,can_delete").eq("tenant_id",tenantId).order("user_id").order("module_key").range(from,to))
    ]);
    const err=m.error||e.error||p.error;if(err)throw err;
    const employees=e.data||[];
@@ -50,20 +51,18 @@ export default function UserPermissionsModule({db,tenantId,currentRole}:{db:Supa
   if(!["owner"].includes(currentRole))return;
   setSaving(member.user_id);setNotice("");
   try{
-   const changes=modules.map(async mod=>{
+   const permissions=modules.flatMap(mod=>{
     const k=keyOf(member.user_id,mod.key);
-    if(!enabled[k]){
-     const {error}=await db.from("tenant_user_module_permissions").delete().eq("tenant_id",tenantId).eq("user_id",member.user_id).eq("module_key",mod.key);
-     if(error)throw error;return;
-    }
-    const permission=overrides[k]||empty;
-    const {error}=await db.from("tenant_user_module_permissions").upsert({
-     tenant_id:tenantId,user_id:member.user_id,module_key:mod.key,...permission,updated_by:(await db.auth.getUser()).data.user?.id
-    },{onConflict:"tenant_id,user_id,module_key"});
-    if(error)throw error;
+    if(!enabled[k])return [];
+    return [{module_key:mod.key,...(overrides[k]||empty)}];
    });
-   await Promise.all(changes);setNotice("Permissions saved for "+(member.full_name||member.email||member.user_id.slice(0,8))+".");
+   const {data,error}=await db.rpc("save_tenant_user_module_permissions",{
+    p_tenant_id:tenantId,p_user_id:member.user_id,p_permissions:permissions
+   });
+   if(error)throw error;
+   if(data?.success!==true)throw new Error("Permission matrix save was not confirmed.");
    await load();
+   setNotice("Permissions saved atomically for "+(member.full_name||member.email||member.user_id.slice(0,8))+".");
   }catch(err){setNotice(err instanceof Error?err.message:"Unable to save permissions.");}
   finally{setSaving("");}
  }
