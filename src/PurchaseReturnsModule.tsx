@@ -1,3 +1,4 @@
+import {toLocalDateInput} from "./lib/localDate";
 import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import {sumActivePurchaseReturnQuantities} from "./lib/purchaseReturnQuantities";
 import {FormEvent,useEffect,useState} from "react";
@@ -6,7 +7,7 @@ import {useModuleAction} from "./lib/modulePermissionContext";
 type Row=Record<string,any>;
 export default function PurchaseReturnsModule({db,tenantId,currentRole}:{db:SupabaseClient;tenantId:string;currentRole:string}){
  const [grns,setGrns]=useState<Row[]>([]),[orders,setOrders]=useState<Row[]>([]),[parties,setParties]=useState<Row[]>([]),[products,setProducts]=useState<Row[]>([]),[notes,setNotes]=useState<Row[]>([]),[lines,setLines]=useState<Row[]>([]);
- const [selectedGrn,setSelectedGrn]=useState(""),[reason,setReason]=useState(""),[noteDate,setNoteDate]=useState(new Date().toISOString().slice(0,10));
+ const [selectedGrn,setSelectedGrn]=useState(""),[reason,setReason]=useState(""),[noteDate,setNoteDate]=useState(toLocalDateInput());
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[show,setShow]=useState(false),[notice,setNotice]=useState("");
  const canCreate=useModuleAction("purchase_supplier","create",["owner","admin","manager","purchase"].includes(currentRole));
  const canPost=useModuleAction("purchase_supplier","update",["owner","admin","manager","accounts","warehouse"].includes(currentRole));
