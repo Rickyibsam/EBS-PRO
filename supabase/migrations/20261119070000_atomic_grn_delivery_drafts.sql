@@ -63,7 +63,7 @@ begin
   from public.purchase_orders po
   left join public.warehouses po_wh on po_wh.id=po.warehouse_id and po_wh.tenant_id=po.tenant_id
   where po.id=p_purchase_order_id and po.tenant_id=p_tenant_id
-  for update of po;
+  ;
   if not found or v_po.status not in ('approved','part_received') then
     raise exception 'Select an approved or partially received purchase order';
   end if;
@@ -104,6 +104,7 @@ begin
       rejected_quantity numeric,unit_cost numeric,batch_number text,
       manufactured_date date,expiry_date date
     )
+    order by purchase_order_line_id
   loop
     if v_line.purchase_order_line_id is null or v_line.quantity is null or v_line.quantity<=0
        or v_line.accepted_quantity is null or v_line.accepted_quantity<0
