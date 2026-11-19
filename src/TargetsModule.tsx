@@ -1,3 +1,4 @@
+import {toLocalMonthEnd,toLocalMonthStart} from "./lib/localDate";
 import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import {FormEvent,useEffect,useMemo,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
@@ -5,7 +6,7 @@ import {useModuleAction} from "./lib/modulePermissionContext";
 type Row=Record<string,any>;
 export default function TargetsModule({db,tenantId,currentRole}:{db:SupabaseClient;tenantId:string;currentRole:string}){
  const [targets,setTargets]=useState<Row[]>([]),[employees,setEmployees]=useState<Row[]>([]),[vendors,setVendors]=useState<Row[]>([]),[products,setProducts]=useState<Row[]>([]),[catalog,setCatalog]=useState<Row[]>([]),[actuals,setActuals]=useState<Row[]>([]),[accruals,setAccruals]=useState<Row[]>([]);
- const [form,setForm]=useState<Row>({target_name:"",target_role:"order_booker",target_metric:"net_sales",period_start:new Date().toISOString().slice(0,7)+"-01",period_end:new Date(new Date().getFullYear(),new Date().getMonth()+1,0).toISOString().slice(0,10),target_value:"",incentive_amount:"0",incentive_rate:"0",is_active:true});
+ const [form,setForm]=useState<Row>({target_name:"",target_role:"order_booker",target_metric:"net_sales",period_start:toLocalMonthStart(),period_end:toLocalMonthEnd(),target_value:"",incentive_amount:"0",incentive_rate:"0",is_active:true});
  const [show,setShow]=useState(false),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[notice,setNotice]=useState(""),[importPeriod,setImportPeriod]=useState("");
  const canCreateTarget=useModuleAction("sales_customer","create",["owner","admin","manager","sales"].includes(currentRole));
  const canCreatePayroll=useModuleAction("hr_payroll","create",["owner","admin","manager","sales"].includes(currentRole));
