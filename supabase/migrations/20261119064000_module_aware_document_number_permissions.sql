@@ -63,6 +63,7 @@ begin
     -- Source workflow RPCs enforce the relevant module permission before posting.
     if not v_role_allowed and not (
       private.module_permission_grant_internal(p_tenant_id,'accounts_finance','create')
+      or private.module_permission_grant_internal(p_tenant_id,'accounts_finance','update')
       or private.module_permission_grant_internal(p_tenant_id,'purchase_supplier','update')
       or private.module_permission_grant_internal(p_tenant_id,'distribution_delivery','update')
       or private.module_permission_grant_internal(p_tenant_id,'inventory','update')
