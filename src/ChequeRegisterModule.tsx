@@ -1,3 +1,4 @@
+import {toLocalDateInput} from "./lib/localDate";
 import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -6,7 +7,7 @@ import {useModuleAction} from "./lib/modulePermissionContext";
 type Cheque = { id:string; party_id:string|null; direction:"received"|"issued"; cheque_number:string; bank_name:string|null; cheque_date:string|null; due_date:string; amount:number; status:string; cleared_date:string|null; notes:string|null; created_at:string };
 type Party = { id:string; name:string; party_type:string };
 const money=(v:number)=>"PKR "+Number(v||0).toLocaleString("en-PK",{minimumFractionDigits:2,maximumFractionDigits:2});
-const today=()=>new Date().toISOString().slice(0,10);
+const today=()=>toLocalDateInput();
 
 export default function ChequeRegisterModule({db,tenantId,currentRole}:{db:SupabaseClient;tenantId:string;currentRole:string}) {
  const roleCanManage=["owner","admin","manager","accounts"].includes(currentRole);
