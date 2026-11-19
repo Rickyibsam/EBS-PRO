@@ -31,8 +31,8 @@ begin
   if coalesce(cardinality(p_employee_ids),0)=0 then
     raise exception 'Select at least one active employee with a positive basic salary';
   end if;
-  select count(distinct x) into v_requested
-  from unnest(p_employee_ids) as x;
+  select count(distinct employee_id) into v_requested
+  from unnest(p_employee_ids) as selected(employee_id);
   if v_requested<>cardinality(p_employee_ids) then
     raise exception 'Duplicate employees are not allowed in a payroll run';
   end if;
