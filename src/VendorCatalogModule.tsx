@@ -1,3 +1,4 @@
+import {toLocalDateInput} from "./lib/localDate";
 import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import {FormEvent,useEffect,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
@@ -26,7 +27,7 @@ export default function VendorCatalogModule({db,tenantId,currentRole}:{db:Supaba
   e.preventDefault();if(!canCreate&&!canUpdate)return;setSaving(true);setNotice("");
   const cost=Number(form.purchase_cost),min=Number(form.minimum_order_qty),lead=Number(form.lead_time_days);
   if(!form.supplier_id||!form.product_id||!Number.isFinite(cost)||cost<0||!Number.isFinite(min)||min<=0||!Number.isInteger(lead)||lead<0){setNotice("Vendor, product, valid purchase cost, MOQ and lead time are required.");setSaving(false);return;}
-  const {error}=await db.from("vendor_product_catalog").upsert({tenant_id:tenantId,supplier_id:form.supplier_id,product_id:form.product_id,supplier_item_code:form.supplier_item_code.trim()||null,purchase_cost:cost,minimum_order_qty:min,lead_time_days:lead,is_preferred:form.is_preferred,last_cost_date:new Date().toISOString().slice(0,10),notes:form.notes.trim()||null},{onConflict:"tenant_id,supplier_id,product_id"});
+  const {error}=await db.from("vendor_product_catalog").upsert({tenant_id:tenantId,supplier_id:form.supplier_id,product_id:form.product_id,supplier_item_code:form.supplier_item_code.trim()||null,purchase_cost:cost,minimum_order_qty:min,lead_time_days:lead,is_preferred:form.is_preferred,last_cost_date:toLocalDateInput(),notes:form.notes.trim()||null},{onConflict:"tenant_id,supplier_id,product_id"});
   if(error)setNotice(error.message);else{setNotice("Vendor product cost and feeding details saved.");setForm({supplier_id:"",product_id:"",supplier_item_code:"",purchase_cost:"0",minimum_order_qty:"1",lead_time_days:"0",is_preferred:false,notes:""});setShow(false);await load();}
   setSaving(false);
  }
