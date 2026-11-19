@@ -231,6 +231,20 @@ begin
     raise exception 'FAIL: invalid permission save was not rejected atomically';
   end if;
   perform set_config('request.jwt.claim.sub',v_booker_user::text,true);
+  v_backoffice_order_result:=public.create_backoffice_order(
+    v_tenant_a,'sales_order',v_branch_a,v_warehouse,v_customer,current_date,
+    'Custom permission sales order',v_employee,null,null,
+    jsonb_build_array(jsonb_build_object(
+      'product_id',v_product,'unit_id',v_unit,'quantity',1,
+      'unit_rate',50,'tax_rate',17,'discount_amount',0
+    ))
+  );
+  if coalesce((v_backoffice_order_result->>'success')::boolean,false) is not true
+     or not exists(select 1 from public.sales_orders
+       where id=(v_backoffice_order_result->>'order_id')::uuid
+         and created_by=v_booker_user and order_source='backoffice') then
+    raise exception 'FAIL: explicit per-user create permission did not authorize sales order creation: %',v_backoffice_order_result;
+  end if;
   v_permission_rejected:=false;
   begin
     perform public.update_draft_voucher_lines(v_tenant_a,'sales_orders',v_order_first,'[]'::jsonb);
