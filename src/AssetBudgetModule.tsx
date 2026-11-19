@@ -51,7 +51,11 @@ export default function AssetBudgetModule({db,tenantId,currentRole}:{db:Supabase
   try{
    const start=periodMonth+"-01",end=new Date(Number(periodMonth.slice(0,4)),Number(periodMonth.slice(5,7)),0).toISOString().slice(0,10);
    const {data,error}=await db.rpc("post_asset_monthly_depreciation",{p_asset_id:asset.id,p_period_start:start,p_period_end:end,p_expense_account_id:depExpense,p_accumulated_account_id:depAccum});
-   if(error)throw error;setNotice("Monthly depreciation journal posted: "+money(Number(data?.amount||0))+".");await load();
+   if(error)throw error;
+   if(data?.success!==true)throw new Error("Depreciation posting was not confirmed.");
+   if(data?.posted!==true&&data?.already_posted!==true)throw new Error("A depreciation record exists but is not posted. Reconcile that entry before continuing.");
+   setNotice(data.already_posted===true?"Monthly depreciation was already posted: "+money(Number(data?.amount||0))+".":"Monthly depreciation journal posted: "+money(Number(data?.amount||0))+".");
+   await load();
   }catch(e){setNotice(e instanceof Error?e.message:"Depreciation posting failed.");}
   finally{setSaving(false);}
  }
@@ -62,7 +66,10 @@ export default function AssetBudgetModule({db,tenantId,currentRole}:{db:Supabase
   setSaving(true);setNotice("");
   try{
    const {data,error}=await db.rpc("dispose_fixed_asset",{p_asset_id:asset.id,p_disposal_date:disposalDate,p_proceeds:amount,p_asset_cost_account_id:assetCostAccount,p_accumulated_account_id:depAccum,p_cash_account_id:cashAccount,p_gain_account_id:gainAccount||null,p_loss_account_id:lossAccount||null});
-   if(error)throw error;setNotice("Asset disposal journal posted. Gain: "+money(Number(data?.gain||0))+" · Loss: "+money(Number(data?.loss||0))+".");await load();
+   if(error)throw error;
+   if(data?.success!==true||data?.posted!==true)throw new Error("Asset disposal posting was not confirmed.");
+   setNotice("Asset disposal journal posted. Gain: "+money(Number(data?.gain||0))+" · Loss: "+money(Number(data?.loss||0))+".");
+   await load();
   }catch(e){setNotice(e instanceof Error?e.message:"Asset disposal failed.");}
   finally{setSaving(false);}
  }
