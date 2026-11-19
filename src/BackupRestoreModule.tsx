@@ -1,12 +1,13 @@
 import {useEffect,useState,type ChangeEvent} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
+import {fetchAllRowsResult} from "./lib/fetchAllRows";
 type Backup=Record<string,any>;
 type Customer={id:string;name:string;party_code:string|null};
 export default function BackupRestoreModule({db,tenantId,currentRole}:{db:SupabaseClient;tenantId:string;currentRole:string}){
  const allowed=["owner","admin"].includes(currentRole);
  const [backup,setBackup]=useState<Backup|null>(null),[fileName,setFileName]=useState(""),[busy,setBusy]=useState(false),[notice,setNotice]=useState(""),[result,setResult]=useState<Backup|null>(null);
  const [customers,setCustomers]=useState<Customer[]>([]),[customerId,setCustomerId]=useState("");
- useEffect(()=>{let live=true;void db.from("parties").select("id,name,party_code").eq("tenant_id",tenantId).in("party_type",["customer","both"]).eq("status","active").order("name").then(({data,error})=>{if(!live)return;if(error){setNotice("Customer list could not be loaded: "+error.message);return;}setCustomers((data??[]) as Customer[]);});return()=>{live=false;};},[db,tenantId]);
+ useEffect(()=>{let live=true;void fetchAllRowsResult<Customer>((from,to)=>db.from("parties").select("id,name,party_code").eq("tenant_id",tenantId).in("party_type",["customer","both"]).eq("status","active").order("name").order("id",{ascending:true}).range(from,to)).then(({data,error})=>{if(!live)return;if(error){setNotice("Customer list could not be loaded: "+error.message);return;}setCustomers(data??[]);});return()=>{live=false;};},[db,tenantId]);
  async function downloadCustomerBackup(){
   if(!allowed||!customerId)return;setBusy(true);setNotice("");setResult(null);
   try{
@@ -24,6 +25,8 @@ export default function BackupRestoreModule({db,tenantId,currentRole}:{db:Supaba
   if(!allowed)return;setBusy(true);setNotice("");setResult(null);
   try{
    const {data,error}=await db.rpc("export_tenant_backup",{p_tenant_id:tenantId});if(error)throw error;
+   if(data?.format!=="EBS-PRO-TENANT-BACKUP-V1"||data?.tenant_id!==tenantId||!data?.tables||typeof data.tables!=="object"||Array.isArray(data.tables))throw new Error("Company backup response format or company ownership was invalid.");
+   if(Object.values(data.tables).some(rows=>!Array.isArray(rows)))throw new Error("Company backup contains malformed table data.");
    const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");
    a.href=url;a.download="EBS-PRO-backup-"+new Date().toISOString().slice(0,10)+".json";a.click();URL.revokeObjectURL(url);
    setNotice("Company backup downloaded. Keep this file in a secure location outside the ERP.");
