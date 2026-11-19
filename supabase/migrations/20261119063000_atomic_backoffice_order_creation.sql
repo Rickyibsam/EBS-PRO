@@ -16,7 +16,7 @@ create or replace function public.create_backoffice_order(
 )
 returns jsonb
 language plpgsql
-security invoker
+security definer
 set search_path=pg_catalog,public,private,auth
 as $function$
 declare
