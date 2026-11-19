@@ -377,6 +377,12 @@ begin
        where id=v_backoffice_sales_order and status='allocated') then
     raise exception 'FAIL: atomic delivery draft creation failed: %',v_delivery_draft_result;
   end if;
+  if coalesce((public.update_delivery_assignment(
+    v_tenant_a,(v_delivery_draft_result->>'delivery_id')::uuid,v_route,v_employee,'Smoke Test Booker'
+  )->>'success')::boolean,false) is not true then
+    raise exception 'FAIL: validated delivery assignment update did not save';
+  end if;
+
   perform set_config('request.jwt.claim.sub',v_booker_user::text,true);
   v_rejected:=false;
   begin
