@@ -21,7 +21,7 @@ export default function AssetBudgetModule({db,tenantId,currentRole}:{db:Supabase
    db.from("fixed_asset_account_mappings").select("*").eq("tenant_id",tenantId).maybeSingle(),
    fetchAllRowsResult<any>((from,to)=>db.from("cash_flow_account_mappings").select("account_id,classification").eq("tenant_id",tenantId).order("account_id").range(from,to)),
    fetchAllRowsResult<any>((from,to)=>db.from("asset_depreciation_entries").select("asset_id,depreciation_amount,period_start,period_end,journal_entry_id,posted").eq("tenant_id",tenantId).eq("posted",true).order("period_start").order("id").range(from,to)),
-   db.rpc("get_budget_actuals",{p_tenant_id:tenantId}),
+   fetchAllRowsResult<any>((from,to)=>db.rpc("get_budget_actuals",{p_tenant_id:tenantId}).order("period_start",{ascending:false}).order("budget_line_id",{ascending:true}).range(from,to)),
    fetchAllRowsResult<any>((from,to)=>db.from("branches").select("id,name,code").eq("tenant_id",tenantId).order("name").order("id",{ascending:true}).range(from,to))
   ]);
   const e=x.error||y.error||c.error||l.error||j.error||m.error||cm.error||de.error||ba.error||br.error;
