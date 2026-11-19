@@ -242,6 +242,10 @@ begin
   ) then
     raise exception 'Delivery warehouse must be active and belong to the sales order branch';
   end if;
+  if v_order.branch_id is null then
+    select w.branch_id into v_order.branch_id
+    from public.warehouses w where w.id=p_warehouse_id and w.tenant_id=p_tenant_id;
+  end if;
   if p_delivery_date is null then raise exception 'Delivery date is required'; end if;
   v_delivery_man_id:=coalesce(p_delivery_man_employee_id,v_order.delivery_man_employee_id);
   v_route_id:=coalesce(p_route_id,v_order.route_id);
