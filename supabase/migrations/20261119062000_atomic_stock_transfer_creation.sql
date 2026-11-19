@@ -16,6 +16,7 @@ set search_path=pg_catalog,public,private,auth
 as $function$
 declare
   v_user uuid:=auth.uid();
+  v_branch_id uuid;
   v_number text;
   v_transfer_id uuid;
   v_requested integer;
@@ -48,8 +49,12 @@ begin
   if p_transfer_date is null then
     raise exception 'Transfer date is required';
   end if;
-  if not exists(select 1 from public.warehouses where id=p_from_warehouse_id and tenant_id=p_tenant_id and is_active)
-     or not exists(select 1 from public.warehouses where id=p_to_warehouse_id and tenant_id=p_tenant_id and is_active) then
+  select w.branch_id into v_branch_id
+  from public.warehouses w
+  where w.id=p_from_warehouse_id and w.tenant_id=p_tenant_id and w.is_active;
+  if not found or not exists(
+    select 1 from public.warehouses where id=p_to_warehouse_id and tenant_id=p_tenant_id and is_active
+  ) then
     raise exception 'Both warehouses must be active and belong to this company';
   end if;
   if p_lines is null or jsonb_typeof(p_lines) is distinct from 'array' then
@@ -79,7 +84,7 @@ begin
     raise exception 'Every selected product must be active and belong to this company';
   end if;
 
-  v_number:=public.next_document_number(p_tenant_id,'stock_transfer');
+  v_number:=public.next_document_number_for_branch(p_tenant_id,'stock_transfer',v_branch_id);
   insert into public.stock_transfers(
     tenant_id,transfer_number,from_warehouse_id,to_warehouse_id,
     transfer_date,status,notes,created_by
