@@ -1,3 +1,4 @@
+import {toLocalDateInput} from "./lib/localDate";
 import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import {buildCsvWithBom} from "./lib/csvExport";
 import {FormEvent,useEffect,useState} from "react";
@@ -6,7 +7,7 @@ import {useModuleAction} from "./lib/modulePermissionContext";
 type Row=Record<string,any>;
 export default function BankReconciliationModule({db,tenantId,currentRole}:{db:SupabaseClient;tenantId:string;currentRole:string}){
  const canCreate=useModuleAction("accounts_finance","create",["owner","admin","manager","accounts"].includes(currentRole));
- const [accounts,setAccounts]=useState<Row[]>([]),[rows,setRows]=useState<Row[]>([]),[accountId,setAccountId]=useState(""),[statementDate,setStatementDate]=useState(new Date().toISOString().slice(0,10)),[statementBalance,setStatementBalance]=useState(""),[notes,setNotes]=useState(""),[saving,setSaving]=useState(false),[loading,setLoading]=useState(true),[notice,setNotice]=useState("");
+ const [accounts,setAccounts]=useState<Row[]>([]),[rows,setRows]=useState<Row[]>([]),[accountId,setAccountId]=useState(""),[statementDate,setStatementDate]=useState(toLocalDateInput()),[statementBalance,setStatementBalance]=useState(""),[notes,setNotes]=useState(""),[saving,setSaving]=useState(false),[loading,setLoading]=useState(true),[notice,setNotice]=useState("");
  const money=(v:number)=>"PKR "+Number(v||0).toLocaleString("en-PK",{minimumFractionDigits:2,maximumFractionDigits:2});
  async function load(){setLoading(true);setNotice("");const [a,r]=await Promise.all([db.from("chart_of_accounts").select("id,account_code,account_name,account_type").eq("tenant_id",tenantId).eq("is_active",true).order("account_code"),fetchAllRowsResult<any>((from,to)=>db.from("bank_reconciliations").select("id,account_id,statement_date,statement_balance,book_balance,difference,notes,created_at").eq("tenant_id",tenantId).order("statement_date",{ascending:false}).order("id",{ascending:true}).range(from,to))]);if(a.error||r.error)setNotice(a.error?.message||r.error?.message||"Bank records could not be loaded.");else{const bankish=(a.data??[]).filter(x=>/bank|cash/i.test(x.account_name+" "+x.account_code));setAccounts(bankish);setRows(r.data??[]);if(!accountId&&bankish[0])setAccountId(bankish[0].id);}setLoading(false);}
  useEffect(()=>{void load();},[tenantId]);
