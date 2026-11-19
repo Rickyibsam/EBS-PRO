@@ -25,12 +25,7 @@ export default function AdminModule({db,tenantId,module,currentRole}:{db:Supabas
  async function load(){
   setLoading(true);setNotice("");
   try {
-   if(module==="Booker Product Access"){
-     if(!form.employee_id)throw new Error("Select a Booker.");
-     if(!form.vendor_id&&!form.brand&&!form.product_id)throw new Error("Select a Vendor, Brand or Product scope.");
-     const {error}=await db.from("booker_product_visibility").insert({tenant_id:tenantId,employee_id:form.employee_id,vendor_id:form.vendor_id||null,brand:form.brand||null,product_id:form.product_id||null,is_allowed:form.is_allowed!=="false",require_stock:form.require_stock!=="false"});
-     if(error)throw error;setNotice("Booker product visibility rule saved.");
-   } else if(team){
+   if(team){
     const [e,m,b]=await Promise.all([db.from("employees").select("id,employee_code,full_name,phone,job_title,employment_status,branch_id,user_id").eq("tenant_id",tenantId).order("full_name"),db.from("tenant_memberships").select("id,user_id,role,is_active,created_at").eq("tenant_id",tenantId).order("created_at"),db.from("branches").select("id,name,code").eq("tenant_id",tenantId).eq("is_active",true).order("name")]);
      if(e.error)throw e.error;if(m.error)throw m.error;if(b.error)throw b.error;setLookups(v=>({...v,branches:b.data??[]}));setRows([...(e.data??[]).map(x=>({...x,_kind:"Employee"})),...(m.data??[]).map(x=>({...x,_kind:"Login account"}))]);
     } else if(routes){
@@ -61,7 +56,13 @@ export default function AdminModule({db,tenantId,module,currentRole}:{db:Supabas
  async function save(e:FormEvent){
   e.preventDefault();setSaving(true);setNotice("");
   try {
-   if(team){
+   if(module==="Booker Product Access"){
+    if(!form.employee_id)throw new Error("Select a Booker.");
+    if(!form.vendor_id&&!form.brand&&!form.product_id)throw new Error("Select a Vendor, Brand or Product scope.");
+    const {error}=await db.from("booker_product_visibility").insert({tenant_id:tenantId,employee_id:form.employee_id,vendor_id:form.vendor_id||null,brand:form.brand||null,product_id:form.product_id||null,is_allowed:form.is_allowed!=="false",require_stock:form.require_stock!=="false"});
+    if(error)throw error;
+    setNotice("Booker product visibility rule saved.");
+   } else if(team){
      if(!form.branch_id||!form.email?.trim()||!form.role)throw new Error("Enter staff email, role and assigned branch.");
      const {data,error}=await db.functions.invoke("invite-tenant-member",{body:{tenant_id:tenantId,email:form.email.trim(),full_name:form.full_name.trim(),employee_code:"",phone:form.phone.trim()||null,job_title:form.job_title.trim()||null,branch_id:form.branch_id,role:form.role}});
      if(error)throw error;if(data?.error)throw new Error(data.error);setNotice(data?.message||"Staff account configured.");
