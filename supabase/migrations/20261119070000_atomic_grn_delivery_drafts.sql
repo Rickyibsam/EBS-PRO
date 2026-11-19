@@ -310,3 +310,81 @@ $function$;
 
 revoke all on function public.create_delivery_draft(uuid,uuid,uuid,date,text,text,text,uuid,uuid,jsonb) from public,anon;
 grant execute on function public.create_delivery_draft(uuid,uuid,uuid,date,text,text,text,uuid,uuid,jsonb) to authenticated;
+
+
+-- Enforce delivery quantity reservations even if a client bypasses the draft RPC.
+create or replace function private.guard_delivery_line_order_quantity()
+returns trigger
+language plpgsql
+security definer
+set search_path=pg_catalog,public,private,auth
+as $function$
+declare
+  v_delivery public.deliveries%rowtype;
+  v_order_line record;
+  v_ordered_base numeric;
+  v_reserved numeric:=0;
+  v_current numeric:=0;
+begin
+  select * into v_delivery
+  from public.deliveries d
+  where d.id=new.delivery_id and d.tenant_id=new.tenant_id
+  for update;
+  if not found then raise exception 'Delivery header not found for this line'; end if;
+  if new.sales_order_line_id is null then
+    raise exception 'Delivery line must reference a sales order line';
+  end if;
+  if new.quantity_base is null or new.quantity_base<=0
+     or new.picked_quantity_base is null or new.picked_quantity_base<0
+     or new.picked_quantity_base>new.quantity_base
+     or new.delivered_quantity_base is null or new.delivered_quantity_base<0
+     or new.delivered_quantity_base>new.picked_quantity_base then
+    raise exception 'Delivery quantities are invalid';
+  end if;
+
+  perform 1 from public.sales_orders so
+  where so.id=v_delivery.sales_order_id and so.tenant_id=new.tenant_id
+  for update;
+  select sol.product_id,sol.quantity,sol.conversion_to_base
+  into v_order_line
+  from public.sales_order_lines sol
+  where sol.id=new.sales_order_line_id and sol.tenant_id=new.tenant_id
+    and sol.sales_order_id=v_delivery.sales_order_id
+  for update;
+  if not found or v_order_line.product_id<>new.product_id then
+    raise exception 'Delivery line does not match its sales order line';
+  end if;
+  v_ordered_base:=v_order_line.quantity*v_order_line.conversion_to_base;
+
+  select coalesce(sum(case
+    when d.status='pending' then dl.quantity_base
+    when d.status='delivered' then dl.delivered_quantity_base
+    else dl.picked_quantity_base
+  end),0)
+  into v_reserved
+  from public.delivery_lines dl
+  join public.deliveries d on d.id=dl.delivery_id and d.tenant_id=dl.tenant_id
+  where dl.tenant_id=new.tenant_id
+    and dl.sales_order_line_id=new.sales_order_line_id
+    and d.sales_order_id=v_delivery.sales_order_id
+    and d.status in ('pending','picked','dispatched','delivered')
+    and (tg_op='INSERT' or dl.id<>new.id);
+
+  v_current:=case
+    when v_delivery.status='pending' then new.quantity_base
+    when v_delivery.status='delivered' then new.delivered_quantity_base
+    else new.picked_quantity_base
+  end;
+  if v_reserved+v_current>v_ordered_base+0.000001 then
+    raise exception 'Delivery quantities exceed the remaining sales order quantity';
+  end if;
+  return new;
+end
+$function$;
+
+drop trigger if exists guard_delivery_line_order_quantity on public.delivery_lines;
+create trigger guard_delivery_line_order_quantity
+before insert or update of quantity_base,picked_quantity_base,delivered_quantity_base,
+  sales_order_line_id,product_id
+on public.delivery_lines
+for each row execute function private.guard_delivery_line_order_quantity();
