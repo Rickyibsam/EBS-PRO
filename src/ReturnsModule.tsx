@@ -1,3 +1,4 @@
+import {toLocalDateInput} from "./lib/localDate";
 import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import {buildCsvWithBom} from "./lib/csvExport";
 import { FormEvent, useEffect, useState } from "react";
@@ -17,7 +18,7 @@ export default function ReturnsModule({ db, tenantId, currentRole }: { db: Supab
   const [invoiceId, setInvoiceId] = useState("");
   const [invoiceLines, setInvoiceLines] = useState<ReturnLine[]>([]);
   const [reason, setReason] = useState("");
-  const [noteDate, setNoteDate] = useState(new Date().toISOString().slice(0,10));
+  const [noteDate, setNoteDate] = useState(toLocalDateInput());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
