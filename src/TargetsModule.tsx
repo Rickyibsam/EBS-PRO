@@ -1,4 +1,4 @@
-import {toLocalMonthEnd,toLocalMonthStart} from "./lib/localDate";
+import {toLocalDateInput,toLocalMonthEnd,toLocalMonthStart} from "./lib/localDate";
 import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import {FormEvent,useEffect,useMemo,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
@@ -95,7 +95,7 @@ export default function TargetsModule({db,tenantId,currentRole}:{db:SupabaseClie
   setSaving(true);setNotice("");
   try{
    const periods=[...new Set(targets.map(t=>t.period_start+"|"+t.period_end))];
-   const selectedPeriod=importPeriod||periods.find(x=>{const [s,e]=x.split("|");return s<=new Date().toISOString().slice(0,10)&&e>=new Date().toISOString().slice(0,10);})||periods[0];
+   const selectedPeriod=importPeriod||periods.find(x=>{const [s,e]=x.split("|");return s<=toLocalDateInput()&&e>=toLocalDateInput();})||periods[0];
    if(!selectedPeriod)throw new Error("No target periods are available.");
    const [start,end]=selectedPeriod.split("|");
    const settledTargetIds=new Set(accruals.filter(a=>a.status==="settled").map(a=>a.sales_target_id));
