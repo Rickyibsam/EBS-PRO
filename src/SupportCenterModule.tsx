@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import "./support-center.css";
 
 type Ticket = { id:string; tenant_id:string; ticket_number:number; subject:string; category:string; priority:string; status:string; description:string; created_at:string; updated_at:string; sla_due_at:string|null; first_response_at:string|null; escalation_level:number; escalated_at:string|null; resolution:string|null };
@@ -50,9 +51,9 @@ export default function SupportCenterModule({db,tenantId,userId}:{db:SupabaseCli
     if(!selected){setMessages([]);setAttachments([]);setTicketEvents([]);return;}
     let live=true;
     Promise.all([
-      db.from("platform_support_messages").select("id,ticket_id,sender_id,body,created_at").eq("ticket_id",selected).order("created_at"),
-      db.from("platform_support_attachments").select("*").eq("ticket_id",selected).order("created_at"),
-      db.from("platform_support_ticket_events").select("*").eq("ticket_id",selected).order("created_at",{ascending:false})
+      fetchAllRowsResult<Message>((from,to)=>db.from("platform_support_messages").select("id,ticket_id,sender_id,body,created_at").eq("ticket_id",selected).order("created_at").order("id",{ascending:true}).range(from,to)),
+      fetchAllRowsResult<Attachment>((from,to)=>db.from("platform_support_attachments").select("*").eq("ticket_id",selected).order("created_at").order("id",{ascending:true}).range(from,to)),
+      fetchAllRowsResult<TicketEvent>((from,to)=>db.from("platform_support_ticket_events").select("*").eq("ticket_id",selected).order("created_at",{ascending:false}).order("id",{ascending:true}).range(from,to))
     ]).then(([messageResult,attachmentResult,eventResult])=>{
       if(!live)return;
       if(messageResult.error)setNotice(messageResult.error.message);else setMessages((messageResult.data||[]) as Message[]);
