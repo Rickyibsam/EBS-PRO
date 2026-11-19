@@ -14,11 +14,11 @@ export default function PurchaseInvoiceModule({db,tenantId,currentRole}:{db:Supa
   setLoading(true);setNotice("");
   const [g,o,p,i,pay,creditNotes]=await Promise.all([
    fetchAllRowsResult<any>((from,to)=>db.from("goods_receipts").select("id,grn_number,received_date,purchase_order_id,status").eq("tenant_id",tenantId).eq("status","posted").order("received_date",{ascending:false}).order("id",{ascending:true}).range(from,to)),
-   db.from("purchase_orders").select("id,po_number,supplier_id").eq("tenant_id",tenantId),
-   db.from("parties").select("id,party_code,name").eq("tenant_id",tenantId).in("party_type",["supplier","both"]).order("name"),
+   fetchAllRowsResult<any>((from,to)=>db.from("purchase_orders").select("id,po_number,supplier_id").eq("tenant_id",tenantId).order("id",{ascending:true}).range(from,to)),
+   fetchAllRowsResult<any>((from,to)=>db.from("parties").select("id,party_code,name").eq("tenant_id",tenantId).in("party_type",["supplier","both"]).order("name").order("id",{ascending:true}).range(from,to)),
    fetchAllRowsResult<any>((from,to)=>db.from("purchase_invoices").select("id,goods_receipt_id,supplier_id,supplier_invoice_no,invoice_date,due_date,subtotal,tax_amount,grand_total,status,posted_at").eq("tenant_id",tenantId).order("invoice_date",{ascending:false}).order("id",{ascending:true}).range(from,to)),
-   db.from("payments").select("purchase_invoice_id,amount").eq("tenant_id",tenantId).eq("payment_type","payment").not("purchase_invoice_id","is",null),
-   db.from("purchase_debit_notes").select("goods_receipt_id,subtotal").eq("tenant_id",tenantId).eq("status","posted")
+   fetchAllRowsResult<any>((from,to)=>db.from("payments").select("purchase_invoice_id,amount").eq("tenant_id",tenantId).eq("payment_type","payment").not("purchase_invoice_id","is",null).order("id",{ascending:true}).range(from,to)),
+   fetchAllRowsResult<any>((from,to)=>db.from("purchase_debit_notes").select("goods_receipt_id,subtotal").eq("tenant_id",tenantId).eq("status","posted").order("id",{ascending:true}).range(from,to))
   ]);
   const err=g.error||o.error||p.error||i.error||pay.error||creditNotes.error;if(err)setNotice(err.message);else{setGrns(g.data??[]);setOrders(o.data??[]);setParties(p.data??[]);setInvoices((i.data??[]).map(x=>{const paid=(pay.data??[]).filter(y=>y.purchase_invoice_id===x.id).reduce((n,y)=>n+Number(y.amount||0),0);const credits=(creditNotes.data??[]).filter(y=>y.goods_receipt_id===x.goods_receipt_id).reduce((n,y)=>n+Number(y.subtotal||0),0);return {...x,paid,credits,outstanding:Math.max(Number(x.grand_total)-paid-credits,0)};}));}
   setLoading(false);
