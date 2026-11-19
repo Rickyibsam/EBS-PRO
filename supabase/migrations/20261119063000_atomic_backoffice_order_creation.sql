@@ -39,7 +39,7 @@ begin
   if v_user is null then
     raise exception 'Authentication required' using errcode='42501';
   end if;
-  if p_document_type not in ('sales_order','purchase_order') then
+  if p_document_type is null or p_document_type not in ('sales_order','purchase_order') then
     raise exception 'Unsupported order type';
   end if;
   if p_document_type='sales_order' then
