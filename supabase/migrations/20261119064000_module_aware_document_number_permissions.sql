@@ -41,26 +41,43 @@ begin
     raise exception 'Not authorized to allocate a document number' using errcode='42501';
   end if;
 
-  v_role_allowed:=case v_module_key
-    when 'sales_customer' then public.has_tenant_role(p_tenant_id,array['owner','admin','manager','sales','cashier'])
-    when 'purchase_supplier' then public.has_tenant_role(p_tenant_id,array['owner','admin','manager','purchase','warehouse'])
-    when 'distribution_delivery' then public.has_tenant_role(p_tenant_id,array['owner','admin','manager','warehouse'])
-    when 'accounts_finance' then public.has_tenant_role(p_tenant_id,array['owner','admin','manager','accounts','cashier'])
-    when 'hr_payroll' then public.has_tenant_role(p_tenant_id,array['owner','admin','manager','accounts'])
-    when 'inventory' then public.has_tenant_role(p_tenant_id,array['owner','admin','manager','warehouse'])
-    else false end;
+  v_role_allowed:=case
+    when p_document_type='journal_entry' then
+      public.has_tenant_role(p_tenant_id,array['owner','admin','manager','accounts','warehouse','purchase','sales','cashier','hr'])
+    else case v_module_key
+      when 'sales_customer' then public.has_tenant_role(p_tenant_id,array['owner','admin','manager','sales','cashier'])
+      when 'purchase_supplier' then public.has_tenant_role(p_tenant_id,array['owner','admin','manager','purchase','warehouse'])
+      when 'distribution_delivery' then public.has_tenant_role(p_tenant_id,array['owner','admin','manager','warehouse'])
+      when 'accounts_finance' then public.has_tenant_role(p_tenant_id,array['owner','admin','manager','accounts','cashier'])
+      when 'hr_payroll' then public.has_tenant_role(p_tenant_id,array['owner','admin','manager','accounts'])
+      when 'inventory' then public.has_tenant_role(p_tenant_id,array['owner','admin','manager','warehouse'])
+      else false end
+  end;
   v_is_platform_owner:=public.has_tenant_role(p_tenant_id,array['owner','admin']);
   select exists(
     select 1 from public.tenant_user_module_permissions p
     where p.tenant_id=p_tenant_id and p.user_id=v_user and p.module_key=v_module_key
   ) into v_has_override;
 
-  if not v_role_allowed then
+  if p_document_type='journal_entry' then
+    -- Source workflow RPCs enforce the relevant module permission before posting.
+    if not v_role_allowed and not (
+      private.module_permission_grant_internal(p_tenant_id,'accounts_finance','create')
+      or private.module_permission_grant_internal(p_tenant_id,'purchase_supplier','update')
+      or private.module_permission_grant_internal(p_tenant_id,'distribution_delivery','update')
+      or private.module_permission_grant_internal(p_tenant_id,'inventory','update')
+      or private.module_permission_grant_internal(p_tenant_id,'hr_payroll','update')
+      or private.module_permission_grant_internal(p_tenant_id,'fixed_assets','update')
+      or private.module_permission_grant_internal(p_tenant_id,'sales_customer','update')
+    ) then
+      raise exception 'Not authorized to allocate a journal number' using errcode='42501';
+    end if;
+  elsif not v_role_allowed then
     if not private.module_permission_grant_internal(p_tenant_id,v_module_key,v_action) then
       raise exception 'Not authorized to allocate a document number' using errcode='42501';
     end if;
   elsif not v_is_platform_owner and v_has_override
-        and not private.module_permission_grant_internal(p_tenant_id,v_module_key,'create') then
+        and not private.module_permission_grant_internal(p_tenant_id,v_module_key,v_action) then
     raise exception 'Document creation is disabled for this user' using errcode='42501';
   end if;
 
