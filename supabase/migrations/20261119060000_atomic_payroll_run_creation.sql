@@ -10,7 +10,8 @@ create or replace function public.create_payroll_run(
 )
 returns jsonb
 language plpgsql
-set search_path=pg_catalog,public,auth
+security definer
+set search_path=pg_catalog,public,private,auth
 as $function$
 declare
   v_user uuid:=auth.uid();
