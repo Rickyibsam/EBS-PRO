@@ -233,7 +233,7 @@ begin
   where so.id=p_sales_order_id and so.tenant_id=p_tenant_id
   for update of so;
   if not found or v_order.status not in ('approved','allocated','dispatched') then
-    raise exception 'Select an approved or allocated sales order';
+    raise exception 'Select an approved, allocated or partially dispatched sales order';
   end if;
   if p_warehouse_id is null or not exists(
     select 1 from public.warehouses w where w.id=p_warehouse_id
