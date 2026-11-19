@@ -412,6 +412,17 @@ begin
     raise exception 'FAIL: duplicate GRN drafts exceeded the remaining purchase order quantity';
   end if;
   perform public.post_goods_receipt(v_grn);
+  v_rejected:=false;
+  begin
+    update public.purchase_order_lines
+    set received_base_quantity=quantity*conversion_to_base+1
+    where id=v_purchase_order_line and tenant_id=v_tenant_a;
+  exception when check_violation then
+    v_rejected:=true;
+  end;
+  if not v_rejected or (select received_base_quantity from public.purchase_order_lines where id=v_purchase_order_line)<>7 then
+    raise exception 'FAIL: purchase order received quantity guard did not prevent over-receipt';
+  end if;
   if not exists(select 1 from public.stock_movements where tenant_id=v_tenant_a
     and reference_type='goods_receipt' and reference_id=v_grn and quantity_in=7) then
     raise exception 'FAIL: GRN did not create the expected stock movement';
