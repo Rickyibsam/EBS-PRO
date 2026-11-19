@@ -105,6 +105,93 @@ revoke all on function public.sync_sales_order_delivery_status(uuid,uuid,uuid,te
 grant execute on function public.sync_sales_order_delivery_status(uuid,uuid,uuid,text) to authenticated;
 
 
+create or replace function public.update_delivery_assignment(
+  p_tenant_id uuid,
+  p_delivery_id uuid,
+  p_route_id uuid,
+  p_delivery_man_employee_id uuid,
+  p_driver_name text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path=pg_catalog,public,private,auth
+as $function$
+declare
+  v_user uuid:=auth.uid();
+  v_delivery record;
+  v_employee_name text;
+  v_role_allowed boolean;
+  v_is_owner_admin boolean;
+  v_has_override boolean;
+  v_driver_name text;
+begin
+  if v_user is null then raise exception 'Authentication required' using errcode='42501'; end if;
+
+  v_role_allowed:=public.has_tenant_role(p_tenant_id,array['owner','admin','manager','warehouse']);
+  v_is_owner_admin:=public.has_tenant_role(p_tenant_id,array['owner','admin']);
+  select exists(select 1 from public.tenant_user_module_permissions p
+    where p.tenant_id=p_tenant_id and p.user_id=v_user and p.module_key='distribution_delivery')
+  into v_has_override;
+  if not v_role_allowed then
+    if not private.module_permission_grant_internal(p_tenant_id,'distribution_delivery','update') then
+      raise exception 'Delivery assignment update permission required' using errcode='42501';
+    end if;
+  elsif not v_is_owner_admin and v_has_override
+        and not private.module_permission_grant_internal(p_tenant_id,'distribution_delivery','update') then
+    raise exception 'Delivery assignment updates are disabled for this user' using errcode='42501';
+  end if;
+
+  select d.id,d.sales_order_id,d.status,
+         coalesce(so.branch_id,so_wh.branch_id,dw.branch_id) as branch_id
+  into v_delivery
+  from public.deliveries d
+  join public.sales_orders so on so.id=d.sales_order_id and so.tenant_id=d.tenant_id
+  left join public.warehouses so_wh on so_wh.id=so.warehouse_id and so_wh.tenant_id=so.tenant_id
+  left join public.warehouses dw on dw.id=d.warehouse_id and dw.tenant_id=d.tenant_id
+  where d.id=p_delivery_id and d.tenant_id=p_tenant_id
+  for update of d;
+  if not found then raise exception 'Delivery not found for this company'; end if;
+  if v_delivery.status not in ('pending','picked') then
+    raise exception 'Delivery assignments cannot be changed after dispatch';
+  end if;
+
+  if p_route_id is not null and not exists(
+    select 1 from public.sales_routes r
+    where r.id=p_route_id and r.tenant_id=p_tenant_id and r.is_active
+      and (v_delivery.branch_id is null or r.branch_id is null or r.branch_id=v_delivery.branch_id)
+  ) then raise exception 'Selected route must be active in this branch'; end if;
+
+  if p_delivery_man_employee_id is not null then
+    select e.full_name into v_employee_name
+    from public.employees e
+    where e.id=p_delivery_man_employee_id and e.tenant_id=p_tenant_id
+      and e.employment_status='active'
+      and (v_delivery.branch_id is null or e.branch_id is null or e.branch_id=v_delivery.branch_id);
+    if not found then raise exception 'Selected delivery man must be active and assigned to this branch'; end if;
+  end if;
+  if p_driver_name is not null and length(p_driver_name)>160 then raise exception 'Driver name is too long'; end if;
+  v_driver_name:=coalesce(nullif(trim(p_driver_name),''),v_employee_name);
+
+  update public.deliveries
+  set route_id=p_route_id,delivery_man_employee_id=p_delivery_man_employee_id,
+      driver_name=v_driver_name
+  where id=p_delivery_id and tenant_id=p_tenant_id;
+
+  update public.sales_orders
+  set route_id=p_route_id,delivery_man_employee_id=p_delivery_man_employee_id,updated_at=now()
+  where id=v_delivery.sales_order_id and tenant_id=p_tenant_id;
+
+  return jsonb_build_object('success',true,'delivery_id',p_delivery_id,
+    'route_id',p_route_id,'delivery_man_employee_id',p_delivery_man_employee_id);
+end
+$function$;
+
+revoke all on function public.update_delivery_assignment(uuid,uuid,uuid,uuid,text) from public,anon;
+grant execute on function public.update_delivery_assignment(uuid,uuid,uuid,uuid,text) to authenticated;
+
+
+
 CREATE OR REPLACE FUNCTION public.dispatch_delivery(p_delivery_id uuid, p_lines jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
