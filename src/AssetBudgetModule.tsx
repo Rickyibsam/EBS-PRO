@@ -1,6 +1,7 @@
 import {FormEvent,useEffect,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 import {useModuleAction} from "./lib/modulePermissionContext";
+import {fetchAllRowsResult} from "./lib/fetchAllRows";
 const money=(v:number)=>"PKR "+Number(v||0).toLocaleString("en-PK",{minimumFractionDigits:2,maximumFractionDigits:2});
 export default function AssetBudgetModule({db,tenantId,currentRole}:{db:SupabaseClient;tenantId:string;currentRole:string}){
  const [tab,setTab]=useState("assets"),[branches,setBranches]=useState<any[]>([]),[assets,setAssets]=useState<any[]>([]),[budgets,setBudgets]=useState<any[]>([]),[accounts,setAccounts]=useState<any[]>([]),[lines,setLines]=useState<any[]>([]),[actuals,setActuals]=useState<any[]>([]),[cashMappings,setCashMappings]=useState<any[]>([]),[depreciationEntries,setDepreciationEntries]=useState<any[]>([]),[budgetActuals,setBudgetActuals]=useState<any[]>([]),[notice,setNotice]=useState(""),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[periodMonth,setPeriodMonth]=useState(new Date().toISOString().slice(0,7)),[depExpense,setDepExpense]=useState(""),[depAccum,setDepAccum]=useState(""),[assetCostAccount,setAssetCostAccount]=useState(""),[cashAccount,setCashAccount]=useState(""),[gainAccount,setGainAccount]=useState(""),[lossAccount,setLossAccount]=useState(""),[disposalDate,setDisposalDate]=useState(new Date().toISOString().slice(0,10)),[proceeds,setProceeds]=useState("0");
@@ -9,7 +10,32 @@ export default function AssetBudgetModule({db,tenantId,currentRole}:{db:Supabase
  const roleCanEdit=["owner","admin","manager","accounts"].includes(currentRole);
  const canCreate=useModuleAction("accounts_finance","create",roleCanEdit);
  const canUpdate=useModuleAction("accounts_finance","update",roleCanEdit);
- async function load(){setLoading(true);const [x,y,c,l,j,m,cm,de,ba,br]=await Promise.all([db.from("fixed_assets").select("*").eq("tenant_id",tenantId).order("acquisition_date",{ascending:false}),db.from("budgets").select("*").eq("tenant_id",tenantId).order("period_start",{ascending:false}),db.from("chart_of_accounts").select("id,account_code,account_name,account_type").eq("tenant_id",tenantId).eq("is_active",true).order("account_code"),db.from("budget_lines").select("*").eq("tenant_id",tenantId),db.from("journal_lines").select("journal_entry_id,account_id,debit,credit,journal_entries!inner(entry_date,status)").eq("tenant_id",tenantId).eq("journal_entries.status","posted"),db.from("fixed_asset_account_mappings").select("*").eq("tenant_id",tenantId).maybeSingle(),db.from("cash_flow_account_mappings").select("account_id,classification").eq("tenant_id",tenantId),db.from("asset_depreciation_entries").select("asset_id,depreciation_amount,period_start,period_end,journal_entry_id,posted").eq("tenant_id",tenantId).eq("posted",true),db.rpc("get_budget_actuals",{p_tenant_id:tenantId}),db.from("branches").select("id,name,code").eq("tenant_id",tenantId).order("name")]);const e=x.error||y.error||c.error||l.error||j.error||m.error||cm.error||de.error||ba.error||br.error;if(e)setNotice(e.message);else{setBranches(br.data||[]);setAssets(x.data||[]);setBudgets(y.data||[]);setAccounts(c.data||[]);setLines(l.data||[]);setActuals(j.data||[]);setCashMappings(cm.data||[]);setDepreciationEntries(de.data||[]);setBudgetActuals(ba.data||[]);setDepExpense(m.data?.depreciation_expense_account_id||"");setDepAccum(m.data?.accumulated_depreciation_account_id||"");setAssetCostAccount(m.data?.asset_cost_account_id||"");setCashAccount(m.data?.cash_account_id||"");setGainAccount(m.data?.disposal_gain_account_id||"");setLossAccount(m.data?.disposal_loss_account_id||"");}setLoading(false);}
+ async function load(){
+  setLoading(true);setNotice("");
+  const [x,y,c,l,j,m,cm,de,ba,br]=await Promise.all([
+   fetchAllRowsResult<any>((from,to)=>db.from("fixed_assets").select("*").eq("tenant_id",tenantId).order("acquisition_date",{ascending:false}).order("id",{ascending:true}).range(from,to)),
+   fetchAllRowsResult<any>((from,to)=>db.from("budgets").select("*").eq("tenant_id",tenantId).order("period_start",{ascending:false}).order("id",{ascending:true}).range(from,to)),
+   fetchAllRowsResult<any>((from,to)=>db.from("chart_of_accounts").select("id,account_code,account_name,account_type").eq("tenant_id",tenantId).eq("is_active",true).order("account_code").order("id",{ascending:true}).range(from,to)),
+   fetchAllRowsResult<any>((from,to)=>db.from("budget_lines").select("*").eq("tenant_id",tenantId).order("budget_id").order("account_id").order("id",{ascending:true}).range(from,to)),
+   fetchAllRowsResult<any>((from,to)=>db.from("journal_lines").select("id,journal_entry_id,account_id,debit,credit,journal_entries!inner(entry_date,status)").eq("tenant_id",tenantId).eq("journal_entries.status","posted").order("journal_entry_id").order("id").range(from,to)),
+   db.from("fixed_asset_account_mappings").select("*").eq("tenant_id",tenantId).maybeSingle(),
+   fetchAllRowsResult<any>((from,to)=>db.from("cash_flow_account_mappings").select("account_id,classification").eq("tenant_id",tenantId).order("account_id").range(from,to)),
+   fetchAllRowsResult<any>((from,to)=>db.from("asset_depreciation_entries").select("asset_id,depreciation_amount,period_start,period_end,journal_entry_id,posted").eq("tenant_id",tenantId).eq("posted",true).order("period_start").order("id").range(from,to)),
+   db.rpc("get_budget_actuals",{p_tenant_id:tenantId}),
+   fetchAllRowsResult<any>((from,to)=>db.from("branches").select("id,name,code").eq("tenant_id",tenantId).order("name").order("id",{ascending:true}).range(from,to))
+  ]);
+  const e=x.error||y.error||c.error||l.error||j.error||m.error||cm.error||de.error||ba.error||br.error;
+  if(e)setNotice(e.message);
+  else{
+   setBranches(br.data||[]);setAssets(x.data||[]);setBudgets(y.data||[]);setAccounts(c.data||[]);
+   setLines(l.data||[]);setActuals(j.data||[]);setCashMappings(cm.data||[]);
+   setDepreciationEntries(de.data||[]);setBudgetActuals(ba.data||[]);
+   setDepExpense(m.data?.depreciation_expense_account_id||"");setDepAccum(m.data?.accumulated_depreciation_account_id||"");
+   setAssetCostAccount(m.data?.asset_cost_account_id||"");setCashAccount(m.data?.cash_account_id||"");
+   setGainAccount(m.data?.disposal_gain_account_id||"");setLossAccount(m.data?.disposal_loss_account_id||"");
+  }
+  setLoading(false);
+ }
 
  async function saveAssetMappings(){
   if(!canUpdate)return;
