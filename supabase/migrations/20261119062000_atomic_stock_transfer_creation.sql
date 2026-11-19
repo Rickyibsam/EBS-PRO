@@ -11,7 +11,7 @@ create or replace function public.create_stock_transfer(
 )
 returns jsonb
 language plpgsql
-security invoker
+security definer
 set search_path=pg_catalog,public,private,auth
 as $function$
 declare
