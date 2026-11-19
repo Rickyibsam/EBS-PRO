@@ -1,3 +1,4 @@
+import {toLocalDateInput} from "./lib/localDate";
 import {FormEvent,useEffect,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 import {useModuleAction} from "./lib/modulePermissionContext";
@@ -6,7 +7,7 @@ import {fetchAllRowsResult} from "./lib/fetchAllRows";
 type R=Record<string,any>;
 export default function VendorReconciliationModule({db,tenantId,currentRole}:{db:SupabaseClient;tenantId:string;currentRole:string}){
  const canCreate=useModuleAction("purchase_supplier","create",["owner","admin","manager","accounts"].includes(currentRole));
- const [vendors,S]=useState<R[]>([]),[rows,RW]=useState<R[]>([]),[vendor,V]=useState(""),[date,D]=useState(new Date().toISOString().slice(0,10)),[balance,B]=useState(""),[notes,N]=useState(""),[notice,Q]=useState(""),[busy,U]=useState(false);
+ const [vendors,S]=useState<R[]>([]),[rows,RW]=useState<R[]>([]),[vendor,V]=useState(""),[date,D]=useState(toLocalDateInput()),[balance,B]=useState(""),[notes,N]=useState(""),[notice,Q]=useState(""),[busy,U]=useState(false);
  const money=(n:number)=>"PKR "+Number(n||0).toLocaleString("en-PK",{minimumFractionDigits:2,maximumFractionDigits:2});
  async function load(){const [p,r]=await Promise.all([
   fetchAllRowsResult<R>((from,to)=>db.from("parties").select("id,name,party_code,opening_balance").eq("tenant_id",tenantId).in("party_type",["supplier","both"]).order("name").order("id",{ascending:true}).range(from,to)),
