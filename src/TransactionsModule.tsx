@@ -102,7 +102,12 @@ export default function TransactionsModule({db,tenantId,module,currentRole}:{db:
    const detail=clean.map(l=>{const pu=allowedUnits(l.product_id).find(x=>x.unit_id===l.unit_id)!;const amount=Number(l.quantity)*Number(l.rate);const taxAmount=Math.max(0,amount-Number(l.discount))*Number(l.tax_rate)/100;return {tenant_id:tenantId,[purchase?"purchase_order_id":"sales_order_id"]:created.id,product_id:l.product_id,unit_id:l.unit_id,quantity:Number(l.quantity),conversion_to_base:Number(pu.conversion_to_base),[purchase?"unit_cost":"unit_price"]:Number(l.rate),tax_rate:Number(l.tax_rate)||0,discount_amount:Number(l.discount)||0,line_total:amount+taxAmount-(Number(l.discount)||0)};});
    const lineTable=purchase?"purchase_order_lines":"sales_order_lines";
    const {error:lineError}=await db.from(lineTable).insert(detail);
-   if(lineError){const cleanup=await db.from(table).delete().eq("id",created.id).eq("tenant_id",tenantId).eq("status","draft");setNotice("Order lines could not be saved: "+lineError.message+(cleanup.error?" The empty draft could not be removed; please review document "+doc+".":" The empty draft was rolled back."));await loadAll();return;}
+   if(lineError){
+    const cleanup=await db.from(table).delete().eq("id",created.id).eq("tenant_id",tenantId).eq("status","draft").select("id");
+    const removed=!cleanup.error&&(cleanup.data||[]).some(x=>x.id===created.id);
+    setNotice("Order lines could not be saved: "+lineError.message+(cleanup.error?" The empty draft could not be removed; please review document "+doc+".":removed?" The empty draft was rolled back.":" The draft still exists; please review document "+doc+" before retrying."));
+    await loadAll();return;
+   }
    setNotice("Draft "+doc+" saved successfully.");
    setLines([{product_id:"",unit_id:"",quantity:"1",rate:"0",tax_rate:"0",discount:"0"}]);setPartyId("");setWarehouseId("");setNotes("");setBookerId("");setRouteId("");setDeliveryManId("");setShowForm(false);await loadAll();
   }catch(err){setNotice(err instanceof Error?err.message:"The transaction could not be saved.");}
