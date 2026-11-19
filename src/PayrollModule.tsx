@@ -44,16 +44,18 @@ export default function PayrollModule({db,tenantId,currentRole}:{db:SupabaseClie
    if(!periodStart||!periodEnd||periodEnd<periodStart)throw new Error("Enter a valid payroll period.");
    const staff=employees.filter(x=>x.employment_status==="active"&&Number(x.basic_salary)>0);
    if(!staff.length)throw new Error("Set basic salary for at least one active employee before generating payroll.");
-   const {data:runNo,error:numberError}=await db.rpc("next_document_number",{p_tenant_id:tenantId,p_document_type:"payroll_run"});
-   if(numberError)throw numberError;
-   if(typeof runNo!=="string"||!runNo)throw new Error("Payroll run number could not be generated.");
-   const {data:auth}=await db.auth.getUser();
-   const {data:head,error}=await db.from("payroll_runs").insert({tenant_id:tenantId,run_number:runNo,period_start:periodStart,period_end:periodEnd,pay_date:payDate,status:"draft",created_by:auth.user?.id??null}).select("id").single();
+   const {data,error}=await db.rpc("create_payroll_run",{
+    p_tenant_id:tenantId,
+    p_period_start:periodStart,
+    p_period_end:periodEnd,
+    p_pay_date:payDate,
+    p_employee_ids:staff.map(x=>x.id)
+   });
    if(error)throw error;
-   const payload=staff.map(x=>({tenant_id:tenantId,payroll_run_id:head.id,employee_id:x.id,basic_salary:Number(x.basic_salary),allowances:0,overtime:0,sales_incentive:0,deductions:0,net_salary:Number(x.basic_salary)}));
-   const {error:lineError}=await db.from("payroll_lines").insert(payload);
-   if(lineError){await db.from("payroll_runs").delete().eq("id",head.id).eq("tenant_id",tenantId).eq("status","draft");throw new Error("Payroll lines could not be generated: "+lineError.message);}
-   setSelected(head.id);setNotice("Draft payroll generated for "+staff.length+" active employees.");await load();
+   if(data?.success!==true||typeof data.run_id!=="string")throw new Error("Payroll run and employee lines were not confirmed as saved.");
+   await load();
+   setSelected(data.run_id);
+   setNotice("Draft payroll "+data.run_number+" saved atomically for "+data.line_count+" active employees.");
   }catch(err){setNotice(err instanceof Error?err.message:"Payroll run could not be created.");}
   finally{setSaving(false);}
  }
