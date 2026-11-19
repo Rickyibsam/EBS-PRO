@@ -198,6 +198,10 @@ declare
   v_delivery_id uuid;
   v_order record;
   v_line record;
+  v_route_id uuid;
+  v_delivery_man_id uuid;
+  v_employee_name text;
+  v_final_driver_name text;
   v_order_line record;
   v_requested integer;
   v_inserted integer:=0;
@@ -222,7 +226,8 @@ begin
     raise exception 'Delivery creation is disabled for this user' using errcode='42501';
   end if;
 
-  select so.id,coalesce(so.branch_id,so_wh.branch_id) as branch_id,so.status into v_order
+  select so.id,coalesce(so.branch_id,so_wh.branch_id) as branch_id,so.status,
+         so.route_id,so.delivery_man_employee_id into v_order
   from public.sales_orders so
   left join public.warehouses so_wh on so_wh.id=so.warehouse_id and so_wh.tenant_id=so.tenant_id
   where so.id=p_sales_order_id and so.tenant_id=p_tenant_id
@@ -238,15 +243,19 @@ begin
     raise exception 'Delivery warehouse must be active and belong to the sales order branch';
   end if;
   if p_delivery_date is null then raise exception 'Delivery date is required'; end if;
-  if p_delivery_man_employee_id is not null and not exists(
-    select 1 from public.employees e where e.id=p_delivery_man_employee_id
-      and e.tenant_id=p_tenant_id and e.employment_status='active'
-  ) then raise exception 'Selected delivery man must be an active employee'; end if;
-  if p_route_id is not null and not exists(
-    select 1 from public.sales_routes r where r.id=p_route_id
+  v_delivery_man_id:=coalesce(p_delivery_man_employee_id,v_order.delivery_man_employee_id);
+  v_route_id:=coalesce(p_route_id,v_order.route_id);
+  if v_delivery_man_id is not null then
+    select e.full_name into v_employee_name from public.employees e
+    where e.id=v_delivery_man_id and e.tenant_id=p_tenant_id and e.employment_status='active';
+    if not found then raise exception 'Selected delivery man must be an active employee'; end if;
+  end if;
+  if v_route_id is not null and not exists(
+    select 1 from public.sales_routes r where r.id=v_route_id
       and r.tenant_id=p_tenant_id and r.is_active
   ) then raise exception 'Selected route must be active in this company'; end if;
   if p_driver_name is not null and length(p_driver_name)>160 then raise exception 'Driver name is too long'; end if;
+  v_final_driver_name:=coalesce(nullif(trim(p_driver_name),''),v_employee_name);
   if p_vehicle_number is not null and length(p_vehicle_number)>80 then raise exception 'Vehicle number is too long'; end if;
   if p_notes is not null and length(p_notes)>2000 then raise exception 'Delivery notes cannot exceed 2000 characters'; end if;
   if p_lines is null or jsonb_typeof(p_lines) is distinct from 'array' then
@@ -265,8 +274,8 @@ begin
     driver_name,vehicle_number,status,notes,route_id,delivery_man_employee_id
   ) values (
     p_tenant_id,p_sales_order_id,p_warehouse_id,v_number,p_delivery_date,
-    nullif(trim(p_driver_name),''),nullif(trim(p_vehicle_number),''),'pending',
-    nullif(trim(p_notes),''),p_route_id,p_delivery_man_employee_id
+    v_final_driver_name,nullif(trim(p_vehicle_number),''),'pending',
+    nullif(trim(p_notes),''),v_route_id,v_delivery_man_id
   ) returning id into v_delivery_id;
 
   for v_line in
