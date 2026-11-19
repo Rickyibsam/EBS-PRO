@@ -87,7 +87,7 @@ CREATE OR REPLACE FUNCTION public.post_stock_take(p_stock_take_id uuid)
  SECURITY DEFINER
  SET search_path TO 'pg_catalog', 'public', 'private', 'auth'
 AS $function$
-declare v_take public.stock_takes%rowtype;x record;v_current numeric;v_variance numeric;v_count integer:=0;v_user uuid:=auth.uid();v_role_allowed boolean;v_is_owner_admin boolean;v_has_override boolean;
+declare v_take public.stock_takes%rowtype;x record;v_current numeric;v_variance numeric;v_count integer:=0;v_user uuid:=auth.uid();v_product public.products%rowtype;v_role_allowed boolean;v_is_owner_admin boolean;v_has_override boolean;
 begin
  if v_user is null then raise exception 'Authentication required.' using errcode='42501';end if;
  select * into v_take from public.stock_takes where id=p_stock_take_id for update;
@@ -103,6 +103,13 @@ begin
  if v_take.status<>'draft' then raise exception 'Only draft stock takes can be posted.'; end if;
  if not exists(select 1 from public.stock_take_lines where tenant_id=v_take.tenant_id and stock_take_id=v_take.id) then raise exception 'Stock take has no count lines.'; end if;
  for x in select * from public.stock_take_lines where tenant_id=v_take.tenant_id and stock_take_id=v_take.id order by product_id,batch_number,expiry_date for update loop
+  if x.counted_quantity is null or x.counted_quantity<0 or x.expected_quantity is null or x.expected_quantity<0 then
+   raise exception 'Stock take line quantities are invalid';
+  end if;
+  select * into v_product from public.products where id=x.product_id and tenant_id=v_take.tenant_id and is_active;
+  if not found then raise exception 'Stock take product is no longer active in this company'; end if;
+  if v_product.track_batch and nullif(btrim(x.batch_number),'') is null then raise exception 'Batch number is required for %.',v_product.name; end if;
+  if v_product.track_expiry and x.expiry_date is null then raise exception 'Expiry date is required for %.',v_product.name; end if;
   perform pg_advisory_xact_lock(hashtextextended(v_take.tenant_id::text||'|'||v_take.warehouse_id::text||'|'||x.product_id::text,0));
   select coalesce(sum(quantity_in-quantity_out),0) into v_current from public.stock_movements
   where tenant_id=v_take.tenant_id and warehouse_id=v_take.warehouse_id and product_id=x.product_id
