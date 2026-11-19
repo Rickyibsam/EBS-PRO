@@ -1,3 +1,4 @@
+import {toLocalDateInput} from "./lib/localDate";
 import { FormEvent, useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {useModuleAction} from "./lib/modulePermissionContext";
@@ -26,7 +27,7 @@ export default function AccountingModule({ db, tenantId,currentRole }: { db: Sup
   const [cashAccountId,setCashAccountId]=useState("");
   const [cashBranchId,setCashBranchId]=useState("");
   const [cashRecons,setCashRecons]=useState<Row[]>([]);
-  const [statementDate,setStatementDate]=useState(new Date().toISOString().slice(0,10));
+  const [statementDate,setStatementDate]=useState(toLocalDateInput());
   const [statementBalance,setStatementBalance]=useState("0");
   const [reconNotes,setReconNotes]=useState("");
   const [loading, setLoading] = useState(true);
