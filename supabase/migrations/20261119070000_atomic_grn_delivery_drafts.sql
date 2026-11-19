@@ -87,7 +87,7 @@ begin
     raise exception 'GRN contains duplicate or invalid purchase order line references';
   end if;
 
-  v_number:=public.next_document_number(p_tenant_id,'grn');
+  v_number:=public.next_document_number_for_branch(p_tenant_id,'grn',v_po.branch_id);
   insert into public.goods_receipts(
     tenant_id,purchase_order_id,warehouse_id,grn_number,received_date,
     supplier_invoice_no,status,notes,received_by
