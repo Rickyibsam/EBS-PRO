@@ -110,7 +110,7 @@ export default function BookerOrderModule({ db, tenantId }: { db: SupabaseClient
       const err = emp.error || u.error || recent.error;
       if (err) throw err;
       if (!emp.data) throw new Error("Your active employee profile is not linked to this login. Ask the administrator to link your employee account and branch.");
-      const catalogResult = await fetchAllRowsResult<Row>((from,to)=>db.rpc("get_booker_catalog",{p_tenant_id:tenantId,p_customer_id:null}).order("product_id").order("unit_id").order("price_list_id").range(from,to));
+      const catalogResult = await fetchAllRowsResult<Row>((from,to)=>db.rpc("get_booker_catalog",{p_tenant_id:tenantId,p_customer_id:null}).order("product_id").order("unit_id").order("price_list_id").order("min_quantity").range(from,to));
       if (catalogResult.error) throw catalogResult.error;
       const catalogRows = catalogResult.data || [];
       const visibleProducts = [...new Map(catalogRows.map(row => [row.product_id, {
