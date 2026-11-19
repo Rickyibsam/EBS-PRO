@@ -249,6 +249,33 @@ begin
          and created_by=v_booker_user and order_source='backoffice') then
     raise exception 'FAIL: explicit per-user create permission did not authorize sales order creation: %',v_backoffice_order_result;
   end if;
+  perform set_config('request.jwt.claim.sub',v_user::text,true);
+  v_permission_save_result:=public.save_tenant_user_module_permissions(
+    v_tenant_a,v_booker_user,
+    jsonb_build_array(jsonb_build_object(
+      'module_key','sales_customer','can_view',true,'can_create',false,
+      'can_update',false,'can_delete',false
+    ))
+  );
+  perform set_config('request.jwt.claim.sub',v_booker_user::text,true);
+  v_permission_rejected:=false;
+  begin
+    perform public.next_document_number_for_branch(v_tenant_a,'sales_order',v_branch_a);
+  exception when insufficient_privilege then
+    v_permission_rejected:=true;
+  end;
+  if not v_permission_rejected then
+    raise exception 'FAIL: explicit per-user create denial did not block sales order numbering';
+  end if;
+  perform set_config('request.jwt.claim.sub',v_user::text,true);
+  perform public.save_tenant_user_module_permissions(
+    v_tenant_a,v_booker_user,
+    jsonb_build_array(jsonb_build_object(
+      'module_key','sales_customer','can_view',true,'can_create',true,
+      'can_update',false,'can_delete',false
+    ))
+  );
+  perform set_config('request.jwt.claim.sub',v_booker_user::text,true);
   v_permission_rejected:=false;
   begin
     perform public.update_draft_voucher_lines(v_tenant_a,'sales_orders',v_order_first,'[]'::jsonb);
