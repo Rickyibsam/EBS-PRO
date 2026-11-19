@@ -15,7 +15,7 @@ export default function StockTakeModule({db,tenantId,currentRole}:{db:SupabaseCl
  const canEdit=canCreate||canUpdate;
  async function load(){
   setLoading(true);setNotice("");
-  const [w,t]=await Promise.all([db.from("warehouses").select("id,code,name,is_active").eq("tenant_id",tenantId).eq("is_active",true).order("name"),fetchAllRowsResult<any>((from,to)=>db.from("stock_takes").select("id,warehouse_id,stock_take_number,count_date,status,notes,created_at").eq("tenant_id",tenantId).order("created_at",{ascending:false}).order("id",{ascending:true}).range(from,to))]);
+  const [w,t]=await Promise.all([fetchAllRowsResult<Row>((from,to)=>db.from("warehouses").select("id,code,name,is_active").eq("tenant_id",tenantId).eq("is_active",true).order("name").order("id",{ascending:true}).range(from,to)),fetchAllRowsResult<any>((from,to)=>db.from("stock_takes").select("id,warehouse_id,stock_take_number,count_date,status,notes,created_at").eq("tenant_id",tenantId).order("created_at",{ascending:false}).order("id",{ascending:true}).range(from,to))]);
   const err=w.error||t.error;if(err)setNotice(err.message);else{setWarehouses(w.data||[]);setTakes(t.data||[]);if(!warehouseId&&w.data?.[0])setWarehouseId(w.data[0].id);}
   setLoading(false);
  }
@@ -23,7 +23,7 @@ export default function StockTakeModule({db,tenantId,currentRole}:{db:SupabaseCl
  async function loadSnapshot(){
   if(!warehouseId){setNotice("Select a warehouse first.");return;}
   setSaving(true);setNotice("");
-  const {data,error}=await db.rpc("get_stock_take_snapshot",{p_tenant_id:tenantId,p_warehouse_id:warehouseId});
+  const {data,error}=await fetchAllRowsResult<Row>((from,to)=>db.rpc("get_stock_take_snapshot",{p_tenant_id:tenantId,p_warehouse_id:warehouseId}).order("product_name").order("product_id").order("expiry_date").order("batch_number").range(from,to));
   if(error)setNotice(error.message);else{setSnapshot((data||[]).map((x:Row)=>({...x,counted_quantity:String(x.expected_quantity??0)})));setNotice((data||[]).length+" product/batch balances loaded for physical verification.");}
   setSaving(false);
  }
@@ -45,11 +45,12 @@ export default function StockTakeModule({db,tenantId,currentRole}:{db:SupabaseCl
  }
  async function openTake(take:Row){
   setSelectedTake(take);setLines([]);setProducts([]);
-  const {data,error}=await db.from("stock_take_lines").select("id,product_id,batch_number,expiry_date,expected_quantity,counted_quantity,variance_quantity,unit_cost").eq("tenant_id",tenantId).eq("stock_take_id",take.id).order("product_id");
-  if(error){setNotice(error.message);return;}
-  setLines(data||[]);
-  const ids=[...new Set((data||[]).map((x:Row)=>x.product_id))];
-  if(ids.length){const result=await db.from("products").select("id,sku,name").eq("tenant_id",tenantId).in("id",ids);if(!result.error)setProducts(result.data||[]);}
+  const lineResult=await fetchAllRowsResult<Row>((from,to)=>db.from("stock_take_lines").select("id,product_id,batch_number,expiry_date,expected_quantity,counted_quantity,variance_quantity,unit_cost").eq("tenant_id",tenantId).eq("stock_take_id",take.id).order("product_id").order("id",{ascending:true}).range(from,to));
+  if(lineResult.error){setNotice(lineResult.error.message);return;}
+  const data=lineResult.data||[];
+  setLines(data);
+  const ids=[...new Set(data.map((x:Row)=>x.product_id))];
+  if(ids.length){const result=await fetchAllRowsResult<Row>((from,to)=>db.from("products").select("id,sku,name").eq("tenant_id",tenantId).in("id",ids).order("id",{ascending:true}).range(from,to));if(!result.error)setProducts(result.data||[]);else setNotice(result.error.message);}
  }
  function updateLine(id:string,value:string){setLines(rows=>rows.map(x=>x.id===id?{...x,counted_quantity:value,variance_quantity:Number(value)-Number(x.expected_quantity)}:x));}
  async function saveCounts(){
