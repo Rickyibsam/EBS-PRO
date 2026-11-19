@@ -67,11 +67,11 @@ export default function TransactionsModule({db,tenantId,module,currentRole}:{db:
   if(purchase){setLines(old=>old.map(line=>{const v=vendorCosts.find(x=>x.supplier_id===id&&x.product_id===line.product_id);const p=products.find(x=>x.id===line.product_id);return line.product_id?{...line,rate:String(v?.purchase_cost??p?.cost_price??0)}:line;}));return;}
   setCustomerPrices([]);
   if(!id)return;
-  const {data:assignments,error}=await db.from("customer_price_lists").select("price_list_id").eq("tenant_id",tenantId).eq("customer_id",id);
+  const {data:assignments,error}=await fetchAllRowsResult<any>((from,to)=>db.from("customer_price_lists").select("price_list_id").eq("tenant_id",tenantId).eq("customer_id",id).order("price_list_id").range(from,to));
   if(error){setNotice("Customer pricing could not be loaded: "+error.message);return;}
   const ids=(assignments??[]).map(x=>x.price_list_id);
   if(!ids.length)return;
-  const {data,error:priceError}=await db.from("product_prices").select("product_id,unit_id,price,min_quantity").eq("tenant_id",tenantId).in("price_list_id",ids);
+  const {data,error:priceError}=await fetchAllRowsResult<any>((from,to)=>db.from("product_prices").select("product_id,unit_id,price,min_quantity").eq("tenant_id",tenantId).in("price_list_id",ids).order("product_id").order("unit_id").order("min_quantity").range(from,to));
   if(priceError){setNotice("Customer product prices could not be loaded: "+priceError.message);return;}
   setCustomerPrices(data??[]);setLines(old=>old.map(line=>{const p=products.find(x=>x.id===line.product_id);const match=(data??[]).filter(x=>x.product_id===line.product_id&&x.unit_id===line.unit_id&&Number(x.min_quantity)<=Number(line.quantity)).sort((a,b)=>Number(b.min_quantity)-Number(a.min_quantity))[0];return line.product_id?{...line,rate:String(match?.price??p?.sale_price??0)}:line;}));
  }
