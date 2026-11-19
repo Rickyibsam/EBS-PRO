@@ -5,16 +5,17 @@ do $$
 begin
   if exists(
     select 1 from public.purchase_order_lines
-    where coalesce(received_base_quantity,0)>quantity*conversion_to_base+0.000001
+    where coalesce(received_base_quantity,0)<0
+       or coalesce(received_base_quantity,0)>quantity*conversion_to_base+0.000001
   ) then
-    raise exception 'Cannot add received quantity guard: existing purchase order lines exceed ordered quantity';
+    raise exception 'Cannot add received quantity guard: existing purchase order received quantities are invalid';
   end if;
 end
 $$;
 
 alter table public.purchase_order_lines
   add constraint purchase_order_lines_received_not_over_ordered
-  check (coalesce(received_base_quantity,0)<=quantity*conversion_to_base+0.000001);
+  check (coalesce(received_base_quantity,0)>=0 and coalesce(received_base_quantity,0)<=quantity*conversion_to_base+0.000001);
 
 create or replace function public.create_goods_receipt_draft(
   p_tenant_id uuid,
