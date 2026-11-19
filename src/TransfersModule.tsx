@@ -1,3 +1,4 @@
+import {toLocalDateInput} from "./lib/localDate";
 import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import {FormEvent,useEffect,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
@@ -23,7 +24,7 @@ export default function TransfersModule({db,tenantId,currentRole}:{db:SupabaseCl
    if(clean.some(x=>!Number.isFinite(Number(x.quantity_base))||Number(x.quantity_base)<=0))throw new Error("Transfer quantities must be positive.");
    const {data,error}=await db.rpc("create_stock_transfer",{
     p_tenant_id:tenantId,p_from_warehouse_id:from,p_to_warehouse_id:to,
-    p_transfer_date:new Date().toISOString().slice(0,10),p_notes:notes.trim()||null,
+    p_transfer_date:toLocalDateInput(),p_notes:notes.trim()||null,
     p_lines:clean.map(x=>({product_id:x.product_id,quantity_base:Number(x.quantity_base)}))
    });
    if(error)throw error;
