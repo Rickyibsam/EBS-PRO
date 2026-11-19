@@ -49,6 +49,19 @@ using (
   )
 );
 
+drop policy if exists sales_routes_delivery_man_assigned_read on public.sales_routes;
+create policy sales_routes_delivery_man_assigned_read
+on public.sales_routes for select to authenticated
+using (
+  private.has_tenant_role_internal(tenant_id,array['delivery_man'])
+  and exists(
+    select 1 from public.deliveries d
+    join public.employees e on e.id=d.delivery_man_employee_id and e.tenant_id=d.tenant_id
+    where d.tenant_id=sales_routes.tenant_id and d.route_id=sales_routes.id
+      and e.user_id=auth.uid()
+  )
+);
+
 drop policy if exists purchase_orders_warehouse_receiving_read on public.purchase_orders;
 create policy purchase_orders_warehouse_receiving_read
 on public.purchase_orders for select to authenticated
@@ -80,7 +93,7 @@ using (
     and private.module_permission_guard_internal(tenant_id,'sales_customer','view')
   )
   or (
-    private.has_tenant_role_internal(tenant_id,array['warehouse'])
+    private.has_tenant_role_internal(tenant_id,array['warehouse','delivery_man'])
     and private.module_permission_guard_internal(tenant_id,'distribution_delivery','view')
   )
   or private.module_permission_grant_internal(tenant_id,'distribution_delivery','view')
@@ -95,7 +108,7 @@ using (
     and private.module_permission_guard_internal(tenant_id,'sales_customer','view')
   )
   or (
-    private.has_tenant_role_internal(tenant_id,array['warehouse'])
+    private.has_tenant_role_internal(tenant_id,array['warehouse','delivery_man'])
     and private.module_permission_guard_internal(tenant_id,'distribution_delivery','view')
   )
   or private.module_permission_grant_internal(tenant_id,'distribution_delivery','view')
@@ -110,7 +123,7 @@ using (
     and private.module_permission_guard_internal(tenant_id,'order_booking','view')
   )
   or (
-    private.has_tenant_role_internal(tenant_id,array['warehouse'])
+    private.has_tenant_role_internal(tenant_id,array['warehouse','delivery_man'])
     and private.module_permission_guard_internal(tenant_id,'distribution_delivery','view')
   )
   or private.module_permission_grant_internal(tenant_id,'distribution_delivery','view')
