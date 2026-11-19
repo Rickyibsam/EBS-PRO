@@ -62,8 +62,7 @@ begin
   select po.id,coalesce(po.branch_id,po_wh.branch_id) as branch_id,po.status into v_po
   from public.purchase_orders po
   left join public.warehouses po_wh on po_wh.id=po.warehouse_id and po_wh.tenant_id=po.tenant_id
-  where po.id=p_purchase_order_id and po.tenant_id=p_tenant_id
-  ;
+  where po.id=p_purchase_order_id and po.tenant_id=p_tenant_id;
   if not found or v_po.status not in ('approved','part_received') then
     raise exception 'Select an approved or partially received purchase order';
   end if;
