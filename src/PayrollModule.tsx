@@ -19,7 +19,7 @@ export default function PayrollModule({db,tenantId,currentRole}:{db:SupabaseClie
  async function load(){
   setLoading(true);setNotice("");
   const [e,r]=await Promise.all([
-   db.from("employees").select("id,employee_code,full_name,job_title,employment_status,basic_salary,joining_date,bank_name,bank_account_no").eq("tenant_id",tenantId).order("full_name"),
+   fetchAllRowsResult<Row>((from,to)=>db.from("employees").select("id,employee_code,full_name,job_title,employment_status,basic_salary,joining_date,bank_name,bank_account_no").eq("tenant_id",tenantId).order("full_name").order("id",{ascending:true}).range(from,to)),
    fetchAllRowsResult<any>((from,to)=>db.from("payroll_runs").select("id,run_number,period_start,period_end,pay_date,status,gross_total,deductions_total,net_total,created_at").eq("tenant_id",tenantId).order("period_start",{ascending:false}).order("id",{ascending:true}).range(from,to))]);
   if(e.error||r.error)setNotice(e.error?.message||r.error?.message||"Payroll records could not be loaded.");
   else{setEmployees(e.data??[]);setRuns(r.data??[]);if(!selected&&r.data?.[0])setSelected(r.data[0].id);}
@@ -27,7 +27,7 @@ export default function PayrollModule({db,tenantId,currentRole}:{db:SupabaseClie
  }
  async function loadLines(id:string){
   if(!id){setLines([]);return;}
-  const {data,error}=await db.from("payroll_lines").select("id,employee_id,basic_salary,allowances,overtime,sales_incentive,deductions,net_salary,payment_status,payment_method,payment_reference,paid_at").eq("tenant_id",tenantId).eq("payroll_run_id",id).order("created_at");
+  const {data,error}=await fetchAllRowsResult<Row>((from,to)=>db.from("payroll_lines").select("id,employee_id,basic_salary,allowances,overtime,sales_incentive,deductions,net_salary,payment_status,payment_method,payment_reference,paid_at").eq("tenant_id",tenantId).eq("payroll_run_id",id).order("created_at").order("id",{ascending:true}).range(from,to));
   if(error){setNotice(error.message);return;}
   setLines((data??[]).map(x=>({...x,employee:employees.find(e=>e.id===x.employee_id)?.full_name||x.employee_id})));
  }
