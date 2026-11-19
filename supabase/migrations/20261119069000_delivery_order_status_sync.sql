@@ -19,7 +19,7 @@ declare
   v_full_order boolean;
 begin
   if auth.uid() is null then raise exception 'Authentication required' using errcode='42501'; end if;
-  if p_new_status not in ('allocated','dispatched','delivered') then
+  if p_new_status is null or p_new_status not in ('allocated','dispatched','delivered') then
     raise exception 'Invalid delivery-derived sales order status' using errcode='22023';
   end if;
 
