@@ -29,7 +29,7 @@ begin
   ) then
     raise exception 'Target user is not an eligible member of this company';
   end if;
-  if jsonb_typeof(p_permissions)<>'array' then
+  if p_permissions is null or jsonb_typeof(p_permissions) is distinct from 'array' then
     raise exception 'Permission matrix must be a JSON array';
   end if;
 
