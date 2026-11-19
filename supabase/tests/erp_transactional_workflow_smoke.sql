@@ -51,6 +51,9 @@ declare
   v_sales_invoice_id uuid;
   v_payroll_run uuid := gen_random_uuid();
   v_payroll_line uuid := gen_random_uuid();
+  v_atomic_payroll_run uuid;
+  v_atomic_payroll_result jsonb;
+  v_payroll_count_before integer;
   v_clawback_target_a uuid := gen_random_uuid();
   v_clawback_target_b uuid := gen_random_uuid();
   v_clawback_run_one uuid := gen_random_uuid();
@@ -86,6 +89,7 @@ declare
   v_cleanroom_product uuid := gen_random_uuid();
   v_cleanroom_warehouse uuid := gen_random_uuid();
   v_permission_rejected boolean := false;
+  v_permission_save_result jsonb;
   v_second_warehouse uuid := gen_random_uuid();
   v_stock_transfer uuid := gen_random_uuid();
   v_stock_transfer_line uuid := gen_random_uuid();
@@ -192,9 +196,38 @@ begin
   select warehouse_id into v_warehouse from public.sales_orders where id=v_order_first;
 
   -- Direct voucher RPC must enforce custom per-user update denial, not rely on UI.
-  insert into public.tenant_user_module_permissions(
-    tenant_id,user_id,module_key,can_view,can_create,can_update,can_delete
-  ) values(v_tenant_a,v_booker_user,'sales_customer',true,true,false,false);
+  perform set_config('request.jwt.claim.sub',v_user::text,true);
+  v_permission_save_result:=public.save_tenant_user_module_permissions(
+    v_tenant_a,v_booker_user,
+    jsonb_build_array(jsonb_build_object(
+      'module_key','sales_customer','can_view',true,'can_create',true,
+      'can_update',false,'can_delete',false
+    ))
+  );
+  if coalesce((v_permission_save_result->>'success')::boolean,false) is not true
+     or coalesce((v_permission_save_result->>'saved_count')::integer,-1)<>1 then
+    raise exception 'FAIL: user permission matrix was not saved atomically: %',v_permission_save_result;
+  end if;
+  v_permission_rejected:=false;
+  begin
+    perform public.save_tenant_user_module_permissions(
+      v_tenant_a,v_booker_user,
+      jsonb_build_array(jsonb_build_object(
+        'module_key','sales_customer','can_view',false,'can_create',true,
+        'can_update',false,'can_delete',false
+      ))
+    );
+  exception when others then
+    v_permission_rejected:=true;
+  end;
+  if not v_permission_rejected or not exists(
+    select 1 from public.tenant_user_module_permissions
+    where tenant_id=v_tenant_a and user_id=v_booker_user and module_key='sales_customer'
+      and can_view=true and can_create=true and can_update=false and can_delete=false
+  ) then
+    raise exception 'FAIL: invalid permission save was not rejected atomically';
+  end if;
+  perform set_config('request.jwt.claim.sub',v_booker_user::text,true);
   v_permission_rejected:=false;
   begin
     perform public.update_draft_voucher_lines(v_tenant_a,'sales_orders',v_order_first,'[]'::jsonb);
@@ -584,6 +617,32 @@ begin
     raise exception 'FAIL: legacy delivery RPC bypassed POD signature requirement';
   end if;
 
+  -- Payroll draft creation is atomic: header, lines and sequence roll back together.
+  update public.employees set basic_salary=1000,employment_status='active'
+  where id=v_employee and tenant_id=v_tenant_a;
+  v_atomic_payroll_result:=public.create_payroll_run(
+    v_tenant_a,current_date-30,current_date-1,current_date,array[v_employee]
+  );
+  v_atomic_payroll_run:=(v_atomic_payroll_result->>'run_id')::uuid;
+  if coalesce((v_atomic_payroll_result->>'success')::boolean,false) is not true
+     or coalesce((v_atomic_payroll_result->>'line_count')::integer,0)<>1
+     or not exists(select 1 from public.payroll_runs where id=v_atomic_payroll_run and status='draft')
+     or (select count(*) from public.payroll_lines where payroll_run_id=v_atomic_payroll_run and tenant_id=v_tenant_a)<>1 then
+    raise exception 'FAIL: atomic payroll run creation did not persist its header and lines: %',v_atomic_payroll_result;
+  end if;
+  select count(*) into v_payroll_count_before from public.payroll_runs where tenant_id=v_tenant_a;
+  v_rejected:=false;
+  begin
+    perform public.create_payroll_run(
+      v_tenant_a,current_date-30,current_date-1,current_date,array[gen_random_uuid()]
+    );
+  exception when others then
+    v_rejected:=true;
+  end;
+  if not v_rejected or (select count(*) from public.payroll_runs where tenant_id=v_tenant_a)<>v_payroll_count_before then
+    raise exception 'FAIL: invalid payroll creation left a partial payroll run';
+  end if;
+
   -- Payroll accrual -> GL -> salary payment -> idempotent payment retry.
   insert into public.payroll_runs(id,tenant_id,run_number,period_start,period_end,pay_date,status,created_by)
   values(v_payroll_run,v_tenant_a,'TX-PAY-001',current_date-30,current_date-1,current_date,'draft',v_user);
@@ -793,16 +852,16 @@ begin
   -- Stock transfer: move one available unit between warehouses atomically.
   insert into public.warehouses(id,tenant_id,branch_id,name,code)
   values(v_second_warehouse,v_tenant_a,v_branch_a,'Smoke Test Transfer Warehouse','TX-WH-2');
-  insert into public.stock_transfers(
-    id,tenant_id,transfer_number,from_warehouse_id,to_warehouse_id,
-    transfer_date,status,created_by
-  ) values(
-    v_stock_transfer,v_tenant_a,'TX-ST-001',v_warehouse,v_second_warehouse,
-    current_date,'draft',v_user
+  v_stock_transfer_result:=public.create_stock_transfer(
+    v_tenant_a,v_warehouse,v_second_warehouse,current_date,
+    'Rollback-only atomic stock transfer acceptance test',
+    jsonb_build_array(jsonb_build_object('product_id',v_product,'quantity_base',1))
   );
-  insert into public.stock_transfer_lines(
-    id,tenant_id,stock_transfer_id,product_id,quantity_base,unit_cost
-  ) values(v_stock_transfer_line,v_tenant_a,v_stock_transfer,v_product,1,0);
+  if coalesce((v_stock_transfer_result->>'success')::boolean,false) is not true
+     or coalesce((v_stock_transfer_result->>'line_count')::integer,0)<>1 then
+    raise exception 'FAIL: atomic stock transfer draft creation failed: %',v_stock_transfer_result;
+  end if;
+  v_stock_transfer:=(v_stock_transfer_result->>'transfer_id')::uuid;
   v_stock_transfer_result:=public.post_stock_transfer(v_stock_transfer);
   if coalesce((v_stock_transfer_result->>'success')::boolean,false) is not true
      or v_stock_transfer_result->>'status'<>'posted' then
