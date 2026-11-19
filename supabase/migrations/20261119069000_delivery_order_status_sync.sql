@@ -53,7 +53,7 @@ begin
     raise exception 'Sales order can be completed only after delivery completion';
   end if;
 
-  if p_new_status='allocated' and v_order_status not in ('approved','allocated') then
+  if p_new_status='allocated' and v_order_status not in ('approved','allocated','dispatched') then
     raise exception 'Sales order is not in an allocatable status';
   elsif p_new_status='dispatched' and v_order_status not in ('approved','allocated','dispatched') then
     raise exception 'Sales order is not in a dispatchable status';
@@ -80,13 +80,14 @@ begin
   end if;
 
   update public.sales_orders
-  set status=p_new_status,
+  set status=case when p_new_status='allocated' and v_order_status='dispatched' then 'dispatched' else p_new_status end,
       route_id=coalesce(v_delivery.route_id,route_id),
       delivery_man_employee_id=coalesce(v_delivery.delivery_man_employee_id,delivery_man_employee_id),
       updated_at=now()
   where id=p_sales_order_id and tenant_id=p_tenant_id;
 
-  return jsonb_build_object('success',true,'sales_order_id',p_sales_order_id,'status',p_new_status);
+  return jsonb_build_object('success',true,'sales_order_id',p_sales_order_id,
+    'status',case when p_new_status='allocated' and v_order_status='dispatched' then 'dispatched' else p_new_status end);
 end
 $function$;
 
