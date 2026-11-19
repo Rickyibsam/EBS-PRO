@@ -47,14 +47,14 @@ export default function TransactionsModule({db,tenantId,module,currentRole}:{db:
   const [p,pa,u,pu,vc,w,br,h,emp,rt]=await Promise.all([
    fetchAllRowsResult<any>((from,to)=>db.from("products").select("id,name,sku,barcode,is_active,cost_price,sale_price,purchase_tax_rate,sales_tax_rate").eq("tenant_id",tenantId).eq("is_active",true).order("name").order("id",{ascending:true}).range(from,to)),
    fetchAllRowsResult<any>((from,to)=>db.from("parties").select("id,name,party_code").eq("tenant_id",tenantId).in("party_type",purchase?["supplier","both"]:["customer","both"]).eq("status","active").order("name").order("id",{ascending:true}).range(from,to)),
-   db.from("units_of_measure").select("id,name,symbol").eq("tenant_id",tenantId).order("name"),
-   db.from("product_units").select("id,product_id,unit_id,conversion_to_base,is_purchase_unit,is_sales_unit").eq("tenant_id",tenantId),
-    db.from("vendor_product_catalog").select("supplier_id,product_id,purchase_cost,is_preferred").eq("tenant_id",tenantId),
-   db.from("warehouses").select("id,name,branch_id").eq("tenant_id",tenantId).eq("is_active",true).order("name"),
-   db.from("branches").select("id,name,code,is_default,is_active").eq("tenant_id",tenantId).eq("is_active",true).order("name"),
+   fetchAllRowsResult<any>((from,to)=>db.from("units_of_measure").select("id,name,symbol").eq("tenant_id",tenantId).order("name").order("id",{ascending:true}).range(from,to)),
+   fetchAllRowsResult<any>((from,to)=>db.from("product_units").select("id,product_id,unit_id,conversion_to_base,is_purchase_unit,is_sales_unit").eq("tenant_id",tenantId).order("id",{ascending:true}).range(from,to)),
+   fetchAllRowsResult<any>((from,to)=>db.from("vendor_product_catalog").select("supplier_id,product_id,purchase_cost,is_preferred").eq("tenant_id",tenantId).order("product_id").order("supplier_id").range(from,to)),
+   fetchAllRowsResult<any>((from,to)=>db.from("warehouses").select("id,name,branch_id").eq("tenant_id",tenantId).eq("is_active",true).order("name").order("id",{ascending:true}).range(from,to)),
+   fetchAllRowsResult<any>((from,to)=>db.from("branches").select("id,name,code,is_default,is_active").eq("tenant_id",tenantId).eq("is_active",true).order("name").order("id",{ascending:true}).range(from,to)),
    fetchAllRowsResult<any>((from,to)=>db.from(table).select("id,"+(purchase?"po_number":"order_number")+",order_date,status,grand_total,branch_id"+(purchase?"":",booker_employee_id,route_id,delivery_man_employee_id")).eq("tenant_id",tenantId).order("created_at",{ascending:false}).order("id",{ascending:true}).range(from,to)),
-   db.from("employees").select("id,full_name,job_title").eq("tenant_id",tenantId).eq("employment_status","active").order("full_name"),
-   db.from("sales_routes").select("id,name,route_code").eq("tenant_id",tenantId).eq("is_active",true).order("name")
+   fetchAllRowsResult<any>((from,to)=>db.from("employees").select("id,full_name,job_title").eq("tenant_id",tenantId).eq("employment_status","active").order("full_name").order("id",{ascending:true}).range(from,to)),
+   fetchAllRowsResult<any>((from,to)=>db.from("sales_routes").select("id,name,route_code").eq("tenant_id",tenantId).eq("is_active",true).order("name").order("id",{ascending:true}).range(from,to))
   ]);
   const errors=[p.error,pa.error,u.error,pu.error,vc.error,w.error,br.error,h.error,emp.error,rt.error].filter(Boolean);
   if(errors.length)setNotice(errors.map(e=>e!.message).join(" · "));
