@@ -24,7 +24,7 @@ begin
  elsif not v_is_owner_admin and v_has_override and not private.module_permission_grant_internal(p_tenant_id,'inventory','create') then
    raise exception 'Stock adjustment creation is disabled for this user' using errcode='42501';
  end if;
- if p_direction not in ('in','out') or p_quantity is null or p_quantity<=0 or p_unit_cost is null or p_unit_cost<0 then
+ if p_direction is null or p_direction not in ('in','out') or p_quantity is null or p_quantity<=0 or p_unit_cost is null or p_unit_cost<0 then
    raise exception 'Enter a valid direction, positive quantity and non-negative cost';
  end if;
  if not exists(select 1 from public.warehouses where id=p_warehouse_id and tenant_id=p_tenant_id and is_active) then
