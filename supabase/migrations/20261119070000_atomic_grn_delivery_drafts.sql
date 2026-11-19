@@ -373,7 +373,8 @@ begin
   v_current:=case
     when v_delivery.status='pending' then new.quantity_base
     when v_delivery.status='delivered' then new.delivered_quantity_base
-    else new.picked_quantity_base
+    when v_delivery.status in ('picked','dispatched') then new.picked_quantity_base
+    else 0
   end;
   if v_reserved+v_current>v_ordered_base+0.000001 then
     raise exception 'Delivery quantities exceed the remaining sales order quantity';
@@ -384,7 +385,7 @@ $function$;
 
 drop trigger if exists guard_delivery_line_order_quantity on public.delivery_lines;
 create trigger guard_delivery_line_order_quantity
-before insert or update of quantity_base,picked_quantity_base,delivered_quantity_base,
+before insert or update of tenant_id,delivery_id,quantity_base,picked_quantity_base,delivered_quantity_base,
   sales_order_line_id,product_id
 on public.delivery_lines
 for each row execute function private.guard_delivery_line_order_quantity();
