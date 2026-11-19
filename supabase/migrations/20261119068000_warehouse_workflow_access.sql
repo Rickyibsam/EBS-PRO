@@ -89,7 +89,7 @@ create policy module_override_guard_select
 on public.sales_orders as restrictive for select to authenticated
 using (
   (
-    not private.has_tenant_role_internal(tenant_id,array['warehouse'])
+    not private.has_tenant_role_internal(tenant_id,array['warehouse','delivery_man'])
     and private.module_permission_guard_internal(tenant_id,'sales_customer','view')
   )
   or (
@@ -104,7 +104,7 @@ create policy module_override_guard_select
 on public.sales_order_lines as restrictive for select to authenticated
 using (
   (
-    not private.has_tenant_role_internal(tenant_id,array['warehouse'])
+    not private.has_tenant_role_internal(tenant_id,array['warehouse','delivery_man'])
     and private.module_permission_guard_internal(tenant_id,'sales_customer','view')
   )
   or (
@@ -119,7 +119,7 @@ create policy module_override_guard_select
 on public.sales_routes as restrictive for select to authenticated
 using (
   (
-    not private.has_tenant_role_internal(tenant_id,array['warehouse'])
+    not private.has_tenant_role_internal(tenant_id,array['warehouse','delivery_man'])
     and private.module_permission_guard_internal(tenant_id,'order_booking','view')
   )
   or (
