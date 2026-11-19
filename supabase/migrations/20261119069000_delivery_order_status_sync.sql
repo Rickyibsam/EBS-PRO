@@ -356,3 +356,11 @@ begin
 end;
 $function$
 
+
+
+revoke all on function public.dispatch_delivery(uuid,jsonb) from public,anon;
+grant execute on function public.dispatch_delivery(uuid,jsonb) to authenticated;
+revoke all on function public.complete_delivery(uuid,jsonb) from public,anon;
+grant execute on function public.complete_delivery(uuid,jsonb) to authenticated;
+revoke all on function public.dispatch_van_delivery(uuid,text,jsonb) from public,anon;
+grant execute on function public.dispatch_van_delivery(uuid,text,jsonb) to authenticated;
