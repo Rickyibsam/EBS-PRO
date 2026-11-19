@@ -247,13 +247,15 @@ begin
   v_route_id:=coalesce(p_route_id,v_order.route_id);
   if v_delivery_man_id is not null then
     select e.full_name into v_employee_name from public.employees e
-    where e.id=v_delivery_man_id and e.tenant_id=p_tenant_id and e.employment_status='active';
+    where e.id=v_delivery_man_id and e.tenant_id=p_tenant_id and e.employment_status='active'
+      and (v_order.branch_id is null or e.branch_id is null or e.branch_id=v_order.branch_id);
     if not found then raise exception 'Selected delivery man must be an active employee'; end if;
   end if;
   if v_route_id is not null and not exists(
     select 1 from public.sales_routes r where r.id=v_route_id
       and r.tenant_id=p_tenant_id and r.is_active
-  ) then raise exception 'Selected route must be active in this company'; end if;
+      and (v_order.branch_id is null or r.branch_id is null or r.branch_id=v_order.branch_id)
+  ) then raise exception 'Selected route must be active in this branch'; end if;
   if p_driver_name is not null and length(p_driver_name)>160 then raise exception 'Driver name is too long'; end if;
   v_final_driver_name:=coalesce(nullif(trim(p_driver_name),''),v_employee_name);
   if p_vehicle_number is not null and length(p_vehicle_number)>80 then raise exception 'Vehicle number is too long'; end if;
