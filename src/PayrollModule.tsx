@@ -1,3 +1,4 @@
+import {toLocalDateInput,toLocalMonthEnd,toLocalMonthStart} from "./lib/localDate";
 import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import {FormEvent,useEffect,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
@@ -7,9 +8,9 @@ type Row=Record<string,any>;
 export default function PayrollModule({db,tenantId,currentRole}:{db:SupabaseClient;tenantId:string;currentRole:string}){
  const [employees,setEmployees]=useState<Row[]>([]),[runs,setRuns]=useState<Row[]>([]),[lines,setLines]=useState<Row[]>([]);
  const [selected,setSelected]=useState(""),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[notice,setNotice]=useState("");
- const [periodStart,setPeriodStart]=useState(new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString().slice(0,10));
- const [periodEnd,setPeriodEnd]=useState(new Date(new Date().getFullYear(),new Date().getMonth()+1,0).toISOString().slice(0,10));
- const [payDate,setPayDate]=useState(new Date().toISOString().slice(0,10));
+ const [periodStart,setPeriodStart]=useState(toLocalMonthStart());
+ const [periodEnd,setPeriodEnd]=useState(toLocalMonthEnd());
+ const [payDate,setPayDate]=useState(toLocalDateInput());
  const roleCanManage=["owner","admin","manager","accounts"].includes(currentRole);
  const canCreate=useModuleAction("hr_payroll","create",roleCanManage);
  const canUpdate=useModuleAction("hr_payroll","update",roleCanManage);
