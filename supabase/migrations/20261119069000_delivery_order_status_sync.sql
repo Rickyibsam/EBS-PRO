@@ -239,10 +239,7 @@ begin
  if not (
   public.has_tenant_role(v_delivery.tenant_id,array['owner','admin','manager','warehouse'])
   OR private.module_permission_grant_internal(v_delivery.tenant_id,'distribution_delivery','update')
-  OR (public.has_tenant_role(v_delivery.tenant_id,array['delivery_man']) AND EXISTS (
-   SELECT 1 FROM public.employees e WHERE e.id=v_delivery.delivery_man_employee_id AND e.tenant_id=v_delivery.tenant_id AND e.user_id=v_user
-  ))
- ) then raise exception 'Only an authorized distribution/warehouse user or assigned delivery man can confirm delivery'; end if;
+ ) then raise exception 'Only an authorized distribution/warehouse user can confirm delivery'; end if;
  if v_delivery.status<>'dispatched' then raise exception 'Only dispatched deliveries can be completed'; end if;
  if jsonb_typeof(p_lines)<>'array' then raise exception 'Delivery confirmation lines must be an array'; end if;
  select count(*) into v_count from public.delivery_lines where tenant_id=v_delivery.tenant_id and delivery_id=v_delivery.id;
