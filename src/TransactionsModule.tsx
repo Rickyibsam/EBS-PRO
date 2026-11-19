@@ -1,3 +1,4 @@
+import {toLocalDateInput} from "./lib/localDate";
 import {fetchAllRowsResult} from "./lib/fetchAllRows";
 import {calculateOrderTotals} from "./lib/orderTotals";
 import { useEffect, useMemo, useState, FormEvent } from "react";
@@ -104,7 +105,7 @@ export default function TransactionsModule({db,tenantId,module,currentRole}:{db:
     p_branch_id:branchId,
     p_warehouse_id:warehouseId||null,
     p_party_id:partyId,
-    p_order_date:new Date().toISOString().slice(0,10),
+    p_order_date:toLocalDateInput(),
     p_notes:notes.trim()||null,
     p_booker_employee_id:purchase?null:bookerId||null,
     p_route_id:purchase?null:routeId||null,
