@@ -42,7 +42,10 @@ begin
      or not exists(select 1 from public.warehouses where id=p_to_warehouse_id and tenant_id=p_tenant_id and is_active) then
     raise exception 'Both warehouses must be active and belong to this company';
   end if;
-  if jsonb_typeof(p_lines)<>'array' or jsonb_array_length(p_lines)=0 then
+  if p_lines is null or jsonb_typeof(p_lines) is distinct from 'array' then
+    raise exception 'Transfer lines must be a JSON array';
+  end if;
+  if jsonb_array_length(p_lines)=0 then
     raise exception 'Add at least one product quantity';
   end if;
 
