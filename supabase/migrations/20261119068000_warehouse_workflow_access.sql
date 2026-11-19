@@ -151,11 +151,24 @@ AS $function$
 declare
  v_grn public.goods_receipts%rowtype; v_line record; v_user uuid:=auth.uid(); v_all_received boolean;
  v_total numeric:=0; v_inventory_account uuid; v_grni_account uuid; v_journal_id uuid; v_journal_no text;
+ v_role_allowed boolean; v_is_owner_admin boolean; v_has_override boolean;
 begin
  if v_user is null then raise exception 'Authentication required'; end if;
  select * into v_grn from public.goods_receipts where id=p_goods_receipt_id for update;
  if not found then raise exception 'Goods receipt not found'; end if;
- if not (public.has_tenant_role(v_grn.tenant_id,array['owner','admin','manager','warehouse']) or private.module_permission_grant_internal(v_grn.tenant_id,'purchase_supplier','update')) then raise exception 'Only an authorized purchase/warehouse user can post goods receipts'; end if;
+ v_role_allowed:=public.has_tenant_role(v_grn.tenant_id,array['owner','admin','manager','purchase','warehouse']);
+ v_is_owner_admin:=public.has_tenant_role(v_grn.tenant_id,array['owner','admin']);
+ select exists(select 1 from public.tenant_user_module_permissions p
+   where p.tenant_id=v_grn.tenant_id and p.user_id=v_user and p.module_key='purchase_supplier')
+ into v_has_override;
+ if not v_role_allowed then
+   if not private.module_permission_grant_internal(v_grn.tenant_id,'purchase_supplier','update') then
+     raise exception 'Goods receipt posting permission required' using errcode='42501';
+   end if;
+ elsif not v_is_owner_admin and v_has_override
+       and not private.module_permission_grant_internal(v_grn.tenant_id,'purchase_supplier','update') then
+   raise exception 'Goods receipt posting is disabled for this user' using errcode='42501';
+ end if;
  if v_grn.status<>'draft' then raise exception 'Only draft goods receipts can be posted'; end if;
  if not exists(select 1 from public.goods_receipt_lines where tenant_id=v_grn.tenant_id and goods_receipt_id=v_grn.id and accepted_quantity>0) then raise exception 'At least one accepted quantity is required'; end if;
  select id into v_inventory_account from public.chart_of_accounts where tenant_id=v_grn.tenant_id and account_code='1200' and is_active;
@@ -185,5 +198,9 @@ begin
  update public.goods_receipts set status='posted',posted_at=now() where id=v_grn.id and tenant_id=v_grn.tenant_id;
  return jsonb_build_object('success',true,'goods_receipt_id',v_grn.id,'status','posted','inventory_value',v_total);
 end;
-$function$
+$function$;
+
+revoke all on function public.post_goods_receipt(uuid) from public,anon;
+grant execute on function public.post_goods_receipt(uuid) to authenticated;
+
 
