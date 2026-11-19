@@ -321,6 +321,9 @@ begin
     (v_disposal_gain_account,v_tenant_a,'4900','Gain on Asset Disposal','income'),
     (v_disposal_loss_account,v_tenant_a,'5900','Loss on Asset Disposal','expense');
 
+  -- Reactivate the route after the Booker inactive-route rejection test.
+  update public.sales_routes set is_active=true where id=v_route and tenant_id=v_tenant_a;
+
   -- Back-office sales order header and lines must save atomically with matching tax totals.
   v_backoffice_order_result:=public.create_backoffice_order(
     v_tenant_a,'sales_order',v_branch_a,v_warehouse,v_customer,current_date,
