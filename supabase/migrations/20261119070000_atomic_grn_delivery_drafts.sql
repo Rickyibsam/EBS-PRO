@@ -232,7 +232,7 @@ begin
   left join public.warehouses so_wh on so_wh.id=so.warehouse_id and so_wh.tenant_id=so.tenant_id
   where so.id=p_sales_order_id and so.tenant_id=p_tenant_id
   for update of so;
-  if not found or v_order.status not in ('approved','allocated') then
+  if not found or v_order.status not in ('approved','allocated','dispatched') then
     raise exception 'Select an approved or allocated sales order';
   end if;
   if p_warehouse_id is null or not exists(
