@@ -324,7 +324,7 @@ begin
   -- Back-office sales order header and lines must save atomically with matching tax totals.
   v_backoffice_order_result:=public.create_backoffice_order(
     v_tenant_a,'sales_order',v_branch_a,v_warehouse,v_customer,current_date,
-    'Smoke test back-office sales order',v_employee,null,null,
+    'Smoke test back-office sales order',v_employee,v_route,v_employee,
     jsonb_build_array(jsonb_build_object(
       'product_id',v_product,'unit_id',v_unit,'quantity',1,
       'unit_rate',50,'tax_rate',17,'discount_amount',5
@@ -367,7 +367,9 @@ begin
   );
   if coalesce((v_delivery_draft_result->>'success')::boolean,false) is not true
      or not exists(select 1 from public.deliveries
-       where id=(v_delivery_draft_result->>'delivery_id')::uuid and status='pending') then
+       where id=(v_delivery_draft_result->>'delivery_id')::uuid and status='pending'
+         and route_id=v_route and delivery_man_employee_id=v_employee
+         and driver_name='Smoke Test Booker') then
     raise exception 'FAIL: atomic delivery draft creation failed: %',v_delivery_draft_result;
   end if;
   select count(*) into v_delivery_count_before from public.deliveries where tenant_id=v_tenant_a;
