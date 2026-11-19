@@ -18,6 +18,7 @@ declare
   v_branch_id uuid;
   v_user uuid:=auth.uid();
   v_module_key text;
+  v_action text:='create';
   v_role_allowed boolean;
   v_is_platform_owner boolean;
   v_has_override boolean;
@@ -28,7 +29,7 @@ begin
     when 'grn' then v_prefix:='GR';v_width:=5;v_module_key:='purchase_supplier';
     when 'credit_memo' then v_prefix:='CM';v_width:=6;v_module_key:='sales_customer';
     when 'delivery' then v_prefix:='DLV-';v_width:=5;v_module_key:='distribution_delivery';
-    when 'sales_invoice' then v_prefix:='EBS-INV-';v_width:=6;v_module_key:='distribution_delivery';
+    when 'sales_invoice' then v_prefix:='EBS-INV-';v_width:=6;v_module_key:='distribution_delivery';v_action:='update';
     when 'receipt' then v_prefix:='RC';v_width:=6;v_module_key:='accounts_finance';
     when 'journal_entry' then v_prefix:='EBS-JV-';v_width:=9;v_module_key:='accounts_finance';
     when 'payroll_run' then v_prefix:='EBS-PR-';v_width:=10;v_module_key:='hr_payroll';
@@ -50,7 +51,7 @@ begin
   ) into v_has_override;
 
   if not v_role_allowed then
-    if not private.module_permission_grant_internal(p_tenant_id,v_module_key,'create') then
+    if not private.module_permission_grant_internal(p_tenant_id,v_module_key,v_action) then
       raise exception 'Not authorized to allocate a document number' using errcode='42501';
     end if;
   elsif not v_is_platform_owner and v_has_override
