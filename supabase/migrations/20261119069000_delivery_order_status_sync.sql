@@ -124,6 +124,7 @@ declare
  v_take numeric;
  v_total_cost numeric:=0;
  v_user uuid:=auth.uid();
+ v_role_allowed boolean; v_is_owner_admin boolean; v_has_override boolean;
  v_inventory_account uuid;
  v_cogs_account uuid;
  v_journal_id uuid;
@@ -132,7 +133,19 @@ begin
  if v_user is null then raise exception 'Authentication required'; end if;
  select * into v_delivery from public.deliveries where id=p_delivery_id for update;
  if not found then raise exception 'Delivery not found'; end if;
- if not (public.has_tenant_role(v_delivery.tenant_id,array['owner','admin','manager','warehouse']) or private.module_permission_grant_internal(v_delivery.tenant_id,'distribution_delivery','update')) then raise exception 'Only an authorized distribution/warehouse user can confirm dispatch'; end if;
+ v_role_allowed:=public.has_tenant_role(v_delivery.tenant_id,array['owner','admin','manager','warehouse']);
+ v_is_owner_admin:=public.has_tenant_role(v_delivery.tenant_id,array['owner','admin']);
+ select exists(select 1 from public.tenant_user_module_permissions p
+   where p.tenant_id=v_delivery.tenant_id and p.user_id=v_user and p.module_key='distribution_delivery')
+ into v_has_override;
+ if not v_role_allowed then
+   if not private.module_permission_grant_internal(v_delivery.tenant_id,'distribution_delivery','update') then
+     raise exception 'Delivery dispatch permission required' using errcode='42501';
+   end if;
+ elsif not v_is_owner_admin and v_has_override
+       and not private.module_permission_grant_internal(v_delivery.tenant_id,'distribution_delivery','update') then
+   raise exception 'Delivery dispatch is disabled for this user' using errcode='42501';
+ end if;
  if v_delivery.status not in ('pending','picked') then raise exception 'Only pending or picked deliveries can be dispatched'; end if;
  if jsonb_typeof(p_lines)<>'array' then raise exception 'Dispatch lines must be an array'; end if;
  select count(*) into v_count from public.delivery_lines where tenant_id=v_delivery.tenant_id and delivery_id=v_delivery.id;
@@ -228,6 +241,7 @@ declare
  v_count integer;
  v_full_order boolean;
  v_user uuid:=auth.uid();
+ v_role_allowed boolean; v_is_owner_admin boolean; v_has_override boolean;
  v_invoice_id uuid;
  v_invoice_no text;
  v_subtotal numeric:=0;
@@ -250,10 +264,19 @@ begin
  if v_user is null then raise exception 'Authentication required'; end if;
  select * into v_delivery from public.deliveries where id=p_delivery_id for update;
  if not found then raise exception 'Delivery not found'; end if;
- if not (
-  public.has_tenant_role(v_delivery.tenant_id,array['owner','admin','manager','warehouse'])
-  OR private.module_permission_grant_internal(v_delivery.tenant_id,'distribution_delivery','update')
- ) then raise exception 'Only an authorized distribution/warehouse user can confirm delivery'; end if;
+ v_role_allowed:=public.has_tenant_role(v_delivery.tenant_id,array['owner','admin','manager','warehouse']);
+ v_is_owner_admin:=public.has_tenant_role(v_delivery.tenant_id,array['owner','admin']);
+ select exists(select 1 from public.tenant_user_module_permissions p
+   where p.tenant_id=v_delivery.tenant_id and p.user_id=v_user and p.module_key='distribution_delivery')
+ into v_has_override;
+ if not v_role_allowed then
+   if not private.module_permission_grant_internal(v_delivery.tenant_id,'distribution_delivery','update') then
+     raise exception 'Delivery confirmation permission required' using errcode='42501';
+   end if;
+ elsif not v_is_owner_admin and v_has_override
+       and not private.module_permission_grant_internal(v_delivery.tenant_id,'distribution_delivery','update') then
+   raise exception 'Delivery confirmation is disabled for this user' using errcode='42501';
+ end if;
  if v_delivery.status<>'dispatched' then raise exception 'Only dispatched deliveries can be completed'; end if;
  if jsonb_typeof(p_lines)<>'array' then raise exception 'Delivery confirmation lines must be an array'; end if;
  select count(*) into v_count from public.delivery_lines where tenant_id=v_delivery.tenant_id and delivery_id=v_delivery.id;
@@ -334,12 +357,24 @@ CREATE OR REPLACE FUNCTION public.dispatch_van_delivery(p_delivery_id uuid, p_ve
  SECURITY DEFINER
  SET search_path TO 'pg_catalog', 'public', 'private', 'auth'
 AS $function$
-declare v_delivery public.deliveries%rowtype;v_line public.delivery_lines%rowtype;x record;v_available numeric;v_count integer;v_product public.products%rowtype;
+declare v_delivery public.deliveries%rowtype;v_line public.delivery_lines%rowtype;x record;v_available numeric;v_count integer;v_product public.products%rowtype;v_user uuid:=auth.uid();v_role_allowed boolean;v_is_owner_admin boolean;v_has_override boolean;
 begin
  if auth.uid() is null then raise exception 'Authentication required.'; end if;
  select * into v_delivery from public.deliveries where id=p_delivery_id for update;
  if not found then raise exception 'Delivery not found.'; end if;
- if not (public.has_tenant_role(v_delivery.tenant_id,array['owner','admin','manager','warehouse']) or private.module_permission_grant_internal(v_delivery.tenant_id,'distribution_delivery','update')) then raise exception 'Only authorized distribution/warehouse users can dispatch a van delivery.' using errcode='42501'; end if;
+ v_role_allowed:=public.has_tenant_role(v_delivery.tenant_id,array['owner','admin','manager','warehouse']);
+ v_is_owner_admin:=public.has_tenant_role(v_delivery.tenant_id,array['owner','admin']);
+ select exists(select 1 from public.tenant_user_module_permissions p
+   where p.tenant_id=v_delivery.tenant_id and p.user_id=v_user and p.module_key='distribution_delivery')
+ into v_has_override;
+ if not v_role_allowed then
+   if not private.module_permission_grant_internal(v_delivery.tenant_id,'distribution_delivery','update') then
+     raise exception 'Van delivery dispatch permission required' using errcode='42501';
+   end if;
+ elsif not v_is_owner_admin and v_has_override
+       and not private.module_permission_grant_internal(v_delivery.tenant_id,'distribution_delivery','update') then
+   raise exception 'Van delivery dispatch is disabled for this user' using errcode='42501';
+ end if;
  if v_delivery.delivery_man_employee_id is null or not exists(select 1 from public.employees where id=v_delivery.delivery_man_employee_id and tenant_id=v_delivery.tenant_id and employment_status='active') then raise exception 'Assign an active deliveryman before van dispatch.'; end if;
  if v_delivery.status not in ('pending','picked') then
   if v_delivery.status='dispatched' and upper(coalesce(v_delivery.vehicle_number,''))=upper(btrim(p_vehicle_number)) then return jsonb_build_object('success',true,'replayed',true,'delivery_id',v_delivery.id,'status',v_delivery.status); end if;
