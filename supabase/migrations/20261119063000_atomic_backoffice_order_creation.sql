@@ -112,7 +112,7 @@ begin
     raise exception 'Order must contain between 1 and 100 lines';
   end if;
 
-  v_number:=public.next_document_number_for_branch(p_tenant_id,p_document_type,p_branch_id);
+  v_number:=public.next_document_number(p_tenant_id,p_document_type);
   if p_document_type='sales_order' then
     insert into public.sales_orders(
       tenant_id,branch_id,warehouse_id,customer_id,route_id,booker_employee_id,
