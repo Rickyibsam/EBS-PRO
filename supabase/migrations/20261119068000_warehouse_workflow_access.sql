@@ -3,7 +3,7 @@ drop policy if exists sales_orders_warehouse_delivery_read on public.sales_order
 create policy sales_orders_warehouse_delivery_read
 on public.sales_orders for select to authenticated
 using (
-  status in ('approved','allocated','dispatched')
+  status in ('approved','allocated','dispatched','delivered')
   and (
     private.has_tenant_role_internal(tenant_id,array['warehouse'])
     or private.module_permission_grant_internal(tenant_id,'distribution_delivery','view')
@@ -21,7 +21,7 @@ using (
   and exists(
     select 1 from public.sales_orders so
     where so.id=sales_order_lines.sales_order_id and so.tenant_id=sales_order_lines.tenant_id
-      and so.status in ('approved','allocated','dispatched')
+      and so.status in ('approved','allocated','dispatched','delivered')
   )
 );
 
