@@ -15,7 +15,6 @@ as $function$
 declare
   v_delivery record;
   v_order_status text;
-  v_allowed boolean;
   v_role_allowed boolean;
   v_is_owner_admin boolean;
   v_has_override boolean;
