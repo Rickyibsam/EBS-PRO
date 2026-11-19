@@ -35,6 +35,10 @@ declare
   v_tax_total numeric:=0;
   v_grand_total numeric:=0;
   v_line_total numeric;
+  v_module_key text;
+  v_role_allowed boolean;
+  v_is_owner_admin boolean;
+  v_has_override boolean;
 begin
   if v_user is null then
     raise exception 'Authentication required' using errcode='42501';
@@ -42,16 +46,21 @@ begin
   if p_document_type is null or p_document_type not in ('sales_order','purchase_order') then
     raise exception 'Unsupported order type';
   end if;
-  if p_document_type='sales_order' then
-    if not (public.has_tenant_role(p_tenant_id,array['owner','admin','manager','sales'])
-      or private.module_permission_grant_internal(p_tenant_id,'sales_customer','create')) then
-      raise exception 'Sales order creation permission required' using errcode='42501';
+  v_module_key:=case when p_document_type='sales_order' then 'sales_customer' else 'purchase_supplier' end;
+  v_role_allowed:=case when p_document_type='sales_order'
+    then public.has_tenant_role(p_tenant_id,array['owner','admin','manager','sales'])
+    else public.has_tenant_role(p_tenant_id,array['owner','admin','manager','purchase']) end;
+  v_is_owner_admin:=public.has_tenant_role(p_tenant_id,array['owner','admin']);
+  select exists(select 1 from public.tenant_user_module_permissions p
+    where p.tenant_id=p_tenant_id and p.user_id=v_user and p.module_key=v_module_key)
+    into v_has_override;
+  if not v_role_allowed then
+    if not private.module_permission_grant_internal(p_tenant_id,v_module_key,'create') then
+      raise exception 'Order creation permission required' using errcode='42501';
     end if;
-  else
-    if not (public.has_tenant_role(p_tenant_id,array['owner','admin','manager','purchase'])
-      or private.module_permission_grant_internal(p_tenant_id,'purchase_supplier','create')) then
-      raise exception 'Purchase order creation permission required' using errcode='42501';
-    end if;
+  elsif not v_is_owner_admin and v_has_override
+        and not private.module_permission_grant_internal(p_tenant_id,v_module_key,'create') then
+    raise exception 'Order creation is disabled for this user' using errcode='42501';
   end if;
   if p_branch_id is null or not exists(
     select 1 from public.branches b
