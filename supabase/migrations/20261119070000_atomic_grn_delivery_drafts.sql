@@ -145,6 +145,9 @@ begin
     if v_line.expiry_date is not null and v_line.expiry_date<current_date then
       raise exception 'Expired stock cannot be received';
     end if;
+    if v_line.manufactured_date is not null and v_line.manufactured_date>current_date then
+      raise exception 'Manufacturing date cannot be in the future';
+    end if;
     if v_line.manufactured_date is not null and v_line.expiry_date is not null
        and v_line.manufactured_date>v_line.expiry_date then
       raise exception 'Manufacturing date cannot be later than expiry date';
