@@ -28,7 +28,7 @@ begin
     when 'grn' then v_prefix:='GR';v_width:=5;v_module_key:='purchase_supplier';
     when 'credit_memo' then v_prefix:='CM';v_width:=6;v_module_key:='sales_customer';
     when 'delivery' then v_prefix:='DLV-';v_width:=5;v_module_key:='distribution_delivery';
-    when 'sales_invoice' then v_prefix:='EBS-INV-';v_width:=6;v_module_key:='sales_customer';
+    when 'sales_invoice' then v_prefix:='EBS-INV-';v_width:=6;v_module_key:='distribution_delivery';
     when 'receipt' then v_prefix:='RC';v_width:=6;v_module_key:='accounts_finance';
     when 'journal_entry' then v_prefix:='EBS-JV-';v_width:=9;v_module_key:='accounts_finance';
     when 'payroll_run' then v_prefix:='EBS-PR-';v_width:=10;v_module_key:='hr_payroll';
