@@ -1,4 +1,4 @@
-import {isModuleActionAllowed} from "./lib/erpAccess";
+import {isPermissionEditorActionDisabled} from "./lib/erpAccess";
 import {useEffect,useState} from "react";
 import type {SupabaseClient} from "@supabase/supabase-js";
 type Member={id:string;user_id:string;role:string;is_active:boolean;full_name?:string;employee_code?:string;email?:string};
@@ -47,7 +47,7 @@ export default function UserPermissionsModule({db,tenantId,currentRole}:{db:Supa
   setOverrides(v=>{const current=v[k]||{...empty};const next={...current,[field]:value};if(field==="can_view"&&!value){next.can_create=false;next.can_update=false;next.can_delete=false;}return {...v,[k]:next};});
  }
  async function saveMember(member:Member){
-  if(!["owner"].includes(currentRole))return;
+  if(currentRole!=="owner")return;
   setSaving(member.user_id);setNotice("");
   try{
    const changes=modules.map(async mod=>{
@@ -78,7 +78,7 @@ export default function UserPermissionsModule({db,tenantId,currentRole}:{db:Supa
     {locked?<p className="module-footnote">Owner and administrator access follows the protected role baseline and cannot be restricted here.</p>:<div className="permission-grid">
      {modules.map(mod=>{const k=keyOf(member.user_id,mod.key),on=!!enabled[k],value=overrides[k]||empty;return <div className="permission-row" key={mod.key}>
       <div className="permission-module"><label><input type="checkbox" checked={on} onChange={e=>setEnabled(v=>({...v,[k]:e.target.checked}))}/><b>{mod.label}</b></label><small>{on?"Custom override enabled":"Using role defaults"}</small></div>
-      <div className="permission-actions">{(["can_view","can_create","can_update","can_delete"] as const).map((field,i)=><label key={field} className={!on?"muted":""}><input type="checkbox" disabled={!on||!isModuleActionAllowed(value,field)||((mod.key==="dashboard_management"||mod.key==="reports_analytics")&&field!=="can_view")} checked={on&&value[field]} onChange={e=>toggle(member.user_id,mod.key,field,e.target.checked)}/>{["View","Create","Update","Delete"][i]}</label>)}</div>
+      <div className="permission-actions">{(["can_view","can_create","can_update","can_delete"] as const).map((field,i)=><label key={field} className={!on?"muted":""}><input type="checkbox" disabled={!on||isPermissionEditorActionDisabled(value,field)||((mod.key==="dashboard_management"||mod.key==="reports_analytics")&&field!=="can_view")} checked={on&&value[field]} onChange={e=>toggle(member.user_id,mod.key,field,e.target.checked)}/>{["View","Create","Update","Delete"][i]}</label>)}</div>
      </div>})}
     </div>}
     {!locked&&<div className="permission-save"><button className="primary-action" disabled={saving===member.user_id} onClick={()=>void saveMember(member)}>{saving===member.user_id?"Saving…":"Save "+(member.full_name||"user")+" permissions"}</button></div>}
