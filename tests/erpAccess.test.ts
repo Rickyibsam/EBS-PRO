@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {findProductByBarcodeOrSku,isModuleActionAllowed,resolveAllowedNavigation} from "../src/lib/erpAccess";
+import {findProductByBarcodeOrSku,isModuleActionAllowed,isPermissionEditorActionDisabled,resolveAllowedNavigation} from "../src/lib/erpAccess";
 
 const nav=["Overview","Sales","Booker App","Inventory","Purchases","Accounts","Distribution","Team & Employees","Reports","User Permissions"];
 const groups=[
@@ -31,6 +31,12 @@ test("mutating actions require view permission",()=>{
  assert.equal(isModuleActionAllowed({can_view:false,can_create:true,can_update:true,can_delete:true},"can_create"),false);
  assert.equal(isModuleActionAllowed({can_view:true,can_create:true,can_update:false,can_delete:false},"can_create"),true);
  assert.equal(isModuleActionAllowed({can_view:true,can_create:true,can_update:false,can_delete:false},"can_update"),false);
+});
+test("permission editor always lets the owner enable View on a new override",()=>{
+ const empty={can_view:false,can_create:false,can_update:false,can_delete:false};
+ assert.equal(isPermissionEditorActionDisabled(empty,"can_view"),false);
+ assert.equal(isPermissionEditorActionDisabled(empty,"can_create"),true);
+ assert.equal(isPermissionEditorActionDisabled({...empty,can_view:true},"can_create"),false);
 });
 test("barcode lookup prefers an exact barcode match",()=>{
  const products=[{sku:"SKU-1",barcode:"1234567890123",name:"First"},{sku:"1234567890123",barcode:"999",name:"Second"}];
