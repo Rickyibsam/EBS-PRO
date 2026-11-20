@@ -25,6 +25,10 @@ export function isModuleActionAllowed(permission:ModulePermission,action:keyof M
  if(action!=="can_view"&&!permission.can_view)return false;
  return permission[action];
 }
+/** In the owner editor, View must remain editable while it is currently false. */
+export function isPermissionEditorActionDisabled(permission:ModulePermission,action:keyof ModulePermission):boolean{
+ return action!=="can_view"&&!permission.can_view;
+}
 export type BarcodeProduct={barcode?:string|null;sku?:string|null};
 export function findProductByBarcodeOrSku<T extends BarcodeProduct>(raw:string,products:T[]):T|undefined{
  const code=raw.trim();if(!code)return undefined;
